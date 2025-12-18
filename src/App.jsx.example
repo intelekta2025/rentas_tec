@@ -1,4 +1,7 @@
-// src/App.jsx
+// src/App.jsx.example
+// Versión de ejemplo mostrando cómo integrar Supabase hooks
+// Copia este código a App.jsx cuando estés listo para usar Supabase
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Users, CreditCard, AlertTriangle, Mail, Menu, Home,
@@ -24,7 +27,7 @@ import { usePayments, usePaymentHistory } from './hooks/usePayments';
 
 export default function App() {
   // Hook de autenticación (reemplaza useState de user)
-  const { user, login, logout, loading: authLoading, error: authError } = useAuth();
+  const { user, login, logout, loading: authLoading } = useAuth();
   
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setSidebarOpen] = useState(true);
@@ -43,10 +46,6 @@ export default function App() {
   const [terminationDate, setTerminationDate] = useState('');
 
   // Hooks de datos de Supabase
-  // Solo ejecutar hooks si el usuario tiene los datos necesarios
-  const shouldLoadAdminData = user && user.role !== 'Client' && user.unitId != null
-  const shouldLoadClientData = user && user.role === 'Client' && user.clientId != null
-
   // Clientes - filtrados por unitId si es admin, null si es cliente
   const { 
     clients: filteredClients, 
@@ -54,7 +53,7 @@ export default function App() {
     addClient,
     editClient,
     removeClient
-  } = useClients(shouldLoadAdminData ? user.unitId : null);
+  } = useClients(user?.role !== 'Client' ? user?.unitId : null);
 
   // Facturas/CXC - filtradas según el rol
   const { 
@@ -63,25 +62,23 @@ export default function App() {
     overdueInvoices,
     totalAmount: totalCXCAmount
   } = useInvoices(
-    shouldLoadAdminData 
-      ? { unitId: user.unitId } 
-      : shouldLoadClientData
-      ? { clientId: user.clientId }
-      : {}
+    user?.role !== 'Client' 
+      ? { unitId: user?.unitId } 
+      : { clientId: user?.clientId }
   );
 
   // Facturas vencidas (para vista de Overdue)
   const { 
     invoices: overdueInvoicesList,
     loading: overdueLoading 
-  } = useOverdueInvoices(shouldLoadAdminData ? user.unitId : null);
+  } = useOverdueInvoices(user?.role !== 'Client' ? user?.unitId : null);
 
   // Recordatorios próximos
   const { 
     reminders: filteredUpcoming, 
     loading: remindersLoading 
   } = useUpcomingReminders(
-    shouldLoadAdminData ? user.unitId : null, 
+    user?.role !== 'Client' ? user?.unitId : null, 
     30 // días hacia adelante
   );
 
@@ -89,7 +86,7 @@ export default function App() {
   const { 
     payments: clientPayments,
     loading: paymentsLoading 
-  } = usePayments(shouldLoadClientData ? user.clientId : null);
+  } = usePayments(user?.role === 'Client' ? user?.clientId : null);
 
   // Responsive: Close sidebar by default on small screens
   useEffect(() => {
@@ -110,24 +107,18 @@ export default function App() {
     const result = await login(email, password);
     if (result.success) {
       // El hook useAuth ya maneja el estado del usuario
-      // El usuario se actualizará automáticamente a través del hook
-      // No necesitamos hacer nada aquí, el componente se re-renderizará
+      // Aquí puedes obtener datos adicionales del perfil si es necesario
+      // Por ejemplo, desde una tabla de perfiles en Supabase
+      if (user?.role === 'Client') {
+        setActiveTab('clientPortal_account');
+      } else {
+        setActiveTab('dashboard');
+      }
     } else {
       // El error ya está en el hook, puedes mostrarlo en LoginView
       console.error('Error de login:', result.error);
     }
   };
-
-  // Efecto para cambiar de tab cuando el usuario cambia
-  useEffect(() => {
-    if (user) {
-      if (user.role === 'Client') {
-        setActiveTab('clientPortal_account');
-      } else {
-        setActiveTab('dashboard');
-      }
-    }
-  }, [user]);
 
   const handleLogout = async () => {
     await logout();
@@ -191,7 +182,7 @@ export default function App() {
     // Obtener próxima fecha de pago
     const nextPayment = myCXC
       .filter(i => i.status === 'Scheduled' || i.status === 'Pending')
-      .sort((a, b) => new Date(a.due_date || a.dueDate) - new Date(b.due_date || b.dueDate))[0]?.due_date || null;
+      .sort((a, b) => new Date(a.due_date) - new Date(b.due_date))[0]?.due_date || null;
     
     return {
       balance,
@@ -200,8 +191,8 @@ export default function App() {
     };
   }, [user, myCXC]);
 
-  // Mostrar loading solo durante la carga inicial (cuando authLoading es true y no hay usuario aún)
-  if (authLoading && !user) {
+  // Mostrar loading mientras se autentica
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
@@ -214,7 +205,7 @@ export default function App() {
 
   // Si no hay usuario, mostrar login
   if (!user) {
-    return <LoginView onLogin={handleLogin} loginError={authError} />;
+    return <LoginView onLogin={handleLogin} />;
   }
 
   return (
@@ -296,8 +287,8 @@ export default function App() {
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-100 w-full">
-          {/* Mostrar indicadores de carga si es necesario - solo si el usuario tiene datos válidos */}
-          {user && ((shouldLoadAdminData && (clientsLoading || invoicesLoading)) || (shouldLoadClientData && invoicesLoading)) && (
+          {/* Mostrar indicadores de carga si es necesario */}
+          {(clientsLoading || invoicesLoading) && (
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800">
               Cargando datos...
             </div>
@@ -397,3 +388,4 @@ export default function App() {
     </div>
   );
 }
+

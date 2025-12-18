@@ -1,4 +1,7 @@
-// src/components/auth/LoginView.jsx
+// src/components/auth/LoginView.jsx.example
+// Versión actualizada para usar con Supabase
+// Reemplaza el handleSubmit para usar email y password reales
+
 import React, { useState } from 'react';
 import { Mail, Lock, XCircle } from 'lucide-react';
 import { AppLogo } from '../ui/Shared';
@@ -18,26 +21,13 @@ export const LoginView = ({ onLogin, loginError }) => {
       // onLogin ahora espera (email, password) y retorna una promesa
       const result = await onLogin(email, password);
       
-      console.log('📝 LoginView: Resultado del login:', result);
-      
-      if (!result || !result.success) {
-        const errorMessage = result?.error?.message || 'Error al iniciar sesión. Verifica tus credenciales.';
-        console.error('❌ LoginView: Error en login:', errorMessage);
-        setError(errorMessage);
-        setLoading(false); // Resetear loading si hay error
-      } else {
-        console.log('✅ LoginView: Login exitoso, esperando actualización de estado...');
-        // Si es exitoso, el hook useAuth manejará el estado del usuario
-        // El componente se desmontará cuando user esté disponible
-        // Timeout de seguridad más corto
-        setTimeout(() => {
-          console.log('⏱️ LoginView: Timeout de seguridad, reseteando loading');
-          setLoading(false);
-        }, 2000); // Timeout de seguridad reducido a 2 segundos
+      if (!result.success) {
+        setError(result.error?.message || 'Error al iniciar sesión. Verifica tus credenciales.');
       }
+      // Si es exitoso, el hook useAuth manejará el estado del usuario
     } catch (err) {
-      console.error('Error en handleSubmit:', err);
       setError('Error inesperado. Por favor intenta de nuevo.');
+    } finally {
       setLoading(false);
     }
   };
@@ -136,3 +126,4 @@ export const LoginView = ({ onLogin, loginError }) => {
     </div>
   );
 };
+
