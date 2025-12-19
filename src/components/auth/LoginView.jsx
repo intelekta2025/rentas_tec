@@ -22,7 +22,6 @@ export const LoginView = ({ onLogin, loginError }) => {
       
       if (!result || !result.success) {
         const errorMessage = result?.error?.message || 'Error al iniciar sesión. Verifica tus credenciales.';
-        console.error('❌ LoginView: Error en login:', errorMessage);
         setError(errorMessage);
         setLoading(false); // Resetear loading si hay error
       } else {
@@ -31,7 +30,6 @@ export const LoginView = ({ onLogin, loginError }) => {
         // El componente se desmontará cuando user esté disponible
         // Timeout de seguridad más corto
         setTimeout(() => {
-          console.log('⏱️ LoginView: Timeout de seguridad, reseteando loading');
           setLoading(false);
         }, 2000); // Timeout de seguridad reducido a 2 segundos
       }

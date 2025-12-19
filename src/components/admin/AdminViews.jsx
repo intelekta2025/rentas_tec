@@ -9,10 +9,11 @@ import {
 } from 'lucide-react';
 import { StatusBadge, OverdueBadge, KPICard, RevenueChart } from '../ui/Shared';
 import { UNITS, mockCXC, mockStaff } from '../../data/constants';
+import { useContracts } from '../../hooks/useContracts';
 
-export const DashboardView = ({ adminStats, mockMonthlyStats, user }) => (
+export const DashboardView = ({ adminStats, mockMonthlyStats, user, unitName }) => (
      <div className="space-y-6 animate-fade-in">
-      <h2 className="text-2xl font-bold text-gray-800">Panel General - {UNITS[user.unitId]}</h2>
+      <h2 className="text-2xl font-bold text-gray-800">Panel General - {unitName || `Unidad ${user.unitId}` || 'Sin unidad'}</h2>
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <KPICard title="Total Clientes" value={adminStats.totalClients} icon={Users} color="#003DA5" subtext="En esta unidad" />
         <KPICard title="Por Cobrar" value={`$${adminStats.totalCXC.toLocaleString()}`} icon={CreditCard} color="#F59E0B" subtext="Facturación pendiente" />
@@ -26,41 +27,100 @@ export const DashboardView = ({ adminStats, mockMonthlyStats, user }) => (
     </div>
 );
 
-export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClientClick, user }) => (
+export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClientClick, user, unitName, loading, error }) => {
+  const [searchTerm, setSearchTerm] = useState('')
+  
+  // Filtrar clientes por término de búsqueda
+  const filteredBySearch = filteredClients.filter(client => 
+    client.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    client.contact?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    client.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800">Clientes - {UNITS[user.unitId]}</h2>
+        <h2 className="text-2xl font-bold text-gray-800">Clientes - {unitName || `Unidad ${user.unitId}` || 'Sin unidad'}</h2>
         <button onClick={() => setAddClientModalOpen(true)} className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg flex items-center shadow-sm">
           <Plus size={18} className="mr-2" /> Nuevo Cliente
         </button>
       </div>
-      <div className="bg-white shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
-        <div className="px-4 py-3 bg-gray-50 border-b border-gray-200"><input type="text" className="border rounded p-1 w-full" placeholder="Buscar..." /></div>
-        
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredClients.map((client) => (
-                <tr key={client.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleClientClick(client)}>
-                  <td className="px-6 py-4">{client.name}</td>
-                  <td className="px-6 py-4"><StatusBadge status={client.status} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+      {/* Mostrar error si existe */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <p className="text-sm text-red-800">Error al cargar clientes: {error}</p>
         </div>
+      )}
+
+      <div className="bg-white shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
+        <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+          <input 
+            type="text" 
+            className="border rounded p-1 w-full" 
+            placeholder="Buscar por nombre, contacto o email..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        
+        {loading ? (
+          <div className="px-6 py-12 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-900 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Cargando clientes...</p>
+          </div>
+        ) : filteredBySearch.length === 0 ? (
+          <div className="px-6 py-12 text-center">
+            <p className="text-gray-500">
+              {searchTerm ? 'No se encontraron clientes que coincidan con la búsqueda.' : 'No hay clientes registrados.'}
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contacto</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredBySearch.map((client) => (
+                  <tr key={client.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleClientClick(client)}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{client.name || 'Sin nombre'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">{client.contact || '-'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">{client.email || '-'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <StatusBadge status={client.status} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
-);
+  );
+};
 
-export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, generateContractPreview, setTerminationModalOpen }) => {
-    // Filter Mock CXC for this specific client
+export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, generateContractPreview, setTerminationModalOpen, portalUsers = [], portalUsersLoading = false, contracts = [], contractsLoading = false, onFinalizeContract, onEditContract }) => {
+        // Debug: Verificar campos del cliente
+        if (client && !client.user_market_tec) {
+          console.log('🔍 ClientDetailView: Campos del cliente:', Object.keys(client))
+          console.log('🔍 ClientDetailView: user_market_tec:', client.user_market_tec)
+          console.log('🔍 ClientDetailView: Cliente completo:', client)
+        }
+        
+        // Filter Mock CXC for this specific client
     const clientCXC = mockCXC.filter(item => item.clientId === client.id);
     const balance = clientCXC.filter(i => i.status === 'Pending' || i.status === 'Overdue')
                             .reduce((acc, curr) => acc + parseFloat(curr.amount.replace(/[^0-9.-]+/g,"")), 0);
@@ -86,29 +146,14 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
               <h2 className="text-2xl font-bold text-gray-900">{client.name}</h2>
               <div className="flex flex-col sm:flex-row sm:space-x-4 text-sm text-gray-500 mt-1">
                 <span className="flex items-center"><Mail size={14} className="mr-1"/> {client.email}</span>
-                <span className="flex items-center"><FileText size={14} className="mr-1"/> {client.rfc}</span>
+                <span className="flex items-center"><FileText size={14} className="mr-1"/> ID: {client.id}</span>
               </div>
               <div className="mt-2 flex space-x-2">
                  <StatusBadge status={client.status} />
-                 <span className="text-xs text-gray-400 border border-gray-200 px-2 py-1 rounded">Contrato: 2023-2024</span>
               </div>
             </div>
           </div>
           <div className="flex space-x-3 w-full md:w-auto">
-            <button 
-              onClick={() => { setContractModalOpen(true); generateContractPreview(); }}
-              className="flex-1 md:flex-none px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-sm font-medium flex items-center justify-center shadow-sm"
-            >
-              <FileCheck size={16} className="mr-2" />
-              Renovar Contrato
-            </button>
-            <button 
-              onClick={() => setTerminationModalOpen(true)}
-              className="flex-1 md:flex-none px-4 py-2 bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 rounded-lg text-sm font-medium flex items-center justify-center shadow-sm"
-            >
-              <Ban size={16} className="mr-2" />
-              Finalizar Contrato
-            </button>
              <button className="p-2 border border-gray-300 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-gray-50">
               <Edit size={18} />
             </button>
@@ -134,6 +179,207 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                     {overdueTotal > 0 && <AlertTriangle size={16} className="ml-2" />}
                  </div>
               </div>
+            </div>
+
+            {/* Contratos Existentes */}
+            <div className="bg-white shadow rounded-lg overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                <h3 className="text-lg font-medium text-gray-900">Contratos</h3>
+                <button 
+                  onClick={() => { setContractModalOpen(true); }}
+                  className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-sm font-medium flex items-center shadow-sm"
+                >
+                  <FileCheck size={16} className="mr-2" />
+                  Crear Contrato
+                </button>
+              </div>
+              {contractsLoading ? (
+                <div className="px-6 py-8 text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-900 mx-auto"></div>
+                  <p className="mt-4 text-sm text-gray-600">Cargando contratos...</p>
+                </div>
+              ) : contracts.length === 0 ? (
+                <div className="px-6 py-8 text-center">
+                  <p className="text-sm text-gray-500">No hay contratos registrados para este cliente.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Período</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Renta de Servicios</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Renta Mensual</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Terminación</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {contracts.map((contract) => {
+                        // Usar directamente los campos de la BD (snake_case)
+                        const startDateRaw = contract.start_date
+                        const endDateRaw = contract.end_date
+                        const terminationDateRaw = contract.termination_date
+                        
+                        // Formatear fechas
+                        let startDateFormatted = '-'
+                        if (startDateRaw) {
+                          try {
+                            const date = new Date(startDateRaw)
+                            if (!isNaN(date.getTime())) {
+                              startDateFormatted = date.toLocaleDateString('es-MX', { 
+                                year: 'numeric', 
+                                month: '2-digit', 
+                                day: '2-digit' 
+                              })
+                            }
+                          } catch (e) {
+                            console.warn('Error al formatear startDate:', e)
+                          }
+                        }
+                        
+                        let endDateFormatted = 'Activo'
+                        if (endDateRaw) {
+                          try {
+                            const date = new Date(endDateRaw)
+                            if (!isNaN(date.getTime())) {
+                              endDateFormatted = date.toLocaleDateString('es-MX', { 
+                                year: 'numeric', 
+                                month: '2-digit', 
+                                day: '2-digit' 
+                              })
+                            }
+                          } catch (e) {
+                            console.warn('Error al formatear endDate:', e)
+                          }
+                        }
+                        
+                        // Usar el campo status directamente de la BD
+                        const contractStatus = contract.status || 'Active'
+                        const isActive = contractStatus === 'Active' || contractStatus === 'activo' || contractStatus === 'Activo'
+                        const isTerminated = contractStatus === 'Terminado' || contractStatus === 'terminado' || contractStatus === 'Terminated'
+                        
+                        // Usar directamente el campo de la BD (snake_case)
+                        const monthlyRentRaw = contract.monthly_rent_amount
+                        let monthlyRentFormatted = '$0.00'
+                        if (monthlyRentRaw !== null && monthlyRentRaw !== undefined && monthlyRentRaw !== '') {
+                          try {
+                            const amount = typeof monthlyRentRaw === 'string' 
+                              ? parseFloat(monthlyRentRaw.replace(/[^0-9.-]+/g, '')) 
+                              : parseFloat(monthlyRentRaw)
+                            if (!isNaN(amount)) {
+                              monthlyRentFormatted = `$${amount.toLocaleString('es-MX', { 
+                                minimumFractionDigits: 2, 
+                                maximumFractionDigits: 2 
+                              })}`
+                            }
+                          } catch (e) {
+                            console.warn('Error al formatear monthlyRent:', e)
+                          }
+                        }
+                        
+                        // Obtener renta de servicios - usar el campo de la BD
+                        const serviceRentRaw = contract.monthly_services_amount
+                        let serviceRentFormatted = '$0.00'
+                        if (serviceRentRaw !== null && serviceRentRaw !== undefined && serviceRentRaw !== '') {
+                          try {
+                            const amount = typeof serviceRentRaw === 'string' 
+                              ? parseFloat(serviceRentRaw.replace(/[^0-9.-]+/g, '')) 
+                              : parseFloat(serviceRentRaw)
+                            if (!isNaN(amount)) {
+                              serviceRentFormatted = `$${amount.toLocaleString('es-MX', { 
+                                minimumFractionDigits: 2, 
+                                maximumFractionDigits: 2 
+                              })}`
+                            }
+                          } catch (e) {
+                            console.warn('Error al formatear serviceRent:', e)
+                          }
+                        }
+                        
+                        return (
+                          <tr key={contract.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">
+                                {startDateFormatted} - {endDateFormatted}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">
+                                {serviceRentFormatted}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">
+                                {monthlyRentFormatted}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-500">
+                                {(() => {
+                                  // Formatear fecha de terminación usando termination_date
+                                  let terminationDateFormatted = '-'
+                                  if (terminationDateRaw) {
+                                    try {
+                                      const date = new Date(terminationDateRaw)
+                                      if (!isNaN(date.getTime())) {
+                                        terminationDateFormatted = date.toLocaleDateString('es-MX', { 
+                                          year: 'numeric', 
+                                          month: '2-digit', 
+                                          day: '2-digit' 
+                                        })
+                                      }
+                                    } catch (e) {
+                                      console.warn('Error al formatear terminationDate:', e)
+                                    }
+                                  }
+                                  return terminationDateFormatted
+                                })()}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                isActive 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {contractStatus === 'Active' || contractStatus === 'activo' || contractStatus === 'Activo' 
+                                  ? 'Activo' 
+                                  : isTerminated
+                                  ? 'Terminado'
+                                  : contractStatus || 'Activo'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                              <div className="flex justify-end space-x-2">
+                                {isActive && (
+                                  <>
+                                    <button
+                                      onClick={() => onEditContract && onEditContract(contract)}
+                                      className="text-blue-600 hover:text-blue-900"
+                                      title="Editar contrato"
+                                    >
+                                      <Edit size={16} />
+                                    </button>
+                                    <button
+                                      onClick={() => onFinalizeContract && onFinalizeContract(contract.id)}
+                                      className="text-red-600 hover:text-red-900"
+                                      title="Finalizar contrato"
+                                    >
+                                      <Ban size={16} />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             {/* Transactions Table */}
@@ -195,17 +441,17 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
              <div className="bg-white shadow rounded-lg p-6">
               <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-4">Datos Generales</h3>
               <dl className="space-y-3">
-                <div>
-                  <dt className="text-xs text-gray-500">Dirección Fiscal</dt>
-                  <dd className="text-sm text-gray-900 mt-1">{client.address || "No registrada"}</dd>
-                </div>
                  <div>
                   <dt className="text-xs text-gray-500">Contacto Principal</dt>
                   <dd className="text-sm text-gray-900 mt-1">{client.contact}</dd>
                 </div>
                  <div>
                   <dt className="text-xs text-gray-500">Teléfono</dt>
-                  <dd className="text-sm text-gray-900 mt-1">55-1234-5678</dd>
+                  <dd className="text-sm text-gray-900 mt-1">{client.contactPhone || client.contact_phone || '-'}</dd>
+                </div>
+                 <div>
+                  <dt className="text-xs text-gray-500">Usuario Market Tec</dt>
+                  <dd className="text-sm text-gray-900 mt-1">{client.user_market_tec || client.User_market_tec || '-'}</dd>
                 </div>
               </dl>
              </div>
@@ -218,36 +464,48 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                     <UserPlus size={14} className="mr-1"/> Agregar
                   </button>
                 </div>
-                <ul className="space-y-3">
-                  <li className="flex items-center justify-between text-sm">
-                    <div className="flex items-center">
-                      <div className="bg-blue-100 rounded-full p-1 mr-2">
-                        <Users size={12} className="text-blue-600"/>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">Admin Principal</p>
-                        <p className="text-xs text-gray-500">{client.email}</p>
-                      </div>
-                    </div>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                      Activo
-                    </span>
-                  </li>
-                  <li className="flex items-center justify-between text-sm">
-                    <div className="flex items-center">
-                      <div className="bg-gray-100 rounded-full p-1 mr-2">
-                        <Users size={12} className="text-gray-600"/>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">Contabilidad</p>
-                        <p className="text-xs text-gray-500">facturas@{client.email.split('@')[1]}</p>
-                      </div>
-                    </div>
-                    <button className="text-gray-400 hover:text-red-500">
-                      <Trash2 size={14} />
-                    </button>
-                  </li>
-                </ul>
+                {portalUsersLoading ? (
+                  <div className="py-4 text-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-900 mx-auto"></div>
+                    <p className="mt-2 text-xs text-gray-500">Cargando usuarios...</p>
+                  </div>
+                ) : portalUsers.length === 0 ? (
+                  <p className="text-sm text-gray-500 py-4 text-center">No hay usuarios del portal registrados.</p>
+                ) : (
+                  <ul className="space-y-3">
+                    {portalUsers.map((user) => (
+                      <li key={user.id} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center flex-1 min-w-0">
+                          <div className={`rounded-full p-1 mr-2 flex-shrink-0 ${user.isActive ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                            <Users size={12} className={user.isActive ? 'text-blue-600' : 'text-gray-600'}/>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-gray-900 truncate">{user.name || user.full_name || 'Sin nombre'}</p>
+                            <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                            {user.role && user.role !== 'Client' && (
+                              <p className="text-xs text-gray-400 mt-0.5">{user.role}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2 flex-shrink-0">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                            user.isActive 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {user.isActive ? 'Activo' : 'Inactivo'}
+                          </span>
+                          <button 
+                            className="text-gray-400 hover:text-red-500 transition-colors"
+                            title="Eliminar usuario"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <div className="mt-4 pt-3 border-t border-gray-100">
                   <button className="w-full text-center text-xs text-blue-600 hover:underline flex justify-center items-center">
                     <Key size={12} className="mr-1"/> Restablecer contraseñas
@@ -261,9 +519,6 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
               <div className="space-y-3">
                 <button className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
                   <Mail size={16} className="mr-2 text-gray-400" /> Enviar Estado de Cuenta
-                </button>
-                 <button className="w-full flex items-center justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">
-                  <AlertTriangle size={16} className="mr-2" /> Reportar Incidencia
                 </button>
               </div>
              </div>
@@ -314,7 +569,7 @@ export const MarketTecView = ({ user }) => {
       <div className="space-y-6 animate-fade-in">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Recepción de Cobros - Market Tec</h2>
-          <p className="text-sm text-gray-500">Unidad: {UNITS[user.unitId]}</p>
+          <p className="text-sm text-gray-500">Unidad: {unitName || `Unidad ${user.unitId}` || 'Sin unidad'}</p>
         </div>
 
         <div className="bg-gray-100 p-2 rounded text-xs text-gray-500 font-mono mb-4 border border-gray-200">
@@ -446,7 +701,7 @@ export const MarketTecView = ({ user }) => {
     );
 };
 
-export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelection, user }) => {
+export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelection, user, unitName }) => {
     const overdueItems = filteredCXC.filter(i => i.status === 'Overdue');
     const totalOverdue = overdueItems.reduce((acc, curr) => acc + parseFloat(curr.amount.replace(/[^0-9.-]+/g,"")), 0);
 
@@ -455,7 +710,7 @@ export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelecti
         <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">Cuentas Vencidas</h2>
-            <p className="text-sm text-gray-500">Unidad: {UNITS[user.unitId]}</p>
+            <p className="text-sm text-gray-500">Unidad: {unitName || `Unidad ${user.unitId}` || 'Sin unidad'}</p>
           </div>
           <div className="flex space-x-3">
              <button className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg flex items-center shadow-sm text-sm font-medium">
@@ -596,7 +851,7 @@ export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelecti
     );
 };
 
-export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleReminderSelection, user }) => {
+export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleReminderSelection, user, unitName }) => {
     const pendingReminders = filteredUpcoming.filter(i => !i.sent);
 
     return (
@@ -606,7 +861,7 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
         <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">Recordatorios de Pago</h2>
-            <p className="text-sm text-gray-500">Unidad: {UNITS[user.unitId]}</p>
+            <p className="text-sm text-gray-500">Unidad: {unitName || `Unidad ${user.unitId}` || 'Sin unidad'}</p>
           </div>
           <div className="flex space-x-3">
              <button className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg flex items-center shadow-sm text-sm font-medium">
@@ -753,6 +1008,209 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
     );
 }
 
+// Componente de formulario para crear contrato
+export const ContractForm = ({ client, user, onClose, onSuccess, onAddContract, onRefreshContracts }) => {
+  const [formData, setFormData] = useState({
+    startDate: '',
+    endDate: '',
+    monthlyRentAmount: '',
+    monthlyServicesAmount: '',
+    cutoffDay: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    try {
+      // Validar campos requeridos
+      if (!formData.startDate || !formData.endDate) {
+        throw new Error('Las fechas de inicio y fin son requeridas');
+      }
+
+      if (!formData.monthlyRentAmount && !formData.monthlyServicesAmount) {
+        throw new Error('Debe especificar al menos el monto de renta o el monto de servicios');
+      }
+
+      // Validar que la fecha de fin sea posterior a la de inicio
+      if (new Date(formData.endDate) < new Date(formData.startDate)) {
+        throw new Error('La fecha de fin debe ser posterior a la fecha de inicio');
+      }
+
+      // Preparar datos para el servicio
+      const contractData = {
+        clientId: client.id,
+        unitId: user.unitId,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        monthlyRentAmount: formData.monthlyRentAmount ? parseFloat(formData.monthlyRentAmount) : null,
+        monthlyServicesAmount: formData.monthlyServicesAmount ? parseFloat(formData.monthlyServicesAmount) : null,
+        cutoffDay: formData.cutoffDay ? parseInt(formData.cutoffDay) : null,
+        status: 'Activo',
+      };
+
+      // Usar la función pasada como prop (debe estar siempre presente)
+      if (!onAddContract) {
+        throw new Error('No se proporcionó la función onAddContract');
+      }
+
+      const result = await onAddContract(contractData);
+
+      if (result.success) {
+        // Recargar contratos usando la función pasada como prop
+        if (onRefreshContracts) {
+          await onRefreshContracts();
+        }
+        onSuccess();
+      } else {
+        throw new Error(result.error?.message || 'Error al crear el contrato');
+      }
+    } catch (err) {
+      console.error('Error al crear contrato:', err);
+      setError(err.message || 'Error al crear el contrato');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  return (
+    <div className="p-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Fecha de Inicio */}
+        <div>
+          <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">
+            Fecha de Inicio <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="date"
+            id="startDate"
+            name="startDate"
+            value={formData.startDate}
+            onChange={handleChange}
+            required
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+
+        {/* Fecha de Fin */}
+        <div>
+          <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">
+            Fecha de Fin <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="date"
+            id="endDate"
+            name="endDate"
+            value={formData.endDate}
+            onChange={handleChange}
+            required
+            min={formData.startDate || undefined}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+
+        {/* Monto Renta Mensual */}
+        <div>
+          <label htmlFor="monthlyRentAmount" className="block text-sm font-medium text-gray-700 mb-1">
+            Monto Renta Mensual
+          </label>
+          <div className="relative">
+            <span className="absolute left-3 top-2 text-gray-500">$</span>
+            <input
+              type="number"
+              id="monthlyRentAmount"
+              name="monthlyRentAmount"
+              value={formData.monthlyRentAmount}
+              onChange={handleChange}
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+        </div>
+
+        {/* Monto Servicios Mensual */}
+        <div>
+          <label htmlFor="monthlyServicesAmount" className="block text-sm font-medium text-gray-700 mb-1">
+            Monto Servicios Mensual
+          </label>
+          <div className="relative">
+            <span className="absolute left-3 top-2 text-gray-500">$</span>
+            <input
+              type="number"
+              id="monthlyServicesAmount"
+              name="monthlyServicesAmount"
+              value={formData.monthlyServicesAmount}
+              onChange={handleChange}
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+        </div>
+
+        {/* Día de Corte (Opcional) */}
+        <div>
+          <label htmlFor="cutoffDay" className="block text-sm font-medium text-gray-700 mb-1">
+            Día de Corte (Opcional)
+          </label>
+          <input
+            type="number"
+            id="cutoffDay"
+            name="cutoffDay"
+            value={formData.cutoffDay}
+            onChange={handleChange}
+            min="1"
+            max="31"
+            placeholder="Ej: 15"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          />
+          <p className="mt-1 text-xs text-gray-500">Día del mes en que se genera la factura</p>
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-md p-3">
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+        )}
+
+        {/* Botones */}
+        <div className="flex justify-end space-x-3 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-700 hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+          >
+            {loading ? 'Creando...' : 'Crear Contrato'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
 export const SettingsView = ({ setAddUserModalOpen }) => (
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
@@ -811,7 +1269,7 @@ export const SettingsView = ({ setAddUserModalOpen }) => (
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {staff.unitId ? UNITS[staff.unitId] : <span className="text-gray-400 italic">Acceso Global</span>}
+                    {staff.unitId ? (staff.unitName || `Unidad ${staff.unitId}`) : <span className="text-gray-400 italic">Acceso Global</span>}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${staff.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>

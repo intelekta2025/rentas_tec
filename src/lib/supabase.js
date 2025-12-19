@@ -54,6 +54,8 @@ if (!supabaseInstance) {
     global: {
       headers: {
         'x-client-info': 'rentas-tec@1.0.0',
+        // No agregar Accept ni Content-Type - Supabase los maneja automáticamente
+        // Agregarlos puede causar error 406 (Not Acceptable)
       },
     },
     // Configuración de realtime (si lo usas)

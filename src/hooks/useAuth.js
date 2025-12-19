@@ -33,9 +33,12 @@ export const useAuth = () => {
 
         if (error) {
           console.warn('Error al obtener usuario actual:', error)
-          // No es crítico si no hay usuario, solo significa que no está autenticado
+          // Si hay error, establecer el mensaje y limpiar usuario
           if (error.message && !error.message.includes('session') && !error.message.includes('Auth session missing')) {
             setError(error.message)
+          } else {
+            // Si no hay mensaje específico, usar uno genérico
+            setError('La sesión se cerró. Por favor inicia sesión de nuevo.')
           }
           setUser(null)
         } else {
@@ -66,10 +69,24 @@ export const useAuth = () => {
       
       console.log('Auth state changed:', event, session?.user?.email);
       if (session?.user) {
-        // El servicio onAuthStateChange ya incluye el perfil completo
-        setUser(session.user)
+        // El servicio onAuthStateChange ya incluye el perfil completo si está disponible
+        // Si no tiene perfil completo (sin role), no establecer el usuario
+        // Esto forzará que se muestre la pantalla de login
+        if (session.user.role) {
+          // Si tiene role, significa que tiene perfil completo
+          setUser(session.user)
+        } else {
+          // Si no tiene role, no establecer usuario - esto mostrará la pantalla de login
+          console.warn('⚠️ useAuth: Usuario sin perfil completo, no estableciendo usuario')
+          setUser(null)
+          setError('La sesión se cerró porque no se pudo obtener tu perfil. Por favor inicia sesión de nuevo.')
+        }
       } else {
+        // No hay sesión, establecer user = null
         setUser(null)
+        if (event === 'SIGNED_OUT') {
+          setError(null) // Limpiar error al cerrar sesión explícitamente
+        }
       }
       setLoading(false)
     })

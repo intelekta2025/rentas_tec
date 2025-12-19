@@ -12,18 +12,18 @@ const getStaffProfile = async (userId) => {
   try {
     console.log('👤 getStaffProfile: Consultando system_users para userId:', userId)
     
-    // Crear promesa con timeout de 5 segundos
+    // Crear promesa con timeout de 15 segundos (aumentado para conexiones lentas)
     const queryPromise = supabase
       .from('system_users') // Tabla para administradores
       .select('*')
       .eq('id', userId)
       .single()
     
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => {
-        reject(new Error('Timeout: Consulta a system_users tardó más de 5 segundos'))
-      }, 5000)
-    })
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => {
+            reject(new Error('Timeout: Consulta a system_users tardó más de 25 segundos'))
+          }, 25000) // Aumentado a 25 segundos
+        })
     
     const startTime = Date.now()
     const { data, error } = await Promise.race([queryPromise, timeoutPromise])
@@ -45,7 +45,13 @@ const getStaffProfile = async (userId) => {
       }
       if (error.message?.includes('Timeout')) {
         console.error('⏱️ getStaffProfile: Timeout en la consulta')
-        throw error
+        // No lanzar error, retornar null para que se intente en client_portal_users
+        return { data: null, error: { message: 'Timeout en consulta a system_users', isTimeout: true } }
+      }
+      // Manejar error 406 (Not Acceptable) - puede ser un problema de headers
+      if (error.status === 406 || error.message?.includes('406')) {
+        console.error('❌ getStaffProfile: Error 406 (Not Acceptable) - posible problema de headers')
+        return { data: null, error: { message: 'Error de formato en la petición (406)', is406: true } }
       }
       throw error
     }
@@ -73,18 +79,18 @@ const getClientUserProfile = async (userId) => {
   try {
     console.log('👤 getClientUserProfile: Consultando client_portal_users para userId:', userId)
     
-    // Crear promesa con timeout de 5 segundos
+    // Crear promesa con timeout de 15 segundos (aumentado para conexiones lentas)
     const queryPromise = supabase
       .from('client_portal_users') // Tabla para clientes
       .select('*')
       .eq('id', userId)
       .single()
     
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => {
-        reject(new Error('Timeout: Consulta a client_portal_users tardó más de 5 segundos'))
-      }, 5000)
-    })
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => {
+            reject(new Error('Timeout: Consulta a client_portal_users tardó más de 25 segundos'))
+          }, 25000) // Aumentado a 25 segundos
+        })
     
     const startTime = Date.now()
     const { data, error } = await Promise.race([queryPromise, timeoutPromise])
@@ -106,7 +112,13 @@ const getClientUserProfile = async (userId) => {
       }
       if (error.message?.includes('Timeout')) {
         console.error('⏱️ getClientUserProfile: Timeout en la consulta')
-        throw error
+        // Retornar error pero no lanzar, para que getUserProfile pueda manejarlo
+        return { data: null, error: { message: 'Timeout en consulta a client_portal_users', isTimeout: true } }
+      }
+      // Manejar error 406 (Not Acceptable) - puede ser un problema de headers
+      if (error.status === 406 || error.message?.includes('406')) {
+        console.error('❌ getClientUserProfile: Error 406 (Not Acceptable) - posible problema de headers')
+        return { data: null, error: { message: 'Error de formato en la petición (406)', is406: true } }
       }
       throw error
     }
@@ -138,8 +150,44 @@ const getUserProfile = async (userId) => {
     console.log('👤 getUserProfile: Buscando en system_users...')
     const { data: staffProfile, error: staffError } = await getStaffProfile(userId)
     
+    // Si hay error de timeout o 406, continuar buscando en client_portal_users
+    if (staffError && (staffError.isTimeout || staffError.is406)) {
+      console.warn('⚠️ getUserProfile: Error en system_users (timeout o 406), continuando con client_portal_users...')
+    }
+    
     if (staffProfile) {
       console.log('✅ getUserProfile: Perfil encontrado en system_users')
+      
+      // Obtener nombre de la unidad de negocio desde business_units
+      // NOTA: Si la tabla no existe, se usará un fallback
+      let unitName = null
+      if (staffProfile.unit_id) {
+        try {
+          console.log('👤 getUserProfile: Obteniendo nombre de business_units...')
+          const { data: businessUnit, error: unitError } = await supabase
+            .from('business_units')
+            .select('name')
+            .eq('id', staffProfile.unit_id)
+            .single()
+          
+          if (!unitError && businessUnit) {
+            unitName = businessUnit.name || null
+            console.log('✅ getUserProfile: Nombre de unidad obtenido:', unitName)
+          } else {
+            // Si la tabla no existe o hay error, usar fallback
+            if (unitError?.message?.includes('table') || unitError?.message?.includes('schema cache')) {
+              console.warn('⚠️ getUserProfile: La tabla business_units no existe. Usando fallback.')
+            } else {
+              console.warn('⚠️ getUserProfile: No se pudo obtener el nombre de business_units:', unitError?.message)
+            }
+            // unitName permanece null, se usará el fallback en el frontend
+          }
+        } catch (err) {
+          console.warn('⚠️ getUserProfile: Error al consultar business_units:', err.message)
+          // Continuar sin el nombre de la unidad, no es crítico para el login
+        }
+      }
+      
       // Mapear datos de staff al formato del frontend
       return {
         data: {
@@ -148,6 +196,7 @@ const getUserProfile = async (userId) => {
           email: staffProfile.email,
           role: staffProfile.role,
           unitId: staffProfile.unit_id,
+          unitName: unitName, // Nombre de la unidad desde business_unit
           clientId: null,
           clientName: null,
           // Mantener campos originales
@@ -160,6 +209,20 @@ const getUserProfile = async (userId) => {
     // Si no está en system_users, buscar en client_portal_users
     console.log('👤 getUserProfile: No encontrado en system_users, buscando en client_portal_users...')
     const { data: clientProfile, error: clientError } = await getClientUserProfile(userId)
+    
+    // Si hay error de timeout o 406, retornar error para que se maneje en el nivel superior
+    if (clientError && (clientError.isTimeout || clientError.is406)) {
+      console.error('❌ getUserProfile: Error crítico al obtener perfil de client_portal_users')
+      return {
+        data: null,
+        error: {
+          message: clientError.isTimeout 
+            ? 'Timeout al obtener perfil. La conexión es lenta o el servidor no responde.'
+            : 'Error de formato en la petición (406). Verifica la configuración de Supabase.',
+          originalError: clientError
+        }
+      }
+    }
     
     if (clientProfile) {
       console.log('✅ getUserProfile: Perfil encontrado en client_portal_users')
@@ -177,7 +240,7 @@ const getUserProfile = async (userId) => {
           const clientTimeout = new Promise((_, reject) => {
             setTimeout(() => {
               reject(new Error('Timeout al obtener nombre del cliente'))
-            }, 5000) // 5 segundos para obtener el nombre del cliente
+            }, 10000) // 10 segundos para obtener el nombre del cliente
           })
           
           const { data: client, error: clientError } = await Promise.race([clientPromise, clientTimeout])
@@ -218,6 +281,28 @@ const getUserProfile = async (userId) => {
 
     // Si no se encuentra en ninguna tabla
     console.warn('⚠️ getUserProfile: Usuario no encontrado en ninguna tabla de perfiles')
+    
+    // Si hubo errores de timeout o 406 en ambas consultas, retornar error
+    const hadTimeoutOr406 = (staffError && (staffError.isTimeout || staffError.is406)) || 
+                            (clientError && (clientError.isTimeout || clientError.is406))
+    
+    if (hadTimeoutOr406) {
+      const error = staffError?.isTimeout || staffError?.is406 ? staffError : clientError
+      return {
+        data: null,
+        error: {
+          message: error.isTimeout 
+            ? 'Timeout al obtener perfil. La conexión es lenta o el servidor no responde.'
+            : 'Error de formato en la petición (406). Verifica la configuración de Supabase.',
+          originalError: error,
+          isTimeout: error.isTimeout,
+          is406: error.is406
+        }
+      }
+    }
+    
+    // Si no hay errores pero tampoco se encontró perfil, retornar null sin error
+    // Esto significa que el usuario simplemente no existe en las tablas
     return { data: null, error: null }
   } catch (error) {
     console.error('❌ getUserProfile: Error inesperado:', error)
@@ -268,9 +353,9 @@ export const signIn = async (email, password) => {
     // Intentar login con Supabase Auth con timeout
     console.log('🔐 signIn: Llamando a supabase.auth.signInWithPassword...')
     
-    // Crear una promesa con timeout de 20 segundos
+    // Crear una promesa con timeout de 30 segundos
     // Agregar listener para ver qué está pasando en la red
-    console.log('🔐 signIn: Iniciando signInWithPassword con timeout de 20s...')
+    console.log('🔐 signIn: Iniciando signInWithPassword con timeout de 30s...')
     
     const loginPromise = supabase.auth.signInWithPassword({
       email,
@@ -282,16 +367,23 @@ export const signIn = async (email, password) => {
     
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => {
-        reject(new Error('Timeout: La autenticación tardó más de 20 segundos.\n\nPosibles causas:\n1. El servidor de Supabase Auth está lento\n2. Hay un error 500 en el servidor que no se está reportando\n3. Verifica la pestaña Network para ver la petición a /auth/v1/token\n4. Verifica el estado de Supabase: https://status.supabase.com/'))
-      }, 20000)
+        reject(new Error('Timeout: La autenticación tardó más de 30 segundos.\n\nPosibles causas:\n1. El servidor de Supabase Auth está lento\n2. Hay un error 500 en el servidor que no se está reportando\n3. Problemas de conexión a internet\n4. Verifica la pestaña Network para ver la petición a /auth/v1/token\n5. Verifica el estado de Supabase: https://status.supabase.com/'))
+      }, 30000) // Aumentado a 30 segundos
     })
     
     let data, error
     try {
       const startTime = Date.now()
+      console.log('🔐 signIn: Esperando respuesta de Supabase Auth...')
+      
       const result = await Promise.race([loginPromise, timeoutPromise])
       const elapsedTime = Date.now() - startTime
       console.log(`🔐 signIn: Respuesta recibida después de ${elapsedTime}ms`)
+      
+      // Verificar si el resultado es un error directamente
+      if (result instanceof Error) {
+        throw result
+      }
       
       data = result?.data || result
       error = result?.error
@@ -309,11 +401,16 @@ export const signIn = async (email, password) => {
     } catch (err) {
       // Si es el timeout, retornar el error de timeout
       if (err.message?.includes('Timeout')) {
-        console.error('⏱️ signIn: Timeout alcanzado')
+        console.error('⏱️ signIn: Timeout alcanzado después de 30 segundos')
+        console.error('⏱️ signIn: Esto puede indicar problemas de conexión o que el servidor no responde')
         throw err
       }
       // Si es otro error, puede ser que la promesa rechazó
       console.error('❌ signIn: Excepción capturada:', err)
+      console.error('❌ signIn: Tipo de error:', err.constructor.name)
+      if (err.stack) {
+        console.error('❌ signIn: Stack:', err.stack)
+      }
       error = err
       data = null
     }
@@ -367,10 +464,29 @@ export const signIn = async (email, password) => {
       profile = null
     }
 
-    // Si hay error al obtener el perfil, rechazar el login
+    // Si hay error al obtener el perfil, verificar si es un error temporal
     if (profileError) {
       console.error('❌ Error al obtener perfil:', profileError)
-      // Cerrar sesión si no se pudo obtener el perfil
+      
+      // Si es un error temporal (timeout o 406), no cerrar sesión pero rechazar el login
+      if (profileError.message?.includes('Timeout') || profileError.isTimeout || profileError.is406) {
+        console.warn('⚠️ signIn: Error temporal al obtener perfil (timeout o 406), rechazando login pero NO cerrando sesión de Supabase')
+        // NO cerrar sesión aquí - el usuario puede intentar de nuevo sin tener que volver a autenticarse
+        let errorMessage = 'Timeout al obtener el perfil. El servidor de Supabase tardó demasiado en responder. Por favor intenta de nuevo.'
+        if (profileError.is406) {
+          errorMessage = 'Error de formato en la petición (406). Verifica la configuración de Supabase.'
+        }
+        return {
+          data: null,
+          error: {
+            message: errorMessage,
+            originalError: profileError,
+            isTemporary: true // Marcar como error temporal
+          }
+        }
+      }
+      
+      // Para otros errores (permisos, schema, etc.), cerrar sesión
       await supabase.auth.signOut()
       
       // Mensaje más descriptivo según el tipo de error
@@ -394,8 +510,8 @@ export const signIn = async (email, password) => {
 
     // Si no se encuentra el perfil en ninguna tabla, rechazar el login
     if (!profile) {
-      console.error('❌ No se encontró perfil para el usuario')
-      // Cerrar sesión si no hay perfil
+      console.error('❌ signIn: Perfil no encontrado en system_users ni client_portal_users.')
+      // Cerrar sesión si no hay perfil (esto es un error real, no temporal)
       await supabase.auth.signOut()
       return { 
         data: null, 
@@ -476,14 +592,47 @@ export const getCurrentUser = async () => {
       return { data: null, error: null }
     }
 
-    // Obtener perfil del usuario
-    const { data: profile, error: profileError } = await getUserProfile(user.id)
+    // Obtener perfil del usuario (con timeout para evitar que se cuelgue)
+    let profile, profileError
+    try {
+      const profilePromise = getUserProfile(user.id)
+      const profileTimeout = new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Timeout al obtener perfil en getCurrentUser'))
+        }, 20000) // 20 segundos
+      })
+      
+      const profileResult = await Promise.race([profilePromise, profileTimeout])
+      profile = profileResult.data
+      profileError = profileResult.error
+    } catch (err) {
+      console.error('❌ getCurrentUser: Error o timeout al obtener perfil:', err)
+      profileError = err
+      profile = null
+    }
 
     // Si hay error o no se encuentra el perfil, cerrar sesión
+    // Esto asegura que no se mantengan sesiones sin perfil válido
     if (profileError || !profile) {
-      console.warn('Usuario sin perfil válido, cerrando sesión')
+      console.warn('⚠️ getCurrentUser: No se pudo obtener perfil válido, cerrando sesión')
       await supabase.auth.signOut()
-      return { data: null, error: { message: 'Usuario sin perfil válido' } }
+      
+      // Mensaje más descriptivo según el tipo de error
+      let errorMessage = 'La sesión se cerró porque no se pudo obtener tu perfil. Por favor inicia sesión de nuevo.'
+      if (profileError?.message?.includes('Timeout')) {
+        errorMessage = 'La sesión se cerró debido a un timeout al obtener tu perfil. Por favor inicia sesión de nuevo.'
+      } else if (profileError?.message?.includes('406')) {
+        errorMessage = 'La sesión se cerró debido a un error de comunicación con el servidor. Por favor inicia sesión de nuevo.'
+      } else if (profileError?.message) {
+        errorMessage = `La sesión se cerró: ${profileError.message}. Por favor inicia sesión de nuevo.`
+      }
+      
+      return { 
+        data: null, 
+        error: { 
+          message: errorMessage
+        } 
+      }
     }
 
     // Verificar que el usuario tiene un rol válido
@@ -529,15 +678,65 @@ export const getSession = async () => {
  * @returns {object} Objeto con subscription para desuscribirse
  */
 export const onAuthStateChange = (callback) => {
+  console.log('👂 onAuthStateChange: Suscribiéndose a cambios de estado de autenticación.')
   return supabase.auth.onAuthStateChange(async (event, session) => {
+    console.log('👂 onAuthStateChange: Evento de autenticación:', event, 'Usuario:', session?.user?.email)
     if (session?.user) {
-      // Obtener perfil del usuario cuando hay sesión
-      const { data: profile } = await getUserProfile(session.user.id)
-      const userWithProfile = profile ? {
-        ...session.user,
-        ...profile,
-      } : session.user
-      callback(event, { ...session, user: userWithProfile })
+      try {
+        // Obtener perfil del usuario cuando hay sesión (con timeout)
+        let profile, profileError
+        try {
+          const profilePromise = getUserProfile(session.user.id)
+          const profileTimeout = new Promise((_, reject) => {
+            setTimeout(() => {
+              reject(new Error('Timeout al obtener perfil en onAuthStateChange'))
+            }, 30000) // 30 segundos para obtener el perfil
+          })
+          
+          const profileResult = await Promise.race([profilePromise, profileTimeout])
+          profile = profileResult.data
+          profileError = profileResult.error
+        } catch (err) {
+          // Si el timeout se activa, capturarlo como error
+          console.error('❌ onAuthStateChange: Error o timeout al obtener perfil:', err.message)
+          profile = null
+          profileError = { message: err.message, isTimeout: err.message?.includes('Timeout') }
+        }
+        
+        if (profileError) {
+          console.error('❌ onAuthStateChange: Error al obtener perfil:', profileError.message)
+          
+          // Si es un timeout, no cerrar sesión - puede ser un problema temporal de conexión
+          if (profileError.isTimeout || profileError.message?.includes('Timeout')) {
+            console.warn('⚠️ onAuthStateChange: Timeout al obtener perfil, manteniendo sesión sin perfil completo')
+            // Mantener la sesión pero sin perfil completo - el usuario puede seguir usando la app
+            callback(event, { ...session, user: session.user })
+            return
+          }
+          
+          // Para otros errores, cerrar sesión
+          console.warn('⚠️ onAuthStateChange: Error crítico al obtener perfil, cerrando sesión')
+          await supabase.auth.signOut()
+          callback(event, null) // Pasar null para indicar que no hay sesión
+        } else if (!profile) {
+          // Si no se encuentra el perfil, cerrar sesión solo si no es un timeout
+          console.warn('⚠️ onAuthStateChange: Perfil no encontrado, cerrando sesión')
+          await supabase.auth.signOut()
+          callback(event, null)
+        } else {
+          const userWithProfile = {
+            ...session.user,
+            ...profile,
+          }
+          callback(event, { ...session, user: userWithProfile })
+        }
+      } catch (err) {
+        console.error('❌ onAuthStateChange: Error inesperado al obtener perfil:', err)
+        // Si hay error inesperado, también cerrar sesión para evitar sesiones sin perfil
+        console.warn('⚠️ onAuthStateChange: Error inesperado, cerrando sesión')
+        await supabase.auth.signOut()
+        callback(event, null) // Pasar null para indicar que no hay sesión
+      }
     } else {
       callback(event, session)
     }

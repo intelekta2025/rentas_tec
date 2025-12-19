@@ -13,14 +13,99 @@ import { LoginView } from './components/auth/LoginView';
 import { ClientPortalDashboard, ClientPortalPayments } from './components/client/ClientViews';
 import { 
   DashboardView, ClientsView, ClientDetailView, 
-  MarketTecView, OverdueView, RemindersView, SettingsView 
+  MarketTecView, OverdueView, RemindersView, SettingsView,
+  ContractForm
 } from './components/admin/AdminViews';
 
 // Importar hooks de Supabase
 import { useAuth } from './hooks/useAuth';
 import { useClients } from './hooks/useClients';
 import { useInvoices, useOverdueInvoices, useUpcomingReminders } from './hooks/useInvoices';
-import { usePayments, usePaymentHistory } from './hooks/usePayments';
+import { useBusinessUnit } from './hooks/useBusinessUnit';
+import { useClientPortalUsers } from './hooks/useClientPortalUsers';
+import { useContracts } from './hooks/useContracts';
+
+// Componente wrapper para el formulario de contrato que usa el mismo hook que ClientDetailView
+// Este componente debe compartir el mismo hook que ClientDetailViewWithPortalUsers
+// Para que cuando se cree un contrato, se actualice automáticamente la lista
+const ContractFormWrapper = ({ client, user, onClose, onContractCreated }) => {
+  const { addContract, refreshContracts } = useContracts(client?.id);
+
+  const handleSuccess = async () => {
+    // Recargar contratos en este hook
+    await refreshContracts();
+    // Notificar al componente padre que se creó un contrato para forzar recarga en ClientDetailViewWithPortalUsers
+    if (onContractCreated) {
+      onContractCreated();
+    }
+    onClose();
+  };
+
+  return (
+    <ContractForm 
+      client={client}
+      user={user}
+      onClose={onClose}
+      onSuccess={handleSuccess}
+      onAddContract={addContract}
+      onRefreshContracts={refreshContracts}
+    />
+  );
+};
+
+// Componente wrapper para ClientDetailView que carga los usuarios del portal y contratos
+const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModalOpen, generateContractPreview, setTerminationModalOpen, contractsRefreshKey }) => {
+  const { portalUsers, loading: portalUsersLoading } = useClientPortalUsers(client?.id);
+  const { contracts, loading: contractsLoading, addContract, finalizeContract, refreshContracts } = useContracts(client?.id);
+  
+  // Recargar contratos cuando cambie contractsRefreshKey
+  useEffect(() => {
+    if (contractsRefreshKey > 0) {
+      refreshContracts();
+    }
+  }, [contractsRefreshKey]);
+  
+  const handleFinalizeContract = async (contractId) => {
+    if (window.confirm('¿Estás seguro de que deseas finalizar este contrato?')) {
+      const result = await finalizeContract(contractId);
+      if (result.success) {
+        await refreshContracts();
+      }
+    }
+  };
+
+  const handleEditContract = (contract) => {
+    // TODO: Implementar modal de edición
+    console.log('Editar contrato:', contract);
+  };
+
+  const handleAddContract = async (contractData) => {
+    const result = await addContract(contractData);
+    if (result.success) {
+      // Recargar contratos después de crear uno nuevo
+      await refreshContracts();
+    }
+    return result;
+  };
+  
+  return (
+    <ClientDetailView 
+      client={client} 
+      setActiveTab={setActiveTab} 
+      setContractModalOpen={setContractModalOpen} 
+      generateContractPreview={generateContractPreview} 
+      setTerminationModalOpen={setTerminationModalOpen}
+      portalUsers={portalUsers}
+      portalUsersLoading={portalUsersLoading}
+      contracts={contracts}
+      contractsLoading={contractsLoading}
+      onFinalizeContract={handleFinalizeContract}
+      onEditContract={handleEditContract}
+      onAddContract={handleAddContract}
+      onRefreshContracts={refreshContracts}
+    />
+  );
+};
 
 export default function App() {
   // Hook de autenticación (reemplaza useState de user)
@@ -41,16 +126,23 @@ export default function App() {
   const [selectedOverdue, setSelectedOverdue] = useState([]);
   const [selectedReminders, setSelectedReminders] = useState([]);
   const [terminationDate, setTerminationDate] = useState('');
+  const [contractsRefreshKey, setContractsRefreshKey] = useState(0); // Para forzar recarga de contratos
 
   // Hooks de datos de Supabase
   // Solo ejecutar hooks si el usuario tiene los datos necesarios
   const shouldLoadAdminData = user && user.role !== 'Client' && user.unitId != null
   const shouldLoadClientData = user && user.role === 'Client' && user.clientId != null
 
+  // Obtener información de la unidad de negocio
+  const { unitName: businessUnitName, loading: unitLoading } = useBusinessUnit(
+    user?.role !== 'Client' ? user?.unitId : null
+  )
+
   // Clientes - filtrados por unitId si es admin, null si es cliente
   const { 
     clients: filteredClients, 
     loading: clientsLoading,
+    error: clientsError,
     addClient,
     editClient,
     removeClient
@@ -86,10 +178,9 @@ export default function App() {
   );
 
   // Pagos del cliente (solo si es cliente)
-  const { 
-    payments: clientPayments,
-    loading: paymentsLoading 
-  } = usePayments(shouldLoadClientData ? user.clientId : null);
+  // TODO: Restaurar cuando se implemente usePayments
+  const clientPayments = [];
+  const paymentsLoading = false;
 
   // Responsive: Close sidebar by default on small screens
   useEffect(() => {
@@ -241,7 +332,9 @@ export default function App() {
             </div>
             <div className="flex items-center text-white font-medium">
                <Building size={16} className="mr-2 text-blue-300" />
-               {user.role === 'Client' ? user.clientName : UNITS[user.unitId]}
+               {user.role === 'Client' 
+                 ? user.clientName 
+                 : (businessUnitName || user.unitName || `Unidad ${user.unitId}` || 'Sin unidad')}
             </div>
           </div>
 
@@ -287,7 +380,11 @@ export default function App() {
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-500 hidden md:inline">
-                 {user.role === 'Admin' && <><span className="font-semibold text-blue-800">{UNITS[user.unitId]}</span></>}
+                 {user.role === 'Admin' && (
+                   <span className="font-semibold text-blue-800">
+                     {businessUnitName || user.unitName || `Unidad ${user.unitId}` || 'Sin unidad'}
+                   </span>
+                 )}
               </span>
               <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-800 font-semibold text-sm">
                 {user.name?.substring(0,2).toUpperCase() || 'U'}
@@ -326,7 +423,8 @@ export default function App() {
                 <DashboardView 
                   adminStats={adminStats} 
                   mockMonthlyStats={mockMonthlyStats} 
-                  user={user} 
+                  user={user}
+                  unitName={businessUnitName || user.unitName}
                 />
               )}
               {activeTab === 'clients' && (
@@ -336,16 +434,19 @@ export default function App() {
                   handleClientClick={handleClientClick} 
                   user={user}
                   loading={clientsLoading}
+                  error={clientsError}
                   onAddClient={addClient}
+                  unitName={businessUnitName || user.unitName}
                 />
               )}
               {activeTab === 'clientDetail' && selectedClient && (
-                <ClientDetailView 
+                <ClientDetailViewWithPortalUsers 
                   client={selectedClient} 
                   setActiveTab={setActiveTab} 
                   setContractModalOpen={setContractModalOpen} 
                   generateContractPreview={generateContractPreview} 
-                  setTerminationModalOpen={setTerminationModalOpen} 
+                  setTerminationModalOpen={setTerminationModalOpen}
+                  contractsRefreshKey={contractsRefreshKey}
                 />
               )}
               {activeTab === 'overdue' && (
@@ -355,9 +456,15 @@ export default function App() {
                   toggleOverdueSelection={toggleOverdueSelection} 
                   user={user}
                   loading={overdueLoading || invoicesLoading}
+                  unitName={businessUnitName || user.unitName}
                 />
               )}
-              {activeTab === 'marketTec' && <MarketTecView user={user} />}
+              {activeTab === 'marketTec' && (
+                <MarketTecView 
+                  user={user}
+                  unitName={businessUnitName || user.unitName}
+                />
+              )}
               {activeTab === 'reminders' && (
                 <RemindersView 
                   filteredUpcoming={filteredUpcoming} 
@@ -365,6 +472,7 @@ export default function App() {
                   toggleReminderSelection={toggleReminderSelection} 
                   user={user}
                   loading={remindersLoading}
+                  unitName={businessUnitName || user.unitName}
                 />
               )}
               {activeTab === 'settings' && (
@@ -385,7 +493,21 @@ export default function App() {
          </div>
       </Modal>
        <Modal isOpen={isContractModalOpen} onClose={() => setContractModalOpen(false)} title="Crear Contrato">
-         <div className="p-4">Formulario de Contrato</div>
+         {selectedClient && user ? (
+           <ContractFormWrapper 
+             client={selectedClient}
+             user={user}
+             onClose={() => setContractModalOpen(false)}
+             onContractCreated={() => {
+               // Forzar recarga de contratos en ClientDetailViewWithPortalUsers
+               setContractsRefreshKey(prev => prev + 1);
+             }}
+           />
+         ) : (
+           <div className="p-4">
+             <p className="text-gray-600">No se puede crear un contrato sin un cliente seleccionado.</p>
+           </div>
+         )}
       </Modal>
        <Modal isOpen={isTerminationModalOpen} onClose={() => setTerminationModalOpen(false)} title="Finalizar Contrato">
          <div className="p-4">Formulario de Terminación</div>

@@ -20,6 +20,7 @@ const mapClientFromDB = (dbClient) => {
     address: dbClient.address_fiscal, // address_fiscal -> address
     status: dbClient.status,
     rfc: dbClient.rfc,
+    user_market_tec: dbClient.User_market_tec || dbClient.user_market_tec, // Usuario Market Tec (con mayúscula inicial en BD)
     created_at: dbClient.created_at,
     // Mantener también los campos originales para compatibilidad
     ...dbClient
