@@ -34,8 +34,8 @@ const getStaffProfile = async (userId) => {
     // Usar query simple directamente - el join es demasiado lento
     const { data, error } = await withTimeout(
       supabase.from('system_users').select('*').eq('id', userId).single(),
-      6000,
-      'Timeout: Consulta a system_users tardó más de 6 segundos'
+      15000, // Timeout aumentado para manejar BD lenta
+      'Timeout: Consulta a system_users tardó más de 15 segundos'
     )
 
     const elapsedTime = Date.now() - startTime
@@ -485,30 +485,38 @@ export const getCurrentUser = async () => {
 export const onAuthStateChange = (callback) => {
   return supabase.auth.onAuthStateChange(async (event, session) => {
     if (session?.user) {
-      // Intentar cargar perfil rápido
-      try {
-        const { data: profile } = await getUserProfile(session.user.id)
-        if (profile) {
-          callback(event, { ...session, user: { ...session.user, ...profile } })
-        } else {
-          // Si falla perfil durante refresh de token, intentar usar cache de rol
+      // Solo obtener perfil completo en SIGNED_IN inicial, no en cada refresh de token
+      if (event === 'SIGNED_IN') {
+        // Login inicial - obtener perfil completo
+        try {
+          const { data: profile } = await getUserProfile(session.user.id)
+          if (profile) {
+            callback(event, { ...session, user: { ...session.user, ...profile } })
+          } else {
+            // Fallback a cache si falla
+            const cachedRole = localStorage.getItem(`user_role_${session.user.id}`)
+            if (cachedRole) {
+              callback(event, { ...session, user: { ...session.user, role: cachedRole } })
+            } else {
+              callback(event, session)
+            }
+          }
+        } catch (e) {
+          console.warn('Error obteniendo perfil en SIGNED_IN:', e)
           const cachedRole = localStorage.getItem(`user_role_${session.user.id}`)
           if (cachedRole) {
-            console.log(`ℹ️ onAuthStateChange: Usando rol cacheado durante refresh: ${cachedRole}`)
             callback(event, { ...session, user: { ...session.user, role: cachedRole } })
           } else {
-            // Sin cache y sin perfil, callback con session básica (la UI decidirá qué hacer)
-            console.warn('⚠️ onAuthStateChange: Sin perfil ni cache, retornando session básica')
             callback(event, session)
           }
         }
-      } catch (e) {
-        // Error al obtener perfil, intentar usar cache
+      } else {
+        // TOKEN_REFRESHED u otros eventos - usar cache de rol, NO consultar BD
         const cachedRole = localStorage.getItem(`user_role_${session.user.id}`)
         if (cachedRole) {
-          console.log(`ℹ️ onAuthStateChange: Error obteniendo perfil, usando cache: ${cachedRole}`)
           callback(event, { ...session, user: { ...session.user, role: cachedRole } })
         } else {
+          // Si no hay cache (caso raro), callback con session básica
           callback(event, session)
         }
       }
