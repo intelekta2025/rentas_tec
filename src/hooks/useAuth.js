@@ -16,7 +16,7 @@ export const useAuth = () => {
 
     const loadUser = async () => {
       try {
-        console.log('Cargando usuario actual...')
+        // console.log('Cargando usuario actual...')
         // Timeout de seguridad: si tarda más de 5 segundos, cancelar
         const timeoutPromise = new Promise((_, reject) => {
           timeoutId = setTimeout(() => {
@@ -33,11 +33,18 @@ export const useAuth = () => {
 
         if (error) {
           console.warn('Error al obtener usuario actual:', error)
-          // Si hay error, establecer el mensaje y limpiar usuario
+
+          // Si es un error temporal (ej. durante refresh de token), NO limpiar usuario
+          if (error.isTemporary) {
+            console.log('Error temporal de perfil, manteniendo sesión actual')
+            // No hacer nada - mantener el usuario actual
+            return
+          }
+
+          // Si hay error REAL, establecer el mensaje y limpiar usuario
           if (error.message && !error.message.includes('session') && !error.message.includes('Auth session missing')) {
             setError(error.message)
           } else {
-            // Si no hay mensaje específico, usar uno genérico
             setError('La sesión se cerró. Por favor inicia sesión de nuevo.')
           }
           setUser(null)

@@ -28,7 +28,7 @@ const withTimeout = (promise, ms, errorMessage) => {
  */
 const getStaffProfile = async (userId) => {
   try {
-    console.log(`👤 getStaffProfile: Consultando system_users (SIMPLE) para userId: ${userId}`)
+    // console.log(`👤 getStaffProfile: Consultando system_users (SIMPLE) para userId: ${userId}`)
     const startTime = Date.now()
 
     // Usar query simple directamente - el join es demasiado lento
@@ -39,11 +39,11 @@ const getStaffProfile = async (userId) => {
     )
 
     const elapsedTime = Date.now() - startTime
-    console.log(`👤 getStaffProfile: Consulta completada en ${elapsedTime}ms`)
+    // console.log(`👤 getStaffProfile: Consulta completada en ${elapsedTime}ms`)
 
     if (error) {
       if (error.code === 'PGRST116') {
-        console.warn(`⚠️ getStaffProfile: Usuario no encontrado (PGRST116)`);
+        // Usuario no encontrado - comportamiento normal, no logueamos
         return { data: null, error: null }
       }
       throw error
@@ -262,16 +262,16 @@ const getUserProfile = async (userId) => {
     const staffResult = await getStaffProfile(userId);
 
     if (staffResult.data) {
-      console.log('✅ getUserProfile: Encontrado en system_users (Admin).');
+      // console.log('✅ getUserProfile: Encontrado en system_users (Admin).');
       localStorage.setItem(`user_role_${userId}`, staffResult.data.role || 'Admin');
       return staffResult;
     }
 
     // Si falló system_users (pero no explotó), intentamos client_portal_users
-    console.log('ℹ️ getUserProfile: No encontrado en system_users, intentando client_portal_users...');
+    // console.log('ℹ️ getUserProfile: No encontrado en system_users, intentando client_portal_users...');
     const clientResult = await getClientUserProfile(userId);
     if (clientResult.data) {
-      console.log('✅ getUserProfile: Encontrado en client_portal_users (Client).');
+      // console.log('✅ getUserProfile: Encontrado en client_portal_users (Client).');
 
       // Asegurar rol
       if (!clientResult.data.role) clientResult.data.role = 'Client';
@@ -281,7 +281,7 @@ const getUserProfile = async (userId) => {
     }
 
     // Si llegamos aquí, no está en ninguno
-    console.warn('⚠️ getUserProfile: Usuario no encontrado en ninguna tabla');
+    // No logueamos como warning porque es comportamiento normal al cargar la app sin sesión
     return { data: null, error: null };
 
   } catch (error) {
@@ -459,9 +459,13 @@ export const getCurrentUser = async () => {
       )
 
       if (pError || !profile) {
-        console.warn('⚠️ getCurrentUser: Problema con perfil', pError)
-        await supabase.auth.signOut()
-        return { data: null, error: { message: 'Sesión inválida (sin perfil)' } }
+        // Solo loguear si es un problema inesperado (no simplemente "no hay sesión")
+        if (pError && !pError.message?.includes('usuario no encontrado')) {
+          console.warn('⚠️ getCurrentUser: Problema con perfil (puede ser temporal durante refresh de token)', pError)
+        }
+        // NO cerrar sesión aquí - puede ser un problema temporal durante token refresh
+        // Solo retornar null para permitir que la UI maneje el estado
+        return { data: null, error: { message: 'Perfil temporalmente no disponible', isTemporary: true } }
       }
 
       return { data: { ...user, ...profile }, error: null }
@@ -487,12 +491,26 @@ export const onAuthStateChange = (callback) => {
         if (profile) {
           callback(event, { ...session, user: { ...session.user, ...profile } })
         } else {
-          // Si falla perfil, callback con null o usuario básico?
-          // Mejor usuario básico y que la UI maneje carga
-          callback(event, session)
+          // Si falla perfil durante refresh de token, intentar usar cache de rol
+          const cachedRole = localStorage.getItem(`user_role_${session.user.id}`)
+          if (cachedRole) {
+            console.log(`ℹ️ onAuthStateChange: Usando rol cacheado durante refresh: ${cachedRole}`)
+            callback(event, { ...session, user: { ...session.user, role: cachedRole } })
+          } else {
+            // Sin cache y sin perfil, callback con session básica (la UI decidirá qué hacer)
+            console.warn('⚠️ onAuthStateChange: Sin perfil ni cache, retornando session básica')
+            callback(event, session)
+          }
         }
       } catch (e) {
-        callback(event, session)
+        // Error al obtener perfil, intentar usar cache
+        const cachedRole = localStorage.getItem(`user_role_${session.user.id}`)
+        if (cachedRole) {
+          console.log(`ℹ️ onAuthStateChange: Error obteniendo perfil, usando cache: ${cachedRole}`)
+          callback(event, { ...session, user: { ...session.user, role: cachedRole } })
+        } else {
+          callback(event, session)
+        }
       }
     } else {
       callback(event, session)

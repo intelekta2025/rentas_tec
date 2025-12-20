@@ -226,7 +226,9 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                       let startDateFormatted = '-'
                       if (startDateRaw) {
                         try {
-                          const date = new Date(startDateRaw)
+                          // Parsear como fecha local (evitar conversión de zona horaria)
+                          const [year, month, day] = startDateRaw.split('T')[0].split('-')
+                          const date = new Date(year, month - 1, day) // mes es 0-indexed
                           if (!isNaN(date.getTime())) {
                             startDateFormatted = date.toLocaleDateString('es-MX', {
                               year: 'numeric',
@@ -242,7 +244,9 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                       let endDateFormatted = 'Activo'
                       if (endDateRaw) {
                         try {
-                          const date = new Date(endDateRaw)
+                          // Parsear como fecha local (evitar conversión de zona horaria)
+                          const [year, month, day] = endDateRaw.split('T')[0].split('-')
+                          const date = new Date(year, month - 1, day)
                           if (!isNaN(date.getTime())) {
                             endDateFormatted = date.toLocaleDateString('es-MX', {
                               year: 'numeric',
@@ -322,7 +326,9 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                                 let terminationDateFormatted = '-'
                                 if (terminationDateRaw) {
                                   try {
-                                    const date = new Date(terminationDateRaw)
+                                    // Parsear como fecha local (evitar conversión de zona horaria)
+                                    const [year, month, day] = terminationDateRaw.split('T')[0].split('-')
+                                    const date = new Date(year, month - 1, day)
                                     if (!isNaN(date.getTime())) {
                                       terminationDateFormatted = date.toLocaleDateString('es-MX', {
                                         year: 'numeric',
