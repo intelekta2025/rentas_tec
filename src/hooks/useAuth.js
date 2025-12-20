@@ -26,9 +26,9 @@ export const useAuth = () => {
 
         const userPromise = getCurrentUser()
         const { data, error } = await Promise.race([userPromise, timeoutPromise])
-        
+
         clearTimeout(timeoutId)
-        
+
         if (!isMounted) return
 
         if (error) {
@@ -48,7 +48,7 @@ export const useAuth = () => {
       } catch (err) {
         clearTimeout(timeoutId)
         if (!isMounted) return
-        
+
         console.warn('Error o timeout al cargar usuario:', err.message)
         // No es crítico, solo significa que no hay usuario autenticado
         setUser(null)
@@ -66,20 +66,23 @@ export const useAuth = () => {
     // Escuchar cambios en el estado de autenticación
     const { data: { subscription } } = onAuthStateChange(async (event, session) => {
       if (!isMounted) return
-      
+
       console.log('Auth state changed:', event, session?.user?.email);
       if (session?.user) {
         // El servicio onAuthStateChange ya incluye el perfil completo si está disponible
         // Si no tiene perfil completo (sin role), no establecer el usuario
         // Esto forzará que se muestre la pantalla de login
-        if (session.user.role) {
-          // Si tiene role, significa que tiene perfil completo
+        // Validar que el rol sea uno de los permitidos por la aplicación
+        // Supabase por defecto envía user.role = 'authenticated', lo cual NO es suficiente
+        const validRoles = ['Admin', 'Client', 'SuperAdmin', 'Staff'];
+        if (session.user.role && validRoles.includes(session.user.role)) {
+          // Si tiene role válido (app), establecer usuario
           setUser(session.user)
         } else {
-          // Si no tiene role, no establecer usuario - esto mostrará la pantalla de login
-          console.warn('⚠️ useAuth: Usuario sin perfil completo, no estableciendo usuario')
+          // Si no tiene role válido (ej. solo 'authenticated' o undefined), no establecer usuario
+          console.warn(`⚠️ useAuth: Usuario con rol inválido (${session.user.role}), no estableciendo usuario`)
           setUser(null)
-          setError('La sesión se cerró porque no se pudo obtener tu perfil. Por favor inicia sesión de nuevo.')
+          // No seteamos error fatal para permitir que intente cargar de nuevo o mostrar login
         }
       } else {
         // No hay sesión, establecer user = null
@@ -107,7 +110,7 @@ export const useAuth = () => {
     try {
       const { data, error } = await signIn(email, password)
       console.log('Resultado de signIn:', { hasData: !!data, hasError: !!error, error });
-      
+
       // Si hay error, mostrarlo
       if (error) {
         const errorMessage = error.message || 'Error al iniciar sesión'
@@ -116,7 +119,7 @@ export const useAuth = () => {
         setLoading(false) // Asegurar que loading se resetee
         return { success: false, error: { message: errorMessage } }
       }
-      
+
       // Verificar que se obtuvo el usuario con perfil
       if (!data?.user) {
         const errorMessage = 'No se pudo obtener el perfil del usuario'
@@ -126,15 +129,16 @@ export const useAuth = () => {
         return { success: false, error: { message: errorMessage } }
       }
 
-      // Verificar que el usuario tiene un rol
-      if (!data.user.role) {
-        const errorMessage = 'Usuario sin rol asignado'
-        console.error('Error: Usuario sin rol');
+      // Verificar que el usuario tiene un rol válido de aplicación
+      const validRoles = ['Admin', 'Client', 'SuperAdmin', 'Staff'];
+      if (!data.user.role || !validRoles.includes(data.user.role)) {
+        const errorMessage = 'Usuario sin rol de aplicación asignado'
+        console.error('Error: Usuario sin rol válido:', data.user.role);
         setError(errorMessage)
         setLoading(false)
         return { success: false, error: { message: errorMessage } }
       }
-      
+
       console.log('Login exitoso, estableciendo usuario:', data.user.email, 'rol:', data.user.role);
       // El servicio signIn ya incluye el perfil completo del usuario
       // (buscado automáticamente en system_users o client_portal_users)

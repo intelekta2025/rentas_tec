@@ -34,7 +34,7 @@ export const getContracts = async (clientId) => {
         monthlyRentAmount = parseFloat(monthlyRentAmount.replace(/[^0-9.-]+/g, ''))
         if (isNaN(monthlyRentAmount)) monthlyRentAmount = null
       }
-      
+
       return {
         ...contract,
         // Asegurar que monthly_rent_amount sea numérico si es posible
@@ -96,6 +96,9 @@ export const updateContract = async (contractId, contractData) => {
     if (contractData.cutoffDay !== undefined) mappedData.cutoff_day = contractData.cutoffDay
     if (contractData.monthlyRentAmount !== undefined) mappedData.monthly_rent_amount = contractData.monthlyRentAmount
     if (contractData.monthly_rent_amount !== undefined) mappedData.monthly_rent_amount = contractData.monthly_rent_amount
+    // Fix: Save monthly services amount (correct field name: monthly_services_amount)
+    if (contractData.monthlyServicesAmount !== undefined) mappedData.monthly_services_amount = contractData.monthlyServicesAmount
+    if (contractData.monthly_services_amount !== undefined) mappedData.monthly_services_amount = contractData.monthly_services_amount
 
     const { data, error } = await supabase
       .from('contracts')
@@ -124,7 +127,7 @@ export const terminateContract = async (contractId) => {
 
     const { data, error } = await supabase
       .from('contracts')
-      .update({ 
+      .update({
         termination_date: today,
         status: 'Terminado' // También actualizar el status
       })

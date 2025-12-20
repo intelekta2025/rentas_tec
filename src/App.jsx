@@ -1,18 +1,18 @@
 // src/App.jsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
+import {
   Users, CreditCard, AlertTriangle, Mail, Menu, Home,
   FileSpreadsheet, Settings, LogOut, CheckCircle, UserPlus,
   Building, DollarSign, FileText, Calendar, Download, School
 } from 'lucide-react';
 import { UNITS, mockMonthlyStats } from './data/constants'; // Solo constantes estáticas
-import { 
-  SidebarItem, AppLogo, Modal 
+import {
+  SidebarItem, AppLogo, Modal
 } from './components/ui/Shared';
 import { LoginView } from './components/auth/LoginView';
 import { ClientPortalDashboard, ClientPortalPayments } from './components/client/ClientViews';
-import { 
-  DashboardView, ClientsView, ClientDetailView, 
+import {
+  DashboardView, ClientsView, ClientDetailView,
   MarketTecView, OverdueView, RemindersView, SettingsView,
   ContractForm
 } from './components/admin/AdminViews';
@@ -28,43 +28,49 @@ import { useContracts } from './hooks/useContracts';
 // Componente wrapper para el formulario de contrato que usa el mismo hook que ClientDetailView
 // Este componente debe compartir el mismo hook que ClientDetailViewWithPortalUsers
 // Para que cuando se cree un contrato, se actualice automáticamente la lista
-const ContractFormWrapper = ({ client, user, onClose, onContractCreated }) => {
-  const { addContract, refreshContracts } = useContracts(client?.id);
+const ContractFormWrapper = ({ client, user, onClose, onContractCreated, contractToEdit }) => {
+  const { addContract, editContract, refreshContracts } = useContracts(client?.id);
 
   const handleSuccess = async () => {
-    // Recargar contratos en este hook
-    await refreshContracts();
-    // Notificar al componente padre que se creó un contrato para forzar recarga en ClientDetailViewWithPortalUsers
-    if (onContractCreated) {
-      onContractCreated();
-    }
+    // Cerrar modal primero para mejor UX
     onClose();
+
+    // Notificar al componente padre que se creó un contrato para forzar recarga
+    // Agregamos un pequeño delay para asegurar que Supabase haya propagado el cambio
+    if (onContractCreated) {
+      setTimeout(() => {
+        onContractCreated();
+      }, 500);
+    }
   };
 
   return (
-    <ContractForm 
+    <ContractForm
       client={client}
       user={user}
       onClose={onClose}
       onSuccess={handleSuccess}
       onAddContract={addContract}
-      onRefreshContracts={refreshContracts}
+      onUpdateContract={editContract}
+      contractToEdit={contractToEdit}
+    // No pasamos onRefreshContracts interna porque queremos que la recarga la maneje el padre
+    // a través de onContractCreated -> refreshKey
     />
   );
 };
 
 // Componente wrapper para ClientDetailView que carga los usuarios del portal y contratos
-const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModalOpen, generateContractPreview, setTerminationModalOpen, contractsRefreshKey }) => {
+const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModalOpen, generateContractPreview, setTerminationModalOpen, contractsRefreshKey, onPrepareEdit }) => {
   const { portalUsers, loading: portalUsersLoading } = useClientPortalUsers(client?.id);
   const { contracts, loading: contractsLoading, addContract, finalizeContract, refreshContracts } = useContracts(client?.id);
-  
+
   // Recargar contratos cuando cambie contractsRefreshKey
   useEffect(() => {
     if (contractsRefreshKey > 0) {
       refreshContracts();
     }
   }, [contractsRefreshKey]);
-  
+
   const handleFinalizeContract = async (contractId) => {
     if (window.confirm('¿Estás seguro de que deseas finalizar este contrato?')) {
       const result = await finalizeContract(contractId);
@@ -75,8 +81,10 @@ const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModa
   };
 
   const handleEditContract = (contract) => {
-    // TODO: Implementar modal de edición
-    console.log('Editar contrato:', contract);
+    if (onPrepareEdit) {
+      onPrepareEdit(contract);
+    }
+    setContractModalOpen(true);
   };
 
   const handleAddContract = async (contractData) => {
@@ -87,13 +95,13 @@ const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModa
     }
     return result;
   };
-  
+
   return (
-    <ClientDetailView 
-      client={client} 
-      setActiveTab={setActiveTab} 
-      setContractModalOpen={setContractModalOpen} 
-      generateContractPreview={generateContractPreview} 
+    <ClientDetailView
+      client={client}
+      setActiveTab={setActiveTab}
+      setContractModalOpen={setContractModalOpen}
+      generateContractPreview={generateContractPreview}
       setTerminationModalOpen={setTerminationModalOpen}
       portalUsers={portalUsers}
       portalUsersLoading={portalUsersLoading}
@@ -110,15 +118,15 @@ const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModa
 export default function App() {
   // Hook de autenticación (reemplaza useState de user)
   const { user, login, logout, loading: authLoading, error: authError } = useAuth();
-  
+
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setSidebarOpen] = useState(true);
-  
+
   // Modals
   const [isAddClientModalOpen, setAddClientModalOpen] = useState(false);
   const [isContractModalOpen, setContractModalOpen] = useState(false);
-  const [isTerminationModalOpen, setTerminationModalOpen] = useState(false); 
-  const [isAddUserModalOpen, setAddUserModalOpen] = useState(false); 
+  const [isTerminationModalOpen, setTerminationModalOpen] = useState(false);
+  const [isAddUserModalOpen, setAddUserModalOpen] = useState(false);
 
   // Selection & State
   const [selectedClient, setSelectedClient] = useState(null);
@@ -127,6 +135,7 @@ export default function App() {
   const [selectedReminders, setSelectedReminders] = useState([]);
   const [terminationDate, setTerminationDate] = useState('');
   const [contractsRefreshKey, setContractsRefreshKey] = useState(0); // Para forzar recarga de contratos
+  const [contractToEdit, setContractToEdit] = useState(null);
 
   // Hooks de datos de Supabase
   // Solo ejecutar hooks si el usuario tiene los datos necesarios
@@ -139,8 +148,8 @@ export default function App() {
   )
 
   // Clientes - filtrados por unitId si es admin, null si es cliente
-  const { 
-    clients: filteredClients, 
+  const {
+    clients: filteredClients,
     loading: clientsLoading,
     error: clientsError,
     addClient,
@@ -149,31 +158,31 @@ export default function App() {
   } = useClients(shouldLoadAdminData ? user.unitId : null);
 
   // Facturas/CXC - filtradas según el rol
-  const { 
-    invoices: filteredCXC, 
+  const {
+    invoices: filteredCXC,
     loading: invoicesLoading,
     overdueInvoices,
     totalAmount: totalCXCAmount
   } = useInvoices(
-    shouldLoadAdminData 
-      ? { unitId: user.unitId } 
+    shouldLoadAdminData
+      ? { unitId: user.unitId }
       : shouldLoadClientData
-      ? { clientId: user.clientId }
-      : {}
+        ? { clientId: user.clientId }
+        : {}
   );
 
   // Facturas vencidas (para vista de Overdue)
-  const { 
+  const {
     invoices: overdueInvoicesList,
-    loading: overdueLoading 
+    loading: overdueLoading
   } = useOverdueInvoices(shouldLoadAdminData ? user.unitId : null);
 
   // Recordatorios próximos
-  const { 
-    reminders: filteredUpcoming, 
-    loading: remindersLoading 
+  const {
+    reminders: filteredUpcoming,
+    loading: remindersLoading
   } = useUpcomingReminders(
-    shouldLoadAdminData ? user.unitId : null, 
+    shouldLoadAdminData ? user.unitId : null,
     30 // días hacia adelante
   );
 
@@ -232,16 +241,16 @@ export default function App() {
 
   // Mock functions needed for views (puedes reemplazarlos con funciones reales)
   const generateContractPreview = () => { /* ... logic ... */ };
-  const toggleOverdueSelection = (id) => { 
-    setSelectedOverdue(prev => 
-      prev.includes(id) 
+  const toggleOverdueSelection = (id) => {
+    setSelectedOverdue(prev =>
+      prev.includes(id)
         ? prev.filter(i => i !== id)
         : [...prev, id]
     );
   };
-  const toggleReminderSelection = (id) => { 
-    setSelectedReminders(prev => 
-      prev.includes(id) 
+  const toggleReminderSelection = (id) => {
+    setSelectedReminders(prev =>
+      prev.includes(id)
         ? prev.filter(i => i !== id)
         : [...prev, id]
     );
@@ -250,12 +259,12 @@ export default function App() {
   // --- Data Calculations ---
   const adminStats = useMemo(() => {
     if (!user || user.role === 'Client') return { totalClients: 0, totalCXC: 0, overdueCount: 0 };
-    
+
     const totalCXC = filteredCXC.reduce((acc, curr) => {
       const amount = parseFloat(curr.amount?.replace(/[^0-9.-]+/g, '') || 0);
       return acc + amount;
     }, 0);
-    
+
     return {
       totalClients: filteredClients.length,
       totalCXC,
@@ -264,26 +273,26 @@ export default function App() {
   }, [user, filteredClients, filteredCXC]);
 
   // Facturas del cliente (para portal de cliente)
-  const myCXC = useMemo(() => 
-    user?.role === 'Client' ? filteredCXC : [], 
+  const myCXC = useMemo(() =>
+    user?.role === 'Client' ? filteredCXC : [],
     [user, filteredCXC]
   );
 
   const clientStats = useMemo(() => {
     if (!user || user.role !== 'Client') return { balance: 0, pendingInvoices: 0 };
-    
+
     const balance = myCXC
       .filter(i => i.status === 'Pending' || i.status === 'Overdue')
       .reduce((acc, curr) => {
         const amount = parseFloat(curr.amount?.replace(/[^0-9.-]+/g, '') || 0);
         return acc + amount;
       }, 0);
-    
+
     // Obtener próxima fecha de pago
     const nextPayment = myCXC
       .filter(i => i.status === 'Scheduled' || i.status === 'Pending')
       .sort((a, b) => new Date(a.due_date || a.dueDate) - new Date(b.due_date || b.dueDate))[0]?.due_date || null;
-    
+
     return {
       balance,
       pendingInvoices: myCXC.filter(i => i.status === 'Pending').length,
@@ -310,7 +319,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex font-sans">
-      
+
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div className="fixed inset-0 bg-black/50 z-20 md:hidden" onClick={() => setSidebarOpen(false)}></div>
@@ -324,17 +333,17 @@ export default function App() {
             <span className="font-bold text-lg tracking-wide">Rentas</span>
           </div>
         </div>
-        
+
         <div className="flex-1 py-6 overflow-y-auto">
           <div className="px-6 mb-6">
             <div className="text-xs text-blue-400 uppercase font-semibold mb-1">
               {user.role === 'Client' ? 'Portal de Cliente' : 'Unidad de Negocio'}
             </div>
             <div className="flex items-center text-white font-medium">
-               <Building size={16} className="mr-2 text-blue-300" />
-               {user.role === 'Client' 
-                 ? user.clientName 
-                 : (businessUnitName || user.unitName || `Unidad ${user.unitId}` || 'Sin unidad')}
+              <Building size={16} className="mr-2 text-blue-300" />
+              {user.role === 'Client'
+                ? user.clientName
+                : (businessUnitName || user.unitName || `Unidad ${user.unitId}` || 'Sin unidad')}
             </div>
           </div>
 
@@ -347,14 +356,14 @@ export default function App() {
                 <SidebarItem icon={FileSpreadsheet} label="Market Tec" active={activeTab === 'marketTec'} onClick={() => setActiveTab('marketTec')} />
                 <SidebarItem icon={AlertTriangle} label="Cuentas Vencidas" active={activeTab === 'overdue'} onClick={() => setActiveTab('overdue')} />
                 <SidebarItem icon={Mail} label="Recordatorios" active={activeTab === 'reminders'} onClick={() => setActiveTab('reminders')} />
-                
+
                 <div className="pt-4 pb-2 px-6 text-xs uppercase text-blue-400 font-semibold tracking-wider">Administración</div>
                 <SidebarItem icon={Settings} label="Configuración" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
               </>
             ) : (
               <>
-                 <SidebarItem icon={FileText} label="Estado de Cuenta" active={activeTab === 'clientPortal_account'} onClick={() => setActiveTab('clientPortal_account')} />
-                 <SidebarItem icon={CreditCard} label="Mis Pagos" active={activeTab === 'clientPortal_payments'} onClick={() => setActiveTab('clientPortal_payments')} />
+                <SidebarItem icon={FileText} label="Estado de Cuenta" active={activeTab === 'clientPortal_account'} onClick={() => setActiveTab('clientPortal_account')} />
+                <SidebarItem icon={CreditCard} label="Mis Pagos" active={activeTab === 'clientPortal_payments'} onClick={() => setActiveTab('clientPortal_payments')} />
               </>
             )}
           </nav>
@@ -370,26 +379,26 @@ export default function App() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden h-screen w-full">
         <header className="bg-white shadow-sm h-16 flex items-center justify-between px-4 sm:px-6 z-10 shrink-0">
-             <div className="flex items-center">
-              <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="text-gray-500 hover:text-gray-700 focus:outline-none md:hidden mr-4">
-                <Menu size={24} />
-              </button>
-              <h1 className="text-lg sm:text-xl font-semibold text-gray-800 truncate">
-                {user.role === 'Client' ? 'Mi Estado de Cuenta' : 'Administración'}
-              </h1>
+          <div className="flex items-center">
+            <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="text-gray-500 hover:text-gray-700 focus:outline-none md:hidden mr-4">
+              <Menu size={24} />
+            </button>
+            <h1 className="text-lg sm:text-xl font-semibold text-gray-800 truncate">
+              {user.role === 'Client' ? 'Mi Estado de Cuenta' : 'Administración'}
+            </h1>
+          </div>
+          <div className="flex items-center space-x-4">
+            <span className="text-sm text-gray-500 hidden md:inline">
+              {user.role === 'Admin' && (
+                <span className="font-semibold text-blue-800">
+                  {businessUnitName || user.unitName || `Unidad ${user.unitId}` || 'Sin unidad'}
+                </span>
+              )}
+            </span>
+            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-800 font-semibold text-sm">
+              {user.name?.substring(0, 2).toUpperCase() || 'U'}
             </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-500 hidden md:inline">
-                 {user.role === 'Admin' && (
-                   <span className="font-semibold text-blue-800">
-                     {businessUnitName || user.unitName || `Unidad ${user.unitId}` || 'Sin unidad'}
-                   </span>
-                 )}
-              </span>
-              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-800 font-semibold text-sm">
-                {user.name?.substring(0,2).toUpperCase() || 'U'}
-              </div>
-            </div>
+          </div>
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-100 w-full">
@@ -400,38 +409,38 @@ export default function App() {
             </div>
           )}
 
-           {user.role === 'Client' ? (
-             <>
-               {activeTab === 'clientPortal_account' && (
-                 <ClientPortalDashboard 
-                   user={user} 
-                   clientStats={clientStats} 
-                   myCXC={myCXC} 
-                 />
-               )}
-               {activeTab === 'clientPortal_payments' && (
-                 <ClientPortalPayments 
-                   user={user} 
-                   payments={clientPayments}
-                   loading={paymentsLoading}
-                 />
-               )}
-             </>
-           ) : (
-             <>
+          {user.role === 'Client' ? (
+            <>
+              {activeTab === 'clientPortal_account' && (
+                <ClientPortalDashboard
+                  user={user}
+                  clientStats={clientStats}
+                  myCXC={myCXC}
+                />
+              )}
+              {activeTab === 'clientPortal_payments' && (
+                <ClientPortalPayments
+                  user={user}
+                  payments={clientPayments}
+                  loading={paymentsLoading}
+                />
+              )}
+            </>
+          ) : (
+            <>
               {activeTab === 'dashboard' && (
-                <DashboardView 
-                  adminStats={adminStats} 
-                  mockMonthlyStats={mockMonthlyStats} 
+                <DashboardView
+                  adminStats={adminStats}
+                  mockMonthlyStats={mockMonthlyStats}
                   user={user}
                   unitName={businessUnitName || user.unitName}
                 />
               )}
               {activeTab === 'clients' && (
-                <ClientsView 
-                  filteredClients={filteredClients} 
-                  setAddClientModalOpen={setAddClientModalOpen} 
-                  handleClientClick={handleClientClick} 
+                <ClientsView
+                  filteredClients={filteredClients}
+                  setAddClientModalOpen={setAddClientModalOpen}
+                  handleClientClick={handleClientClick}
                   user={user}
                   loading={clientsLoading}
                   error={clientsError}
@@ -440,80 +449,82 @@ export default function App() {
                 />
               )}
               {activeTab === 'clientDetail' && selectedClient && (
-                <ClientDetailViewWithPortalUsers 
-                  client={selectedClient} 
-                  setActiveTab={setActiveTab} 
-                  setContractModalOpen={setContractModalOpen} 
-                  generateContractPreview={generateContractPreview} 
+                <ClientDetailViewWithPortalUsers
+                  client={selectedClient}
+                  setActiveTab={setActiveTab}
+                  setContractModalOpen={setContractModalOpen}
+                  generateContractPreview={generateContractPreview}
                   setTerminationModalOpen={setTerminationModalOpen}
                   contractsRefreshKey={contractsRefreshKey}
+                  onPrepareEdit={setContractToEdit}
                 />
               )}
               {activeTab === 'overdue' && (
-                <OverdueView 
-                  filteredCXC={overdueInvoicesList.length > 0 ? overdueInvoicesList : filteredCXC.filter(i => i.status === 'Overdue')} 
-                  selectedOverdue={selectedOverdue} 
-                  toggleOverdueSelection={toggleOverdueSelection} 
+                <OverdueView
+                  filteredCXC={overdueInvoicesList.length > 0 ? overdueInvoicesList : filteredCXC.filter(i => i.status === 'Overdue')}
+                  selectedOverdue={selectedOverdue}
+                  toggleOverdueSelection={toggleOverdueSelection}
                   user={user}
                   loading={overdueLoading || invoicesLoading}
                   unitName={businessUnitName || user.unitName}
                 />
               )}
               {activeTab === 'marketTec' && (
-                <MarketTecView 
+                <MarketTecView
                   user={user}
                   unitName={businessUnitName || user.unitName}
                 />
               )}
               {activeTab === 'reminders' && (
-                <RemindersView 
-                  filteredUpcoming={filteredUpcoming} 
-                  selectedReminders={selectedReminders} 
-                  toggleReminderSelection={toggleReminderSelection} 
+                <RemindersView
+                  filteredUpcoming={filteredUpcoming}
+                  selectedReminders={selectedReminders}
+                  toggleReminderSelection={toggleReminderSelection}
                   user={user}
                   loading={remindersLoading}
                   unitName={businessUnitName || user.unitName}
                 />
               )}
               {activeTab === 'settings' && (
-                <SettingsView 
-                  setAddUserModalOpen={setAddUserModalOpen} 
+                <SettingsView
+                  setAddUserModalOpen={setAddUserModalOpen}
                 />
               )}
-             </>
-           )}
+            </>
+          )}
         </main>
       </div>
-      
+
       {/* Modals placed here for cleaner DOM structure (using the Shared Modal component) */}
       <Modal isOpen={isAddClientModalOpen} onClose={() => setAddClientModalOpen(false)} title="Nuevo Cliente">
-         <div className="p-4">
-           {/* Aquí puedes agregar un formulario que use addClient del hook */}
-           <p className="text-gray-600">Formulario de Nuevo Cliente (usar addClient del hook)</p>
-         </div>
+        <div className="p-4">
+          {/* Aquí puedes agregar un formulario que use addClient del hook */}
+          <p className="text-gray-600">Formulario de Nuevo Cliente (usar addClient del hook)</p>
+        </div>
       </Modal>
-       <Modal isOpen={isContractModalOpen} onClose={() => setContractModalOpen(false)} title="Crear Contrato">
-         {selectedClient && user ? (
-           <ContractFormWrapper 
-             client={selectedClient}
-             user={user}
-             onClose={() => setContractModalOpen(false)}
-             onContractCreated={() => {
-               // Forzar recarga de contratos en ClientDetailViewWithPortalUsers
-               setContractsRefreshKey(prev => prev + 1);
-             }}
-           />
-         ) : (
-           <div className="p-4">
-             <p className="text-gray-600">No se puede crear un contrato sin un cliente seleccionado.</p>
-           </div>
-         )}
+      <Modal isOpen={isContractModalOpen} onClose={() => { setContractModalOpen(false); setContractToEdit(null); }} title={contractToEdit ? "Editar Contrato" : "Crear Contrato"}>
+        {selectedClient && user ? (
+          <ContractFormWrapper
+            client={selectedClient}
+            user={user}
+            onClose={() => { setContractModalOpen(false); setContractToEdit(null); }}
+            contractToEdit={contractToEdit}
+            onContractCreated={() => {
+              // Forzar recarga de contratos en ClientDetailViewWithPortalUsers
+              setContractsRefreshKey(prev => prev + 1);
+            }}
+          />
+        ) : (
+          <div className="p-4">
+            <p className="text-gray-600">No se puede crear un contrato sin un cliente seleccionado.</p>
+          </div>
+        )}
       </Modal>
-       <Modal isOpen={isTerminationModalOpen} onClose={() => setTerminationModalOpen(false)} title="Finalizar Contrato">
-         <div className="p-4">Formulario de Terminación</div>
+      <Modal isOpen={isTerminationModalOpen} onClose={() => setTerminationModalOpen(false)} title="Finalizar Contrato">
+        <div className="p-4">Formulario de Terminación</div>
       </Modal>
-       <Modal isOpen={isAddUserModalOpen} onClose={() => setAddUserModalOpen(false)} title="Nuevo Usuario">
-         <div className="p-4">Formulario de Usuario</div>
+      <Modal isOpen={isAddUserModalOpen} onClose={() => setAddUserModalOpen(false)} title="Nuevo Usuario">
+        <div className="p-4">Formulario de Usuario</div>
       </Modal>
 
     </div>
