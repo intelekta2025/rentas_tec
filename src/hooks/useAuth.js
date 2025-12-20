@@ -49,6 +49,13 @@ export const useAuth = () => {
           }
           setUser(null)
         } else {
+          // Éxito: Asegurar que el rol esté en caché para futuras consultas
+          if (data && data.id && (data.role || data.rol)) {
+            const roleToCache = data.role || data.rol;
+            localStorage.setItem(`user_role_${data.id}`, roleToCache);
+            // console.log(`🔒 useAuth: Rol asegurado en caché: ${roleToCache}`);
+          }
+
           console.log('Usuario cargado:', data ? data.email : 'ninguno')
           setUser(data)
         }

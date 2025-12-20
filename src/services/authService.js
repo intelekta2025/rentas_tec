@@ -238,8 +238,13 @@ const getUserProfile = async (userId) => {
       // Si hay cache de cliente, confiamos en él. Si falla, invalidamos cache y retornamos error/null.
       // NO hacemos fallback a race para evitar llamadas innecesarias.
       if (!result.data) {
-        console.warn('⚠️ Perfil de cliente definido en cache pero no encontrado en DB. Limpiando cache.');
-        localStorage.removeItem(`user_role_${userId}`);
+        if (!result.error) {
+          console.warn('⚠️ Perfil de cliente definido en cache pero no encontrado en DB. Limpiando cache.');
+          localStorage.removeItem(`user_role_${userId}`);
+        } else {
+          console.warn('⚠️ Error al buscar cliente (Timeout/Red), manteniendo cache por supervivencia:', result.error);
+          return { data: { id: userId, role: cachedRole, from_cache: true }, error: null };
+        }
       }
       return result;
     } else {
@@ -247,8 +252,15 @@ const getUserProfile = async (userId) => {
       // Si hay cache de admin, confiamos en él. 
       // NO intentamos buscar en cliente para evitar error 406.
       if (!result.data) {
-        console.warn('⚠️ Perfil de admin definido en cache pero no encontrado en DB. Limpiando cache.');
-        localStorage.removeItem(`user_role_${userId}`);
+        // SOLO limpiar cache si fue una búsqueda exitosa pero sin resultados (usuario eliminado?)
+        // Si hubo error (timeout, red), MANTENER el cache como salvavidas
+        if (!result.error) {
+          console.warn('⚠️ Perfil de admin definido en cache pero no encontrado en DB. Limpiando cache.');
+          localStorage.removeItem(`user_role_${userId}`);
+        } else {
+          console.warn('⚠️ Error al buscar admin (Timeout/Red), manteniendo cache por supervivencia:', result.error);
+          return { data: { id: userId, role: cachedRole, from_cache: true }, error: null };
+        }
       }
       return result;
     }
@@ -285,7 +297,23 @@ const getUserProfile = async (userId) => {
     return { data: null, error: null };
 
   } catch (error) {
-    console.error('❌ getUserProfile: Error inesperado en secuencia:', error)
+    console.error('Error en getUserProfile:', error);
+
+    // FALLBACK FINAL: Si la BD falla (timeout, conexión), intentar recuperar del caché
+    // Esto evita sacar al usuario si la BD tiene un hipo
+    const cachedRole = localStorage.getItem(`user_role_${userId}`);
+    if (cachedRole) {
+      console.log(`🛡️ getUserProfile: Recuperando rol desde caché tras error de BD: ${cachedRole}`);
+      return {
+        data: {
+          id: userId,
+          role: cachedRole,
+          from_cache: true
+        },
+        error: null
+      };
+    }
+
     return {
       data: null,
       error: { message: error.message || 'Error al obtener perfil', originalError: error }
@@ -426,10 +454,17 @@ export const signIn = async (email, password) => {
 export const signOut = async () => {
   try {
     // Intentar obtener usuario actual para limpiar su caché específico antes de salir
-    const { data } = await supabase.auth.getUser();
-    if (data?.user?.id) {
-      localStorage.removeItem(`user_role_${data.user.id}`);
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      localStorage.removeItem(`user_role_${user.id}`)
     }
+
+    // Limpieza general de claves de rol por seguridad
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('user_role_')) {
+        localStorage.removeItem(key)
+      }
+    })
 
     const { error } = await supabase.auth.signOut()
     if (error) throw error
