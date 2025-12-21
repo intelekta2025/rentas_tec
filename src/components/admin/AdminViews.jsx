@@ -14,13 +14,27 @@ import { StatusBadge, OverdueBadge, KPICard, RevenueChart, Modal } from '../ui/S
 import { UNITS, mockCXC, mockStaff } from '../../data/constants';
 import { useContracts } from '../../hooks/useContracts';
 
-export const DashboardView = ({ adminStats, mockMonthlyStats, user, unitName }) => (
+export const DashboardView = ({ adminStats, mockMonthlyStats, user, unitName, setActiveTab }) => (
   <div className="space-y-6 animate-fade-in">
     <h2 className="text-2xl font-bold text-gray-800">Panel General - {unitName || (user?.unitId ? `Unidad ${user.unitId}` : 'Sin unidad')}</h2>
-    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
       <KPICard title="Total Clientes" value={adminStats.totalClients} icon={Users} color="#003DA5" subtext="En esta unidad" />
       <KPICard title="Por Cobrar" value={`$${adminStats.totalCXC.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} `} icon={CreditCard} color="#F59E0B" subtext="Facturación pendiente" />
-      <KPICard title="Cuentas Vencidas" value={adminStats.overdueCount} icon={AlertTriangle} color="#EF4444" subtext="Requiere atención" />
+      <KPICard
+        title="Monto Vencido"
+        value={`$${(adminStats.overdueAmount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} `}
+        icon={AlertTriangle}
+        color="#EF4444"
+        subtext={`${adminStats.overdueCount || 0} cuentas requieren atención`}
+        onClick={() => setActiveTab('overdue')}
+      />
+      <KPICard
+        title="Proyección Ingresos"
+        value={`$${(adminStats.nextMonthIncome || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} `}
+        icon={Calendar}
+        color="#10B981"
+        subtext="Cobros del próximo mes"
+      />
     </div>
 
     {/* Revenue Chart */}
@@ -1422,7 +1436,8 @@ export const MarketTecView = ({ user, unitName }) => {
 
 export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelection, user, unitName }) => {
   const overdueItems = filteredCXC.filter(i => i.status === 'Overdue');
-  const totalOverdue = overdueItems.reduce((acc, curr) => acc + parseFloat(String(curr.amount || 0).replace(/[^0-9.-]+/g, "") || 0), 0);
+  const totalOverdue = overdueItems.reduce((acc, curr) => acc + (curr.balanceDueRaw || 0), 0);
+  const uniqueClientsCount = new Set(overdueItems.map(i => i.clientId)).size;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -1468,7 +1483,7 @@ export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelecti
           </div>
           <div>
             <p className="text-sm text-gray-500 font-medium">Clientes con Adeudos</p>
-            <p className="text-2xl font-bold text-gray-800">{overdueItems.length}</p>
+            <p className="text-2xl font-bold text-gray-800">{uniqueClientsCount}</p>
           </div>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4 flex items-center cursor-pointer hover:bg-gray-50 transition-colors">
@@ -1518,7 +1533,7 @@ export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelecti
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Concepto</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Límite</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Días Retraso</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo</th>
                 <th scope="col" className="relative px-6 py-3">
                   <span className="sr-only">Acciones</span>
                 </th>
@@ -1552,7 +1567,7 @@ export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelecti
                       <OverdueBadge days={item.daysOverdue} />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-bold text-gray-900">{item.amount}</div>
+                      <div className="text-sm font-bold text-gray-900">{item.balanceDue}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button className="text-blue-600 hover:text-blue-900 text-xs font-semibold">Enviar Email</button>

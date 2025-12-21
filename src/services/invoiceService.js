@@ -41,7 +41,24 @@ const mapReceivableFromDB = (dbReceivable) => {
   today.setHours(0, 0, 0, 0) // Normalizar a medianoche para comparación limpia
 
   const dueDateStr = dbReceivable.due_date || dbReceivable.dueDate;
-  const dueDate = dueDateStr ? new Date(dueDateStr) : null
+  let dueDate = null;
+  let dMonth = null;
+  let dYear = null;
+
+  if (dueDateStr) {
+    // Si es YYYY-MM-DD, parsear manualmente para evitar desfases de zona horaria
+    const parts = String(dueDateStr).split('-');
+    if (parts.length >= 3) {
+      dYear = parseInt(parts[0], 10);
+      dMonth = parseInt(parts[1], 10);
+      const dDay = parseInt(parts[2], 10);
+      dueDate = new Date(dYear, dMonth - 1, dDay);
+    } else {
+      dueDate = new Date(dueDateStr);
+      dMonth = dueDate.getMonth() + 1;
+      dYear = dueDate.getFullYear();
+    }
+  }
   if (dueDate) dueDate.setHours(0, 0, 0, 0);
 
   // Determinar el estado efectivo considerando la lógica de negocio de la BD
@@ -77,9 +94,11 @@ const mapReceivableFromDB = (dbReceivable) => {
     type: dbReceivable.type,
     daysOverdue,
     daysUntil,
-    // Campos de periodo explícitos
-    periodMonth: dbReceivable.period_month,
-    periodYear: dbReceivable.period_year,
+    // Campos de periodo explícitos - Fallback a dueDate si son nulos
+    periodMonth: dbReceivable.period_month || dMonth,
+    periodYear: dbReceivable.period_year || dYear,
+    // Nombre del cliente (desde join o campo directo si existe)
+    client: dbReceivable.clients?.business_name || dbReceivable.client_name || dbReceivable.client,
     // Campos formateados adicionales
     paidAmount: formatCurrency(dbReceivable.amount_paid || dbReceivable.paid_amount),
     balanceDue: formatCurrency(dbReceivable.balance_due || dbReceivable.balance),
@@ -87,6 +106,10 @@ const mapReceivableFromDB = (dbReceivable) => {
     unitId: dbReceivable.unit_id,
     clientId: dbReceivable.client_id,
     contractId: dbReceivable.contract_id,
+    // Valores numéricos crudos para cálculos
+    amountRaw: parseFloat(dbReceivable.amount || 0),
+    paidAmountRaw: parseFloat(dbReceivable.amount_paid || dbReceivable.paid_amount || 0),
+    balanceDueRaw: parseFloat(dbReceivable.balance_due || dbReceivable.balance || 0),
   }
 }
 
@@ -153,7 +176,7 @@ export const getInvoices = async (filters = {}) => {
   try {
     let query = supabase
       .from('receivables') // Tabla real: receivables
-      .select('*, overdue')
+      .select('*, clients(business_name)')
       .order('due_date', { ascending: false })
 
     // Aplicar filtros
@@ -219,7 +242,7 @@ export const getInvoiceById = async (id) => {
   try {
     const { data, error } = await supabase
       .from('receivables') // Tabla real: receivables
-      .select('*')
+      .select('*, clients(business_name)')
       .eq('id', id)
       .single()
 
@@ -338,7 +361,7 @@ export const getUpcomingReminders = async (unitId = null, daysAhead = 30) => {
 
     let query = supabase
       .from('receivables') // Tabla real: receivables
-      .select('*')
+      .select('*, clients(business_name)')
       .in('status', ['Pending', 'Scheduled'])
       .gte('due_date', today.toISOString().split('T')[0])
       .lte('due_date', futureDate.toISOString().split('T')[0])

@@ -293,20 +293,60 @@ export default function App() {
 
   // --- Data Calculations ---
   const adminStats = useMemo(() => {
-    if (!user || user.role === 'Client') return { totalClients: 0, totalCXC: 0, overdueCount: 0 };
+    if (!user || user.role === 'Client') return { totalClients: 0, totalCXC: 0, overdueCount: 0, overdueAmount: 0, nextMonthIncome: 0 };
 
-    const totalCXC = filteredCXC.reduce((acc, curr) => {
-      // Ignorar cancelados
-      if (['cancelled', 'cancelado'].includes((curr.status || '').toLowerCase())) return acc;
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
 
-      const balance = parseFloat(String(curr.balanceDue || curr.balance_due || curr.amount || 0).replace(/[^0-9.-]+/g, '') || 0);
-      return acc + balance;
-    }, 0);
+    // Calcular mes siguiente
+    let nextMonth = currentMonth + 1;
+    let nextYear = currentYear;
+    if (nextMonth > 12) {
+      nextMonth = 1;
+      nextYear++;
+    }
+
+    const stats = filteredCXC.reduce((acc, curr) => {
+      // Ignorar cancelados para balances
+      const isCancelled = ['cancelled', 'cancelado'].includes((curr.status || '').toLowerCase());
+
+      const balance = curr.balanceDueRaw || 0;
+      const fullAmount = curr.amountRaw || 0;
+
+      if (!isCancelled) {
+        acc.totalCXC += balance;
+
+        if (curr.status === 'Overdue' || (curr.status || '').toLowerCase() === 'vencido') {
+          acc.overdueAmount += balance;
+          acc.overdueCount++;
+        }
+      }
+
+      // Proyección: cualquier CXC (no cancelado) que venza el mes siguiente
+      // O que su periodo explícito sea el mes siguiente
+      const dateParts = curr.dueDate ? String(curr.dueDate).split('-') : null;
+      let dYear = dateParts && dateParts.length >= 1 ? Number(dateParts[0]) : 0;
+      const dMonth = dateParts && dateParts.length >= 2 ? Number(dateParts[1]) : 0;
+      if (dYear > 0 && dYear < 100) dYear += 2000;
+
+      let pYear = Number(curr.periodYear || 0);
+      const pMonth = Number(curr.periodMonth || 0);
+      if (pYear > 0 && pYear < 100) pYear += 2000;
+
+      const matchesDate = dMonth === nextMonth && dYear === nextYear;
+      const matchesPeriod = pMonth === nextMonth && pYear === nextYear;
+
+      if (!isCancelled && (matchesDate || matchesPeriod)) {
+        acc.nextMonthIncome += fullAmount;
+      }
+
+      return acc;
+    }, { totalCXC: 0, overdueAmount: 0, overdueCount: 0, nextMonthIncome: 0 });
 
     return {
       totalClients: filteredClients.filter(c => (c.status || '').toLowerCase() === 'activo').length,
-      totalCXC,
-      overdueCount: filteredCXC.filter(i => i.status === 'Overdue').length
+      ...stats
     };
   }, [user, filteredClients, filteredCXC]);
 
@@ -494,6 +534,7 @@ export default function App() {
                   mockMonthlyStats={mockMonthlyStats}
                   user={user}
                   unitName={businessUnitName || user.unitName}
+                  setActiveTab={setActiveTab}
                 />
               )}
               {activeTab === 'clients' && (
