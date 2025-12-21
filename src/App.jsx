@@ -66,7 +66,7 @@ const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModa
   const { contracts, loading: contractsLoading, addContract, finalizeContract, refreshContracts } = useContracts(client?.id);
 
   // Cargar receivables (Estado de Cuenta) reales
-  const { invoices: receivables, loading: receivablesLoading, refreshInvoices } = useInvoices({ clientId: client?.id });
+  const { invoices: receivables, loading: receivablesLoading, refreshInvoices, editInvoice, addPayment } = useInvoices({ clientId: client?.id });
 
   // Recargar contratos cuando cambie contractsRefreshKey
   useEffect(() => {
@@ -124,6 +124,14 @@ const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModa
         }
         return result;
       }}
+      onUpdateReceivable={async (id, data) => {
+        const result = await editInvoice(id, data);
+        if (result.success) {
+          await refreshInvoices();
+        }
+        return result;
+      }}
+      onAddPayment={addPayment}
       receivables={receivables}
       receivablesLoading={receivablesLoading}
     />

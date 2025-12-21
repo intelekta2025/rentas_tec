@@ -12,8 +12,13 @@ export const StatusBadge = ({ status }) => {
     Active: "bg-green-100 text-green-800",
     Activo: "bg-green-100 text-green-800",
     Paid: "bg-green-100 text-green-800",
+    Pagado: "bg-green-100 text-green-800",
     Pending: "bg-yellow-100 text-yellow-800",
+    Pendiente: "bg-yellow-100 text-yellow-800",
+    Partial: "bg-blue-100 text-blue-800",
+    parcial: "bg-blue-100 text-blue-800",
     Overdue: "bg-red-100 text-red-800",
+    Vencido: "bg-red-100 text-red-800",
     Scheduled: "bg-gray-100 text-gray-500 border border-gray-200",
     Inactive: "bg-gray-100 text-gray-600",
     Inactivo: "bg-gray-100 text-gray-600",
@@ -23,6 +28,8 @@ export const StatusBadge = ({ status }) => {
   const labels = {
     Active: "Activo",
     Paid: "Pagado",
+    Partial: "Parcial",
+    parcial: "Parcial",
     Pending: "Pendiente",
     Overdue: "Vencido",
     Scheduled: "Programado",
@@ -62,8 +69,8 @@ export const SidebarItem = ({ icon: Icon, label, active, onClick }) => (
   <button
     onClick={onClick}
     className={`w-full flex items-center space-x-3 px-6 py-3 transition-colors duration-200 ${active
-        ? "bg-blue-900 text-white border-r-4 border-white"
-        : "text-blue-100 hover:bg-blue-800 hover:text-white"
+      ? "bg-blue-900 text-white border-r-4 border-white"
+      : "text-blue-100 hover:bg-blue-800 hover:text-white"
       }`}
   >
     <Icon size={20} />

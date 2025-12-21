@@ -11,7 +11,8 @@ import {
   createInvoice,
   updateInvoice,
   updateInvoiceStatus,
-  deleteInvoice
+  deleteInvoice,
+  registerPayment
 } from '../services/invoiceService'
 
 export const useInvoices = (filters = {}) => {
@@ -111,6 +112,21 @@ export const useInvoices = (filters = {}) => {
     }
   }
 
+  // Función para registrar un pago
+  const addPayment = async (paymentData) => {
+    try {
+      const { data, error } = await registerPayment(paymentData);
+      if (error) throw error;
+
+      // Recargar facturas para reflejar el nuevo estado y balance
+      await refreshInvoices();
+      return { success: true, data, error: null };
+    } catch (err) {
+      setError(err.message);
+      return { success: false, data: null, error: err };
+    }
+  };
+
   // Función para recargar facturas
   const refreshInvoices = async () => {
     setLoading(true)
@@ -159,6 +175,7 @@ export const useInvoices = (filters = {}) => {
     changeStatus,
     removeInvoice,
     refreshInvoices,
+    addPayment,
   }
 }
 

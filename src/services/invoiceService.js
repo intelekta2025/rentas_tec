@@ -38,43 +38,55 @@ const mapReceivableFromDB = (dbReceivable) => {
   if (!dbReceivable) return null
 
   const today = new Date()
-  const dueDate = dbReceivable.due_date ? new Date(dbReceivable.due_date) : null
+  today.setHours(0, 0, 0, 0) // Normalizar a medianoche para comparación limpia
+
+  const dueDateStr = dbReceivable.due_date || dbReceivable.dueDate;
+  const dueDate = dueDateStr ? new Date(dueDateStr) : null
+  if (dueDate) dueDate.setHours(0, 0, 0, 0);
+
+  // Determinar el estado efectivo considerando la lógica de negocio de la BD
+  const dbStatus = (dbReceivable.status || '').toLowerCase();
+
+  // Es vencido si:
+  // 1. La BD ya lo marcó como 'Y' en la columna computada
+  // 2. O si el status es pendiente/parcial y la fecha de vencimiento ya pasó (antes de hoy)
+  const isOverdueFlag = (dbReceivable.overdue === 'Y') ||
+    (['pending', 'pendiente', 'partial', 'parcial'].includes(dbStatus) && dueDate && dueDate < today);
+
+  const effectiveStatus = isOverdueFlag ? 'Overdue' : (dbReceivable.status || 'Pending');
 
   // Calcular días vencidos si está vencida
   let daysOverdue = 0
-  if (dbReceivable.status === 'Overdue' && dueDate) {
+  if (effectiveStatus === 'Overdue' && dueDate) {
     daysOverdue = Math.max(0, Math.floor((today - dueDate) / (1000 * 60 * 60 * 24)))
   }
 
   // Calcular días hasta vencimiento si está pendiente o programada
   let daysUntil = null
-  if ((dbReceivable.status === 'Pending' || dbReceivable.status === 'Scheduled') && dueDate) {
+  if ((effectiveStatus === 'Pending' || effectiveStatus === 'Scheduled' || effectiveStatus === 'pending') && dueDate) {
     daysUntil = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24))
   }
 
   return {
+    ...dbReceivable,
     id: dbReceivable.id,
-    unitId: dbReceivable.unit_id,
-    clientId: dbReceivable.client_id,
-    contractId: dbReceivable.contract_id,
     amount: formatCurrency(dbReceivable.amount), // Convertir numeric a string formateado
     concept: dbReceivable.concept,
     dueDate: dbReceivable.due_date,
-    status: dbReceivable.status,
+    status: effectiveStatus,
     type: dbReceivable.type,
     daysOverdue,
     daysUntil,
-    // Campos nuevos
+    // Campos de periodo explícitos
     periodMonth: dbReceivable.period_month,
     periodYear: dbReceivable.period_year,
-    paidAmount: formatCurrency(dbReceivable.paid_amount),
-    balanceDue: formatCurrency(dbReceivable.balance_due),
-    created_at: dbReceivable.created_at,
-    // Mantener también los campos originales para compatibilidad
-    ...dbReceivable,
-    // Alias para compatibilidad con código existente
-    unit_id: dbReceivable.unit_id,
-    client_id: dbReceivable.client_id,
+    // Campos formateados adicionales
+    paidAmount: formatCurrency(dbReceivable.amount_paid || dbReceivable.paid_amount),
+    balanceDue: formatCurrency(dbReceivable.balance_due || dbReceivable.balance),
+    // Asegurar compatibilidad con alias si es necesario
+    unitId: dbReceivable.unit_id,
+    clientId: dbReceivable.client_id,
+    contractId: dbReceivable.contract_id,
   }
 }
 
@@ -106,7 +118,7 @@ const mapReceivableToDB = (receivableData) => {
   if (receivableData.periodMonth !== undefined) mapped.period_month = receivableData.periodMonth
   if (receivableData.periodYear !== undefined) mapped.period_year = receivableData.periodYear
   if (receivableData.paidAmount !== undefined) {
-    mapped.paid_amount = parseCurrency(receivableData.paidAmount)
+    mapped.amount_paid = parseCurrency(receivableData.paidAmount)
   }
   if (receivableData.balanceDue !== undefined) {
     mapped.balance_due = parseCurrency(receivableData.balanceDue)
@@ -119,8 +131,10 @@ const mapReceivableToDB = (receivableData) => {
   if (receivableData.period_month !== undefined) mapped.period_month = receivableData.period_month
   if (receivableData.period_year !== undefined) mapped.period_year = receivableData.period_year
   if (receivableData.due_date !== undefined) mapped.due_date = receivableData.due_date
-  if (receivableData.paid_amount !== undefined) mapped.paid_amount = receivableData.paid_amount
+  if (receivableData.amount_paid !== undefined) mapped.amount_paid = receivableData.amount_paid
+  if (receivableData.paid_amount !== undefined) mapped.amount_paid = receivableData.paid_amount
   if (receivableData.balance_due !== undefined) mapped.balance_due = receivableData.balance_due
+  if (receivableData.balance !== undefined) mapped.balance_due = receivableData.balance
 
   // Si amount viene como número, mantenerlo
   if (receivableData.amount !== undefined && typeof receivableData.amount === 'number') {
@@ -139,7 +153,7 @@ export const getInvoices = async (filters = {}) => {
   try {
     let query = supabase
       .from('receivables') // Tabla real: receivables
-      .select('*')
+      .select('*, overdue')
       .order('due_date', { ascending: false })
 
     // Aplicar filtros
@@ -377,3 +391,64 @@ export const generateBulkInvoices = async (invoices) => {
     return { data: null, error }
   }
 }
+
+/**
+ * Registra un pago y actualiza el estado del movimiento
+ */
+export const registerPayment = async (paymentData) => {
+  const { receivableId, amount, paymentDate, clientId, unitId } = paymentData;
+
+  try {
+    // 1. Obtener el movimiento actual para calcular el nuevo balance
+    const { data: receivable, error: fetchError } = await supabase
+      .from('receivables')
+      .select('*')
+      .eq('id', receivableId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    const currentPaid = parseFloat(receivable.amount_paid || receivable.paid_amount || 0);
+    const totalAmount = parseFloat(receivable.amount || 0);
+    const newPaidAmount = currentPaid + parseFloat(amount);
+    const newBalanceDue = Math.max(0, totalAmount - newPaidAmount);
+
+    let newStatus = receivable.status;
+    if (newBalanceDue <= 0) {
+      newStatus = 'Paid';
+    } else if (newPaidAmount > 0) {
+      newStatus = 'Partial';
+    }
+
+    // 2. Insertar el registro de pago
+    const { data: payment, error: paymentError } = await supabase
+      .from('payments')
+      .insert([{
+        client_id: clientId,
+        unit_id: unitId,
+        receivable_id: receivableId,
+        amount: parseFloat(amount),
+        payment_date: paymentDate
+      }])
+      .select()
+      .single();
+
+    if (paymentError) throw paymentError;
+
+    // 3. Actualizar el movimiento
+    const { error: updateError } = await supabase
+      .from('receivables')
+      .update({
+        amount_paid: newPaidAmount,
+        status: newStatus
+      })
+      .eq('id', receivableId);
+
+    if (updateError) throw updateError;
+
+    return { data: payment, error: null };
+  } catch (error) {
+    console.error('Error al registrar pago:', error);
+    return { data: null, error };
+  }
+};

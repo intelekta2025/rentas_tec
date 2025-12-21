@@ -7,7 +7,8 @@ import {
   FileSpreadsheet, Settings, LogOut, CheckCircle, UserPlus,
   Building, DollarSign, FileText, Calendar, Download, School,
   Plus, Send, ChevronRight, FileCheck, Ban, Edit, Zap, Trash2,
-  Key, UploadCloud, Loader, Play, Filter, Shield, Eye, User, Phone
+  Key, UploadCloud, Loader, Play, Filter, Shield, Eye, User, Phone, Lightbulb,
+  ChevronUp, ChevronDown
 } from 'lucide-react';
 import { StatusBadge, OverdueBadge, KPICard, RevenueChart, Modal } from '../ui/Shared';
 import { UNITS, mockCXC, mockStaff } from '../../data/constants';
@@ -152,11 +153,18 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
   );
 };
 
-export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, generateContractPreview, setTerminationModalOpen, portalUsers = [], portalUsersLoading = false, contracts = [], contractsLoading = false, onFinalizeContract, onEditContract, onEditClient, onGenerateCXC, receivables = [], receivablesLoading = false }) => {
+export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, generateContractPreview, setTerminationModalOpen, portalUsers = [], portalUsersLoading = false, contracts = [], contractsLoading = false, onFinalizeContract, onEditContract, onEditClient, onGenerateCXC, onUpdateReceivable, onAddPayment, receivables = [], receivablesLoading = false }) => {
   const [isGenerateModalOpen, setGenerateModalOpen] = useState(false);
   const [contractToGenerate, setContractToGenerate] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedContractId, setSelectedContractId] = useState(null);
+  const [generationType, setGenerationType] = useState('Rent'); // 'Rent' or 'Service'
+  const [sortConfig, setSortConfig] = useState({ key: 'dueDate', direction: 'asc' });
+  const [isEditReceivableModalOpen, setEditReceivableModalOpen] = useState(false);
+  const [receivableToEdit, setReceivableToEdit] = useState(null);
+  const [isRegisterPaymentModalOpen, setRegisterPaymentModalOpen] = useState(false);
+  const [receivableToPay, setReceivableToPay] = useState(null);
+  const [movementStatusFilter, setMovementStatusFilter] = useState('Todos');
 
   // Seleccionar automáticamente el primer contrato activo si no hay ninguno seleccionado
   useEffect(() => {
@@ -169,8 +177,56 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
   const selectedContract = contracts.find(c => c.id === selectedContractId);
 
 
-  // Filter CXC for this specific client and selected contract
-  const filteredReceivables = receivables.filter(item => item.contractId === selectedContractId);
+  // Filter and Sort CXC for this specific client and selected contract
+  const filteredReceivablesList = [...receivables]
+    .filter(item => {
+      const matchesContract = item.contractId === selectedContractId;
+      if (!matchesContract) return false;
+
+      if (movementStatusFilter === 'Todos') return true;
+      if (movementStatusFilter === 'Vencido') return item.status === 'Overdue';
+      if (movementStatusFilter === 'Pendiente') return item.status.toLowerCase() === 'pending' || item.status.toLowerCase() === 'pendiente';
+      if (movementStatusFilter === 'Pagado') return item.status.toLowerCase() === 'paid' || item.status.toLowerCase() === 'pagado';
+      return true;
+    });
+
+  const sortedReceivables = filteredReceivablesList.sort((a, b) => {
+    if (!sortConfig.key) return 0;
+
+    let aVal = a[sortConfig.key];
+    let bVal = b[sortConfig.key];
+
+    // Special handling for period (Year + Month)
+    if (sortConfig.key === 'period') {
+      aVal = (a.periodYear || 0) * 100 + (a.periodMonth || 0);
+      bVal = (b.periodYear || 0) * 100 + (b.periodMonth || 0);
+    }
+
+    // Special handling for amounts
+    if (sortConfig.key === 'amount') {
+      aVal = typeof aVal === 'string' ? parseFloat(aVal.replace(/[^0-9.-]+/g, "")) : parseFloat(aVal || 0);
+      bVal = typeof bVal === 'string' ? parseFloat(bVal.replace(/[^0-9.-]+/g, "")) : parseFloat(bVal || 0);
+    }
+
+    if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const filteredReceivables = sortedReceivables; // For compatibility with existing code
+
+  const requestSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (key) => {
+    if (sortConfig.key !== key) return <ChevronUp size={14} className="ml-1 text-gray-300" />;
+    return sortConfig.direction === 'asc' ? <ChevronUp size={14} className="ml-1 text-blue-600" /> : <ChevronDown size={14} className="ml-1 text-blue-600" />;
+  };
 
   const balance = filteredReceivables.filter(i => i.status === 'Pending' || i.status === 'Overdue')
     .reduce((acc, curr) => acc + parseFloat(String(curr.amount || 0).replace(/[^0-9.-]+/g, "") || 0), 0);
@@ -187,222 +243,253 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
       </div>
 
       {/* Top Profile Card */}
-      <div className="bg-white shadow rounded-lg p-6 flex flex-col md:flex-row justify-between items-start md:items-center">
-        <div className="flex items-center mb-4 md:mb-0">
-          <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-xl mr-5">
-            {client.name.substring(0, 2).toUpperCase()}
+      <div className="bg-white shadow rounded-lg overflow-hidden flex flex-col md:flex-row">
+        {/* Left Side: Client Info */}
+        <div className="p-6 flex-1 flex flex-col md:flex-row justify-between items-start md:items-center border-b md:border-b-0 md:border-r border-gray-100">
+          <div className="flex items-center mb-4 md:mb-0">
+            <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-xl mr-5">
+              {client.name.substring(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">{client.name}</h2>
+              <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-600 mt-2">
+                <span className="flex items-center" title="Correo de contacto">
+                  <Mail size={14} className="mr-1.5 text-blue-600" /> {client.email}
+                </span>
+                <span className="flex items-center" title="Contacto principal">
+                  <User size={14} className="mr-1.5 text-blue-600" /> {client.contact}
+                </span>
+                <span className="flex items-center" title="Teléfono">
+                  <Phone size={14} className="mr-1.5 text-blue-600" /> {client.contactPhone || client.contact_phone || '-'}
+                </span>
+                <span className="flex items-center" title="Usuario Market Tec">
+                  <Users size={14} className="mr-1.5 text-blue-600" /> {client.user_market_tec || client.User_market_tec || '-'}
+                </span>
+                <span className="flex items-center">
+                  <FileText size={14} className="mr-1.5 text-gray-400" /> <span className="text-gray-400">ID: {client.id}</span>
+                </span>
+              </div>
+              <div className="mt-3 flex space-x-2">
+                <StatusBadge status={client.status} />
+              </div>
+            </div>
           </div>
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">{client.name}</h2>
-            <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-600 mt-2">
-              <span className="flex items-center" title="Correo de contacto">
-                <Mail size={14} className="mr-1.5 text-blue-600" /> {client.email}
-              </span>
-              <span className="flex items-center" title="Contacto principal">
-                <User size={14} className="mr-1.5 text-blue-600" /> {client.contact}
-              </span>
-              <span className="flex items-center" title="Teléfono">
-                <Phone size={14} className="mr-1.5 text-blue-600" /> {client.contactPhone || client.contact_phone || '-'}
-              </span>
-              <span className="flex items-center" title="Usuario Market Tec">
-                <Users size={14} className="mr-1.5 text-blue-600" /> {client.user_market_tec || client.User_market_tec || '-'}
-              </span>
-              <span className="flex items-center">
-                <FileText size={14} className="mr-1.5 text-gray-400" /> <span className="text-gray-400">ID: {client.id}</span>
-              </span>
-            </div>
-            <div className="mt-3 flex space-x-2">
-              <StatusBadge status={client.status} />
-            </div>
+          <div className="flex space-x-3 w-full md:w-auto">
+            <button
+              onClick={() => onEditClient && onEditClient(client)}
+              className="p-2 border border-gray-300 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-gray-50"
+              title="Editar perfil del cliente"
+            >
+              <Edit size={18} />
+            </button>
           </div>
         </div>
-        <div className="flex space-x-3 w-full md:w-auto">
-          <button
-            onClick={() => onEditClient && onEditClient(client)}
-            className="p-2 border border-gray-300 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-gray-50"
-            title="Editar perfil del cliente"
-          >
-            <Edit size={18} />
-          </button>
+
+        {/* Right Side: Portal Users Management */}
+        <div className="w-full md:w-80 bg-gray-50 p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide">Usuarios del Portal</h3>
+            <button className="text-blue-600 hover:text-blue-800 text-xs font-medium flex items-center">
+              <UserPlus size={14} className="mr-1" /> Agregar
+            </button>
+          </div>
+          {portalUsersLoading ? (
+            <div className="py-2 text-center">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-900 mx-auto"></div>
+            </div>
+          ) : portalUsers.length === 0 ? (
+            <p className="text-xs text-gray-500 py-2 text-center italic">Sin usuarios registrados</p>
+          ) : (
+            <div className="space-y-3 max-h-40 overflow-y-auto pr-1">
+              {portalUsers.map((user) => (
+                <div key={user.id} className="flex items-center justify-between text-xs bg-white p-2 rounded border border-gray-200 shadow-sm">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-gray-900 truncate">{user.name || user.full_name || 'Sin nombre'}</p>
+                    <p className="text-[10px] text-gray-500 truncate">{user.email}</p>
+                  </div>
+                  <div className="flex items-center space-x-1 flex-shrink-0 ml-2">
+                    <button className="text-gray-400 hover:text-red-500 transition-colors" title="Eliminar">
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mt-4 pt-3 border-t border-gray-200">
+            <button className="w-full text-center text-[10px] text-blue-600 hover:underline flex justify-center items-center">
+              <Key size={10} className="mr-1" /> Restablecer contraseñas
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Dashboard Tabs Area */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {/* Main Content Area (Left) */}
-        <div className="lg:col-span-2 space-y-6">
-
-          {/* Financial Summary Cards */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
-              <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Saldo Total Pendiente</div>
-              <div className="text-2xl font-bold text-gray-900 mt-1">${balance.toLocaleString()}</div>
-            </div>
-            <div className="bg-white p-4 rounded-lg shadow border-l-4 border-red-500">
-              <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Deuda Vencida</div>
-              <div className="text-2xl font-bold text-red-600 mt-1 flex items-center">
-                ${overdueTotal.toLocaleString()}
-                {overdueTotal > 0 && <AlertTriangle size={16} className="ml-2" />}
-              </div>
+      {/* Main Content Area */}
+      <div className="space-y-6">
+        {/* Financial Summary Cards */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
+            <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Saldo Total Pendiente</div>
+            <div className="text-2xl font-bold text-gray-900 mt-1">${balance.toLocaleString()}</div>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-red-500">
+            <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Deuda Vencida</div>
+            <div className="text-2xl font-bold text-red-600 mt-1 flex items-center">
+              ${overdueTotal.toLocaleString()}
+              {overdueTotal > 0 && <AlertTriangle size={16} className="ml-2" />}
             </div>
           </div>
+        </div>
 
-          {/* Contratos Existentes */}
-          <div className="bg-white shadow rounded-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-              <h3 className="text-lg font-medium text-gray-900">Contratos</h3>
-              <button
-                onClick={() => { setContractModalOpen(true); }}
-                className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-sm font-medium flex items-center shadow-sm"
-              >
-                <FileCheck size={16} className="mr-2" />
-                Crear Contrato
-              </button>
+        {/* Contratos Existentes */}
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+            <h3 className="text-lg font-medium text-gray-900">Contratos</h3>
+            <button
+              onClick={() => { setContractModalOpen(true); }}
+              className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-sm font-medium flex items-center shadow-sm"
+            >
+              <FileCheck size={16} className="mr-2" />
+              Crear Contrato
+            </button>
+          </div>
+          {contractsLoading ? (
+            <div className="px-6 py-8 text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-900 mx-auto"></div>
+              <p className="mt-4 text-sm text-gray-600">Cargando contratos...</p>
             </div>
-            {contractsLoading ? (
-              <div className="px-6 py-8 text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-900 mx-auto"></div>
-                <p className="mt-4 text-sm text-gray-600">Cargando contratos...</p>
-              </div>
-            ) : contracts.length === 0 ? (
-              <div className="px-6 py-8 text-center">
-                <p className="text-sm text-gray-500">No hay contratos registrados para este cliente.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Período</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Meses</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Renta de Servicios</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Renta Mensual</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Terminación</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {contracts.map((contract) => {
-                      const isSelected = selectedContractId === contract.id;
-                      // Usar directamente los campos de la BD (snake_case)
-                      const startDateRaw = contract.start_date
-                      const endDateRaw = contract.end_date
-                      const terminationDateRaw = contract.termination_date
+          ) : contracts.length === 0 ? (
+            <div className="px-6 py-8 text-center">
+              <p className="text-sm text-gray-500">No hay contratos registrados para este cliente.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Período</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Meses</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Renta de Servicios</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Renta Mensual</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Terminación</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {contracts.map((contract) => {
+                    const isSelected = selectedContractId === contract.id;
+                    const startDateRaw = contract.start_date
+                    const endDateRaw = contract.end_date
+                    const terminationDateRaw = contract.termination_date
 
-                      // ... (rest of formatting logic remains the same)
+                    const contractStatus = contract.status || 'Active'
+                    const isActive = contractStatus === 'Active' || contractStatus === 'activo' || contractStatus === 'Activo'
+                    const isTerminated = contractStatus === 'Terminado' || contractStatus === 'terminado' || contractStatus === 'Terminated'
 
-                      // Let's use the provided code but fix the row part
+                    let startDateFormatted = '-'
+                    if (startDateRaw) {
+                      try {
+                        const [year, month, day] = startDateRaw.split('T')[0].split('-')
+                        const date = new Date(year, month - 1, day)
+                        if (!isNaN(date.getTime())) {
+                          startDateFormatted = date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' }).replace('.', '')
+                        }
+                      } catch (e) { }
+                    }
 
-                      // Usar el campo status directamente de la BD
-                      const contractStatus = contract.status || 'Active'
-                      const isActive = contractStatus === 'Active' || contractStatus === 'activo' || contractStatus === 'Activo'
-                      const isTerminated = contractStatus === 'Terminado' || contractStatus === 'terminado' || contractStatus === 'Terminated'
+                    let endDateFormatted = 'Activo'
+                    if (endDateRaw) {
+                      try {
+                        const [year, month, day] = endDateRaw.split('T')[0].split('-')
+                        const date = new Date(year, month - 1, day)
+                        if (!isNaN(date.getTime())) {
+                          endDateFormatted = date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' }).replace('.', '')
+                        }
+                      } catch (e) { }
+                    }
 
-                      // Formatear fechas (reutilizando lógica existente)
-                      let startDateFormatted = '-'
-                      if (startDateRaw) {
-                        try {
-                          const [year, month, day] = startDateRaw.split('T')[0].split('-')
-                          const date = new Date(year, month - 1, day)
-                          if (!isNaN(date.getTime())) {
-                            startDateFormatted = date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' }).replace('.', '')
-                          }
-                        } catch (e) { }
-                      }
+                    const monthlyRentRaw = contract.monthly_rent_amount
+                    let monthlyRentFormatted = '$0.00'
+                    if (monthlyRentRaw) {
+                      const amount = typeof monthlyRentRaw === 'string' ? parseFloat(monthlyRentRaw.replace(/[^0-9.-]+/g, '')) : parseFloat(monthlyRentRaw)
+                      if (!isNaN(amount)) monthlyRentFormatted = `$${amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    }
 
-                      let endDateFormatted = 'Activo'
-                      if (endDateRaw) {
-                        try {
-                          const [year, month, day] = endDateRaw.split('T')[0].split('-')
-                          const date = new Date(year, month - 1, day)
-                          if (!isNaN(date.getTime())) {
-                            endDateFormatted = date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' }).replace('.', '')
-                          }
-                        } catch (e) { }
-                      }
+                    const serviceRentRaw = contract.monthly_services_amount
+                    let serviceRentFormatted = '$0.00'
+                    if (serviceRentRaw) {
+                      const amount = typeof serviceRentRaw === 'string' ? parseFloat(serviceRentRaw.replace(/[^0-9.-]+/g, '')) : parseFloat(serviceRentRaw)
+                      if (!isNaN(amount)) serviceRentFormatted = `$${amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    }
 
-                      const monthlyRentRaw = contract.monthly_rent_amount
-                      let monthlyRentFormatted = '$0.00'
-                      if (monthlyRentRaw) {
-                        const amount = typeof monthlyRentRaw === 'string' ? parseFloat(monthlyRentRaw.replace(/[^0-9.-]+/g, '')) : parseFloat(monthlyRentRaw)
-                        if (!isNaN(amount)) monthlyRentFormatted = `$${amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                      }
-
-                      const serviceRentRaw = contract.monthly_services_amount
-                      let serviceRentFormatted = '$0.00'
-                      if (serviceRentRaw) {
-                        const amount = typeof serviceRentRaw === 'string' ? parseFloat(serviceRentRaw.replace(/[^0-9.-]+/g, '')) : parseFloat(serviceRentRaw)
-                        if (!isNaN(amount)) serviceRentFormatted = `$${amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                      }
-
-                      return (
-                        <tr
-                          key={contract.id}
-                          onClick={() => setSelectedContractId(contract.id)}
-                          className={`transition-colors cursor-pointer border-l-4 ${isSelected ? 'bg-blue-50 border-blue-500' : 'hover:bg-gray-50 border-transparent'}`}
-                        >
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">
-                              {startDateFormatted} - {endDateFormatted}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center md:text-left font-bold text-blue-700">
-                            {contract.num_months || '-'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">
-                              {serviceRentFormatted}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">
-                              {monthlyRentFormatted}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-500">
-                              {(() => {
-                                // Formatear fecha de terminación usando termination_date
-                                let terminationDateFormatted = '-'
-                                if (terminationDateRaw) {
-                                  try {
-                                    // Parsear como fecha local (evitar conversión de zona horaria)
-                                    const [year, month, day] = terminationDateRaw.split('T')[0].split('-')
-                                    const date = new Date(year, month - 1, day)
-                                    if (!isNaN(date.getTime())) {
-                                      terminationDateFormatted = date.toLocaleDateString('es-MX', {
-                                        day: '2-digit',
-                                        month: 'short',
-                                        year: '2-digit'
-                                      }).replace('.', '')
-                                    }
-                                  } catch (e) {
-                                    console.warn('Error al formatear terminationDate:', e)
+                    return (
+                      <tr
+                        key={contract.id}
+                        onClick={() => setSelectedContractId(contract.id)}
+                        className={`transition-colors cursor-pointer border-l-4 ${isSelected ? 'bg-blue-50 border-blue-500' : 'hover:bg-gray-50 border-transparent'}`}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            {startDateFormatted} - {endDateFormatted}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center md:text-left font-bold text-blue-700">
+                          {contract.num_months || '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            {serviceRentFormatted}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            {monthlyRentFormatted}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-500">
+                            {(() => {
+                              let terminationDateFormatted = '-'
+                              if (terminationDateRaw) {
+                                try {
+                                  const [year, month, day] = terminationDateRaw.split('T')[0].split('-')
+                                  const date = new Date(year, month - 1, day)
+                                  if (!isNaN(date.getTime())) {
+                                    terminationDateFormatted = date.toLocaleDateString('es-MX', {
+                                      day: '2-digit',
+                                      month: 'short',
+                                      year: '2-digit'
+                                    }).replace('.', '')
                                   }
+                                } catch (e) {
+                                  console.warn('Error al formatear terminationDate:', e)
                                 }
-                                return terminationDateFormatted
-                              })()}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline - flex items - center px - 2.5 py - 0.5 rounded - full text - xs font - medium ${isActive
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
-                              } `}>
-                              {contractStatus === 'Active' || contractStatus === 'activo' || contractStatus === 'Activo'
-                                ? 'Activo'
-                                : isTerminated
-                                  ? 'Terminado'
-                                  : contractStatus || 'Activo'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <div className="flex justify-end space-x-2">
-                              {isActive && (
+                              }
+                              return terminationDateFormatted
+                            })()}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${isActive
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                            }`}>
+                            {contractStatus === 'Active' || contractStatus === 'activo' || contractStatus === 'Activo'
+                              ? 'Activo'
+                              : isTerminated
+                                ? 'Terminado'
+                                : contractStatus || 'Activo'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex justify-end space-x-2">
+                            {isActive && (
+                              <div className="flex space-x-1">
                                 <button
-                                  onClick={() => {
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setGenerationType('Rent');
                                     setContractToGenerate(contract);
                                     setGenerateModalOpen(true);
                                   }}
@@ -411,306 +498,590 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                                 >
                                   <Zap size={18} />
                                 </button>
-                              )}
-                              <button
-                                onClick={() => onEditContract && onEditContract(contract)}
-                                className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                                title="Editar contrato"
-                              >
-                                <Edit size={16} />
-                              </button>
-                              {isActive && (
                                 <button
-                                  onClick={() => onFinalizeContract && onFinalizeContract(contract.id)}
-                                  className="p-1 text-gray-400 hover:text-red-500 transition-colors"
-                                  title="Finalizar contrato"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setGenerationType('Service');
+                                    setContractToGenerate(contract);
+                                    setGenerateModalOpen(true);
+                                  }}
+                                  className="p-1 text-gray-400 hover:text-yellow-600 transition-colors"
+                                  title="Generar CXC de Luz/Servicios"
                                 >
-                                  <Ban size={16} />
+                                  <Lightbulb size={18} />
                                 </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* Transactions Table */}
-          <div className="bg-white shadow rounded-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-medium text-gray-900">Estado de Cuenta (Movimientos)</h3>
-                <p className="text-xs text-blue-600 font-bold uppercase mt-0.5">
-                  {selectedContract ? (
-                    (() => {
-                      const formatDateShort = (dateStr) => {
-                        if (!dateStr) return '';
-                        try {
-                          const [y, m, d] = dateStr.split('-');
-                          const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-                          const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-                          return `${months[date.getMonth()]} ${y.substring(2)}`;
-                        } catch (e) { return dateStr; }
-                      };
-                      return `${formatDateShort(selectedContract.start_date)} - ${formatDateShort(selectedContract.end_date)}`;
-                    })()
-                  ) : 'Seleccione un contrato'}
-                </p>
-              </div>
-            </div>
-
-            <div className="max-h-96 overflow-y-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-white sticky top-0 shadow-sm z-10">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Concepto</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vencimiento</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monto</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
-                    <th className="relative px-6 py-3"><span className="sr-only">Acciones</span></th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {receivablesLoading ? (
-                    <tr><td colSpan="5" className="px-6 py-8 text-center"><Loader size={24} className="animate-spin mx-auto text-blue-600" /></td></tr>
-                  ) : filteredReceivables.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50 group">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{item.concept}</div>
-                        {item.type === 'Service' && <span className="text-xs text-yellow-600 flex items-center"><Zap size={10} className="mr-1" />Servicio</span>}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {(() => {
-                          if (!item.dueDate) return '-';
-                          try {
-                            const [y, m, d] = item.dueDate.split('-');
-                            const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-                            const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-                            return `${d} ${months[date.getMonth()]} ${y.substring(2)}`;
-                          } catch (e) { return item.dueDate; }
-                        })()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{item.amount}</td>
-                      <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={item.status} /></td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="hidden group-hover:flex justify-end space-x-2">
-                          <button className="text-blue-600 hover:text-blue-900" title="Registrar Pago"><DollarSign size={16} /></button>
-                          <button className="text-gray-400 hover:text-gray-600" title="Editar Monto"><Edit size={16} /></button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {!receivablesLoading && filteredReceivables.length === 0 && (
-                    <tr><td colSpan="5" className="px-6 py-20 text-center text-sm text-gray-500">
-                      <FileText size={40} className="mx-auto text-gray-200 mb-3" />
-                      No hay movimientos registrados para este contrato.
-                    </td></tr>
-                  )}
+                              </div>
+                            )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onEditContract && onEditContract(contract);
+                              }}
+                              className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                              title="Editar contrato"
+                            >
+                              <Edit size={16} />
+                            </button>
+                            {isActive && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onFinalizeContract && onFinalizeContract(contract.id);
+                                }}
+                                className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                                title="Finalizar contrato"
+                              >
+                                <Ban size={16} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
-          </div>
-        </div>
-
-        {/* Sidebar Area (Right) */}
-        <div className="space-y-6">
-
-          {/* NEW: Portal Access Card */}
-          <div className="bg-white shadow rounded-lg p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Usuarios del Portal</h3>
-              <button className="text-blue-600 hover:text-blue-800 text-xs font-medium flex items-center">
-                <UserPlus size={14} className="mr-1" /> Agregar
-              </button>
-            </div>
-            {portalUsersLoading ? (
-              <div className="py-4 text-center">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-900 mx-auto"></div>
-                <p className="mt-2 text-xs text-gray-500">Cargando usuarios...</p>
-              </div>
-            ) : portalUsers.length === 0 ? (
-              <p className="text-sm text-gray-500 py-4 text-center">No hay usuarios del portal registrados.</p>
-            ) : (
-              <ul className="space-y-3">
-                {portalUsers.map((user) => (
-                  <li key={user.id} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center flex-1 min-w-0">
-                      <div className={`rounded - full p - 1 mr - 2 flex - shrink - 0 ${user.isActive ? 'bg-blue-100' : 'bg-gray-100'} `}>
-                        <Users size={12} className={user.isActive ? 'text-blue-600' : 'text-gray-600'} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-900 truncate">{user.name || user.full_name || 'Sin nombre'}</p>
-                        <p className="text-xs text-gray-500 truncate">{user.email}</p>
-                        {user.role && user.role !== 'Client' && (
-                          <p className="text-xs text-gray-400 mt-0.5">{user.role}</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2 flex-shrink-0">
-                      <span className={`inline - flex items - center px - 2 py - 0.5 rounded text - xs font - medium ${user.isActive
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-gray-100 text-gray-600'
-                        } `}>
-                        {user.isActive ? 'Activo' : 'Inactivo'}
-                      </span>
-                      <button
-                        className="text-gray-400 hover:text-red-500 transition-colors"
-                        title="Eliminar usuario"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="mt-4 pt-3 border-t border-gray-100">
-              <button className="w-full text-center text-xs text-blue-600 hover:underline flex justify-center items-center">
-                <Key size={12} className="mr-1" /> Restablecer contraseñas
-              </button>
-            </div>
-          </div>
-
-          {/* Actions Card */}
-          <div className="bg-white shadow rounded-lg p-6">
-            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-4">Acciones Rápidas</h3>
-            <div className="space-y-3">
-              <button className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                <Mail size={16} className="mr-2 text-gray-400" /> Enviar Estado de Cuenta
-              </button>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      {/* Modal de Confirmación para Generar CXC Rentas */}
-      <Modal
-        isOpen={isGenerateModalOpen}
-        onClose={() => !isGenerating && setGenerateModalOpen(false)}
-        title="Generar CXC de Rentas"
-      >
-        <div className="p-2">
-          {contractToGenerate && (
-            <div className="space-y-4">
-              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
-                <p className="text-sm text-blue-800">
-                  Se generarán <strong>{contractToGenerate.num_months || '0'}</strong> registros de cobro correspondientes a la <strong>Renta Mensual</strong> de este contrato.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-100">
-                <div>
-                  <span className="block text-xs text-gray-500 uppercase font-bold tracking-wider">Monto Mensual</span>
-                  <span className="text-lg font-bold text-gray-900">${(contractToGenerate.monthly_rent_amount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div>
-                  <span className="block text-xs text-gray-500 uppercase font-bold tracking-wider">Total a Generar</span>
-                  <span className="text-lg font-bold text-blue-700">${((contractToGenerate.monthly_rent_amount || 0) * (contractToGenerate.num_months || 0)).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="col-span-2">
-                  <span className="block text-xs text-gray-500 uppercase font-bold tracking-wider">Concepto Sugerido</span>
-                  <span className="text-sm text-gray-700 italic">"Renta [Mes] [Año]"</span>
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <p className="text-xs text-gray-500 text-center italic">
-                  Esta acción creará los registros en el Estado de Cuenta de forma automática.
-                </p>
-              </div>
-
-              <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100">
-                <button
-                  onClick={() => setGenerateModalOpen(false)}
-                  disabled={isGenerating}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={async () => {
-                    setIsGenerating(true);
-                    try {
-                      // Preparar los datos
-                      const invoices = [];
-                      const startDateStr = contractToGenerate.start_date;
-                      // Parsear como fecha local YYYY-MM-DD
-                      const [yearStr, monthStr, dayStr] = startDateStr.split('-');
-                      const startDate = new Date(parseInt(yearStr), parseInt(monthStr) - 1, parseInt(dayStr));
-
-                      const monthsCount = parseInt(contractToGenerate.num_months) || 0;
-
-                      const monthNames = [
-                        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-                        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
-                      ];
-
-                      for (let i = 0; i < monthsCount; i++) {
-                        const currentMonthDate = new Date(startDate);
-                        currentMonthDate.setMonth(startDate.getMonth() + i);
-
-                        const mIndex = currentMonthDate.getMonth();
-                        const year = currentMonthDate.getFullYear();
-
-                        const y = currentMonthDate.getFullYear();
-                        const m = String(currentMonthDate.getMonth() + 1).padStart(2, '0');
-                        const d = String(currentMonthDate.getDate()).padStart(2, '0');
-                        const dueDateStr = `${y}-${m}-${d}`;
-
-                        invoices.push({
-                          unitId: contractToGenerate.unit_id,
-                          clientId: contractToGenerate.client_id,
-                          contractId: contractToGenerate.id,
-                          amount: contractToGenerate.monthly_rent_amount,
-                          concept: `Renta ${monthNames[mIndex]} ${year}`,
-                          dueDate: dueDateStr,
-                          status: 'Pending',
-                          type: 'Rent',
-                          periodMonth: mIndex + 1,
-                          periodYear: year,
-                        });
-                      }
-
-                      if (onGenerateCXC) {
-                        const result = await onGenerateCXC(invoices);
-                        if (result.success) {
-                          setGenerateModalOpen(false);
-                        } else {
-                          alert('Error al generar CXC: ' + (result.error?.message || 'Error desconocido'));
-                        }
-                      }
-                    } catch (err) {
-                      console.error('Error in generation loop:', err);
-                      alert('Ocurrió un error inesperado al generar los cobros.');
-                    } finally {
-                      setIsGenerating(false);
-                    }
-                  }}
-                  disabled={isGenerating}
-                  className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold rounded-md shadow-sm transition-all flex items-center"
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader size={16} className="animate-spin mr-2" />
-                      Generando...
-                    </>
-                  ) : 'Confirmar y Guardar'}
-                </button>
-              </div>
-            </div>
           )}
         </div>
-      </Modal>
+
+        {/* Transactions Table */}
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900">Estado de Cuenta</h3>
+              <p className="text-xs text-blue-600 font-bold uppercase mt-0.5">
+                {selectedContract ? (
+                  (() => {
+                    const formatDateShort = (dateStr) => {
+                      if (!dateStr) return '';
+                      try {
+                        const [y, m, d] = dateStr.split('-');
+                        const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+                        const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+                        return `${months[date.getMonth()]} ${y.substring(2)}`;
+                      } catch (e) { return dateStr; }
+                    };
+                    return `${formatDateShort(selectedContract.start_date)} - ${formatDateShort(selectedContract.end_date)}`;
+                  })()
+                ) : 'Seleccione un contrato'}
+              </p>
+            </div>
+
+            <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-200">
+              {['Todos', 'Vencido', 'Pendiente', 'Pagado'].map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setMovementStatusFilter(f)}
+                  className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${movementStatusFilter === f
+                    ? "bg-white text-blue-700 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                    }`}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="max-h-96 overflow-y-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-white sticky top-0 shadow-sm z-10">
+                <tr>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors w-20"
+                    onClick={() => requestSort('type')}
+                  >
+                    <div className="flex items-center">Tipo {getSortIcon('type')}</div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => requestSort('period')}
+                  >
+                    <div className="flex items-center">Mes {getSortIcon('period')}</div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => requestSort('dueDate')}
+                  >
+                    <div className="flex items-center">Vencimiento {getSortIcon('dueDate')}</div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => requestSort('daysOverdue')}
+                  >
+                    <div className="flex items-center">Atraso {getSortIcon('daysOverdue')}</div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => requestSort('amount')}
+                  >
+                    <div className="flex items-center justify-end">Monto {getSortIcon('amount')}</div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => requestSort('status')}
+                  >
+                    <div className="flex items-center">Estado {getSortIcon('status')}</div>
+                  </th>
+                  <th className="relative px-6 py-3"><span className="sr-only">Acciones</span></th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {receivablesLoading ? (
+                  <tr><td colSpan="5" className="px-6 py-8 text-center"><Loader size={24} className="animate-spin mx-auto text-blue-600" /></td></tr>
+                ) : filteredReceivables.map((item) => (
+                  <tr key={item.id} className="hover:bg-gray-50 group">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {item.type === 'Rent' ? (
+                        <div className="flex items-center text-blue-600" title="Renta">
+                          <Home size={18} />
+                        </div>
+                      ) : (
+                        <div className="flex items-center text-yellow-600" title="Luz/Servicios">
+                          <Lightbulb size={18} />
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {(() => {
+                        if (!item.periodMonth) return '-';
+                        const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+                        return `${months[item.periodMonth - 1]} ${String(item.periodYear).substring(2)}`;
+                      })()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {(() => {
+                        if (!item.dueDate) return '-';
+                        try {
+                          const [y, m, d] = item.dueDate.split('-');
+                          const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+                          const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+                          return `${d} ${months[date.getMonth()]} ${y.substring(2)}`;
+                        } catch (e) { return item.dueDate; }
+                      })()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {item.status === 'Overdue' && item.daysOverdue > 0 ? (
+                        <span className="text-red-600 font-bold flex items-center">
+                          <AlertTriangle size={14} className="mr-1" />
+                          {item.daysOverdue} {item.daysOverdue === 1 ? 'día' : 'días'}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">
+                      {(() => {
+                        const amt = typeof item.amount === 'string' ? parseFloat(item.amount.replace(/[^0-9.-]+/g, "")) : item.amount;
+                        return isNaN(amt) ? item.amount : `$${amt.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                      })()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={item.status} /></td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="hidden group-hover:flex justify-end space-x-2">
+                        <button
+                          className="text-blue-600 hover:text-blue-900"
+                          title="Registrar Pago"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setReceivableToPay(item);
+                            setRegisterPaymentModalOpen(true);
+                          }}
+                        >
+                          <DollarSign size={16} />
+                        </button>
+                        <button
+                          className="text-gray-400 hover:text-gray-600"
+                          title="Editar Monto"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setReceivableToEdit(item);
+                            setEditReceivableModalOpen(true);
+                          }}
+                        >
+                          <Edit size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {!receivablesLoading && sortedReceivables.length === 0 && (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-20 text-center text-sm text-gray-500">
+                      <FileText size={40} className="mx-auto text-gray-200 mb-3" />
+                      No hay movimientos registrados para este contrato.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end">
+            <button className="flex items-center justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors">
+              <Mail size={16} className="mr-2" /> Enviar Estado de Cuenta por Correo
+            </button>
+          </div>
+        </div>
+
+        {/* Modal para editar movimiento */}
+        <Modal
+          isOpen={isEditReceivableModalOpen}
+          onClose={() => setEditReceivableModalOpen(false)}
+          title="Editar Movimiento"
+        >
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            setIsGenerating(true);
+            try {
+              const formData = new FormData(e.target);
+              const updateData = {
+                concept: formData.get('concept'),
+                amount: parseFloat(formData.get('amount')),
+                dueDate: formData.get('dueDate'),
+                periodMonth: parseInt(formData.get('periodMonth')),
+                periodYear: parseInt(formData.get('periodYear')),
+              };
+              const result = await onUpdateReceivable(receivableToEdit.id, updateData);
+              if (result.success) {
+                setEditReceivableModalOpen(false);
+              } else {
+                alert('Error al actualizar: ' + result.error?.message);
+              }
+            } catch (err) {
+              alert('Error inesperado: ' + err.message);
+            } finally {
+              setIsGenerating(false);
+            }
+          }} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mes</label>
+                <select
+                  name="periodMonth"
+                  defaultValue={receivableToEdit?.periodMonth || 1}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="1">Enero</option>
+                  <option value="2">Febrero</option>
+                  <option value="3">Marzo</option>
+                  <option value="4">Abril</option>
+                  <option value="5">Mayo</option>
+                  <option value="6">Junio</option>
+                  <option value="7">Julio</option>
+                  <option value="8">Agosto</option>
+                  <option value="9">Septiembre</option>
+                  <option value="10">Octubre</option>
+                  <option value="11">Noviembre</option>
+                  <option value="12">Diciembre</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Año</label>
+                <input
+                  type="number"
+                  name="periodYear"
+                  defaultValue={receivableToEdit?.periodYear || new Date().getFullYear()}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Concepto</label>
+              <input
+                type="text"
+                name="concept"
+                defaultValue={receivableToEdit?.concept}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Monto</label>
+              <div className="relative">
+                <span className="absolute left-3 top-2 text-gray-500">$</span>
+                <input
+                  type="number"
+                  name="amount"
+                  step="0.01"
+                  defaultValue={receivableToEdit ? parseFloat(String(receivableToEdit.amount).replace(/[^0-9.-]+/g, "")) : 0}
+                  required
+                  className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Vencimiento</label>
+              <input
+                type="date"
+                name="dueDate"
+                defaultValue={receivableToEdit?.dueDate}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <div className="flex justify-end space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={() => setEditReceivableModalOpen(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={isGenerating}
+                className="px-4 py-2 bg-blue-700 text-white rounded-md text-sm font-medium hover:bg-blue-800 disabled:opacity-50"
+              >
+                {isGenerating ? 'Guardando...' : 'Guardar Cambios'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+
+        {/* Modal para registrar pago */}
+        <Modal
+          isOpen={isRegisterPaymentModalOpen}
+          onClose={() => !isGenerating && setRegisterPaymentModalOpen(false)}
+          title="Registrar Pago"
+        >
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            setIsGenerating(true);
+            try {
+              const formData = new FormData(e.target);
+              const paymentData = {
+                receivableId: receivableToPay.id,
+                amount: parseFloat(formData.get('amount')),
+                paymentDate: formData.get('paymentDate'),
+                clientId: client.id,
+                unitId: client.unitId || client.unit_id
+              };
+
+              const result = await onAddPayment(paymentData);
+              if (result.success) {
+                setRegisterPaymentModalOpen(false);
+              } else {
+                alert('Error al registrar pago: ' + result.error?.message);
+              }
+            } catch (err) {
+              console.error('Error registering payment:', err);
+              alert('Error inesperado: ' + err.message);
+            } finally {
+              setIsGenerating(false);
+            }
+          }} className="space-y-4">
+            {receivableToPay && (
+              <div className="bg-blue-50 p-3 rounded-md mb-4 border border-blue-100">
+                <p className="text-xs text-blue-700 uppercase font-bold mb-1">Movimiento Seleccionado</p>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-medium text-blue-900">{receivableToPay.concept}</span>
+                  <div className="text-right">
+                    <span className="block font-bold text-blue-900">
+                      Saldo: ${parseFloat(String(receivableToPay.balance_due || receivableToPay.amount).replace(/[^0-9.-]+/g, "")).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    </span>
+                    {receivableToPay.paid_amount > 0 && (
+                      <span className="text-[10px] text-blue-600 block">Pagado: ${parseFloat(receivableToPay.paid_amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Monto del Pago</label>
+              <div className="relative">
+                <span className="absolute left-3 top-2 text-gray-500">$</span>
+                <input
+                  type="number"
+                  name="amount"
+                  step="0.01"
+                  defaultValue={receivableToPay ? parseFloat(String(receivableToPay.balance_due || receivableToPay.amount).replace(/[^0-9.-]+/g, "")) : 0}
+                  required
+                  className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Pago</label>
+              <input
+                type="date"
+                name="paymentDate"
+                defaultValue={new Date().toISOString().split('T')[0]}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setRegisterPaymentModalOpen(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={isGenerating}
+                className="px-4 py-2 bg-green-700 text-white rounded-md text-sm font-bold hover:bg-green-800 disabled:opacity-50 shadow-sm flex items-center"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader size={16} className="animate-spin mr-2" />
+                    Registrando...
+                  </>
+                ) : 'Registrar Pago'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+
+
+        {/* Modal de Confirmación para Generar CXC Rentas */}
+        <Modal
+          isOpen={isGenerateModalOpen}
+          onClose={() => !isGenerating && setGenerateModalOpen(false)}
+          title={generationType === 'Rent' ? "Generar CXC de Rentas" : "Generar CXC de Luz/Servicios"}
+        >
+          <div className="p-2">
+            {contractToGenerate && (
+              <div className="space-y-4">
+                <div className={generationType === 'Rent' ? "bg-blue-50 border-l-4 border-blue-500 p-4 rounded" : "bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded"}>
+                  <p className={generationType === 'Rent' ? "text-sm text-blue-800" : "text-sm text-yellow-800"}>
+                    Se generarán <strong>{contractToGenerate.num_months || '0'}</strong> registros de cobro correspondientes a la <strong>{generationType === 'Rent' ? 'Renta Mensual' : 'Luz/Servicios'}</strong> de este contrato.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-100">
+                  <div>
+                    <span className="block text-xs text-gray-500 uppercase font-bold tracking-wider">Monto Mensual</span>
+                    <span className="text-lg font-bold text-gray-900">
+                      ${(generationType === 'Rent' ? (contractToGenerate.monthly_rent_amount || 0) : (contractToGenerate.monthly_services_amount || 0)).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-500 uppercase font-bold tracking-wider">Total a Generar</span>
+                    <span className={generationType === 'Rent' ? "text-lg font-bold text-blue-700" : "text-lg font-bold text-yellow-700"}>
+                      ${((generationType === 'Rent' ? (contractToGenerate.monthly_rent_amount || 0) : (contractToGenerate.monthly_services_amount || 0)) * (contractToGenerate.num_months || 0)).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="block text-xs text-gray-500 uppercase font-bold tracking-wider">Concepto Sugerido</span>
+                    <span className="text-sm text-gray-700 italic">"{generationType === 'Rent' ? 'Renta' : 'Luz'} [Mes] [Año]"</span>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <p className="text-xs text-gray-500 text-center italic">
+                    Esta acción creará los registros en el Estado de Cuenta de forma automática.
+                  </p>
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100">
+                  <button
+                    onClick={() => setGenerateModalOpen(false)}
+                    disabled={isGenerating}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setIsGenerating(true);
+                      try {
+                        // Preparar los datos
+                        const invoices = [];
+                        const startDateStr = contractToGenerate.start_date;
+                        // Parsear como fecha local YYYY-MM-DD
+                        const [yearStr, monthStr, dayStr] = startDateStr.split('-');
+                        const startDate = new Date(parseInt(yearStr), parseInt(monthStr) - 1, parseInt(dayStr));
+
+                        const monthsCount = parseInt(contractToGenerate.num_months) || 0;
+
+                        const monthNames = [
+                          "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                          "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+                        ];
+
+                        for (let i = 0; i < monthsCount; i++) {
+                          const currentMonthDate = new Date(startDate);
+                          currentMonthDate.setMonth(startDate.getMonth() + i);
+
+                          const mIndex = currentMonthDate.getMonth();
+                          const year = currentMonthDate.getFullYear();
+
+                          const y = currentMonthDate.getFullYear();
+                          const m = currentMonthDate.getMonth();
+
+                          // Usar cutoff_day si existe, sino usar el día de la fecha de inicio
+                          const cutoffDay = contractToGenerate.cutoff_day || startDate.getDate();
+
+                          // Asegurar que el día sea válido para el mes actual (ej: Feb 30 -> Feb 28/29)
+                          const lastDayOfMonth = new Date(y, m + 1, 0).getDate();
+                          const finalDay = Math.min(cutoffDay, lastDayOfMonth);
+
+                          const mStr = String(m + 1).padStart(2, '0');
+                          const dStr = String(finalDay).padStart(2, '0');
+                          const dueDateStr = `${y}-${mStr}-${dStr}`;
+
+                          const amount = generationType === 'Rent' ? contractToGenerate.monthly_rent_amount : contractToGenerate.monthly_services_amount;
+                          const conceptPrefix = generationType === 'Rent' ? 'Renta' : 'Luz';
+                          const typeVal = generationType === 'Rent' ? 'Rent' : 'Service';
+
+                          invoices.push({
+                            unitId: contractToGenerate.unit_id,
+                            clientId: contractToGenerate.client_id,
+                            contractId: contractToGenerate.id,
+                            amount: amount,
+                            concept: `${conceptPrefix} ${monthNames[mIndex]} ${year}`,
+                            dueDate: dueDateStr,
+                            status: 'Pending',
+                            type: typeVal,
+                            periodMonth: mIndex + 1,
+                            periodYear: year,
+                          });
+                        }
+
+                        if (onGenerateCXC) {
+                          const result = await onGenerateCXC(invoices);
+                          if (result.success) {
+                            setGenerateModalOpen(false);
+                          } else {
+                            alert('Error al generar CXC: ' + (result.error?.message || 'Error desconocido'));
+                          }
+                        }
+                      } catch (err) {
+                        console.error('Error in generation loop:', err);
+                        alert('Ocurrió un error inesperado al generar los cobros.');
+                      } finally {
+                        setIsGenerating(false);
+                      }
+                    }}
+                    disabled={isGenerating}
+                    className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold rounded-md shadow-sm transition-all flex items-center"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader size={16} className="animate-spin mr-2" />
+                        Generando...
+                      </>
+                    ) : 'Confirmar y Guardar'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </Modal>
+      </div>
     </div>
   );
 };
 
-export const MarketTecView = ({ user }) => {
+export const MarketTecView = ({ user, unitName }) => {
   const [fileStatus, setFileStatus] = useState('idle'); // idle, uploading, uploaded, validating, validated, applying, applied
   const [uploadProgress, setUploadProgress] = useState(0);
 
@@ -760,8 +1131,8 @@ export const MarketTecView = ({ user }) => {
       {(fileStatus === 'idle' || fileStatus === 'uploading') && (
         <div
           onClick={fileStatus === 'idle' ? handleFileUpload : undefined}
-          className={`bg - white shadow rounded - lg p - 8 text - center border - 2 border - dashed transition - colors group relative
-                  ${fileStatus === 'idle' ? 'border-gray-300 hover:border-blue-500 cursor-pointer' : 'border-blue-300 cursor-wait'} `}
+          className={`bg-white shadow rounded-lg p-8 text-center border-2 border-dashed transition-colors group relative
+                  ${fileStatus === 'idle' ? 'border-gray-300 hover:border-blue-500 cursor-pointer' : 'border-blue-300 cursor-wait'}`}
         >
           {fileStatus === 'idle' ? (
             <>
@@ -775,7 +1146,7 @@ export const MarketTecView = ({ user }) => {
               <Loader className="h-10 w-10 text-blue-500 animate-spin mb-3" />
               <p className="text-sm font-medium text-gray-600">Subiendo archivo...</p>
               <div className="w-64 bg-gray-200 rounded-full h-2.5 mt-4">
-                <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${uploadProgress}% ` }}></div>
+                <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
               </div>
             </div>
           )}
@@ -899,7 +1270,7 @@ export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelecti
             Descargar Excel
           </button>
           <button
-            className={`px - 4 py - 2 rounded - lg flex items - center shadow - sm text - sm font - medium transition - colors ${selectedOverdue.length > 0 ? 'bg-blue-700 hover:bg-blue-800 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'} `}
+            className={`px-4 py-2 rounded-lg flex items-center shadow-sm text-sm font-medium transition-colors ${selectedOverdue.length > 0 ? 'bg-blue-700 hover:bg-blue-800 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
             disabled={selectedOverdue.length === 0}
           >
             <Send size={16} className="mr-2" />
@@ -984,7 +1355,7 @@ export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelecti
             <tbody className="bg-white divide-y divide-gray-200">
               {overdueItems.length > 0 ? (
                 overdueItems.map((item) => (
-                  <tr key={item.id} className={`hover: bg - red - 50 transition - colors ${selectedOverdue.includes(item.id) ? 'bg-blue-50' : ''} `}>
+                  <tr key={item.id} className={`hover:bg-red-50 transition-colors ${selectedOverdue.includes(item.id) ? 'bg-blue-50' : ''}`}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <input
                         type="checkbox"
@@ -1050,7 +1421,7 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
             Configurar Anticipación
           </button>
           <button
-            className={`px - 4 py - 2 rounded - lg flex items - center shadow - sm text - sm font - medium transition - colors ${selectedReminders.length > 0 ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'} `}
+            className={`px-4 py-2 rounded-lg flex items-center shadow-sm text-sm font-medium transition-colors ${selectedReminders.length > 0 ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
             disabled={selectedReminders.length === 0}
           >
             <Send size={16} className="mr-2" />
@@ -1122,7 +1493,7 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredUpcoming.length > 0 ? (
                 filteredUpcoming.map((item) => (
-                  <tr key={item.id} className={`hover: bg - gray - 50 transition - colors ${selectedReminders.includes(item.id) ? 'bg-blue-50' : ''} `}>
+                  <tr key={item.id} className={`hover:bg-gray-50 transition-colors ${selectedReminders.includes(item.id) ? 'bg-blue-50' : ''}`}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {!item.sent && (
                         <input
@@ -1140,7 +1511,7 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap gap-1">
                         {item.concepts.map((c, idx) => (
-                          <span key={idx} className={`inline - flex items - center px - 2 py - 0.5 rounded text - xs font - medium ${c.includes('Luz') ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'} `}>
+                          <span key={idx} className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${c.includes('Luz') ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'}`}>
                             {c.includes('Luz') && <Zap size={10} className="mr-1 fill-current" />}
                             {c}
                           </span>
@@ -1151,7 +1522,7 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
                       <div className="text-sm font-bold text-gray-900">{item.amount}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`text - sm font - medium ${item.daysUntil <= 5 ? 'text-orange-600' : 'text-green-600'} `}>
+                      <span className={`text-sm font-medium ${item.daysUntil <= 5 ? 'text-orange-600' : 'text-green-600'}`}>
                         {item.daysUntil} días
                       </span>
                     </td>
@@ -1187,7 +1558,7 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
       </div>
     </div>
   );
-}
+};
 
 // Componente de formulario para crear contrato
 export const ContractForm = ({ client, user, onClose, onSuccess, onAddContract, onUpdateContract, onRefreshContracts, contractToEdit }) => {
@@ -1196,7 +1567,7 @@ export const ContractForm = ({ client, user, onClose, onSuccess, onAddContract, 
     endDate: '',
     monthlyRentAmount: '',
     monthlyServicesAmount: '',
-    cutoffDay: '',
+    cutoffDay: '10',
     numMonths: '',
   });
   const [loading, setLoading] = useState(false);
@@ -1398,10 +1769,10 @@ export const ContractForm = ({ client, user, onClose, onSuccess, onAddContract, 
           </div>
         </div>
 
-        {/* Día de Corte (Opcional) */}
+        {/* Día de vencimiento */}
         <div>
           <label htmlFor="cutoffDay" className="block text-sm font-medium text-gray-700 mb-1">
-            Día de Corte (Opcional)
+            Día de vencimiento
           </label>
           <input
             type="number"
@@ -1414,7 +1785,7 @@ export const ContractForm = ({ client, user, onClose, onSuccess, onAddContract, 
             placeholder="Ej: 15"
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
           />
-          <p className="mt-1 text-xs text-gray-500">Día del mes en que se genera la factura</p>
+          <p className="mt-1 text-xs text-gray-500">Día del mes limite para pago</p>
         </div>
 
         {/* Error Message */}
@@ -1508,7 +1879,7 @@ export const SettingsView = ({ setAddUserModalOpen }) => (
                   {staff.unitId ? (staff.unitName || `Unidad ${staff.unitId} `) : <span className="text-gray-400 italic">Acceso Global</span>}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px - 2 py - 1 inline - flex text - xs leading - 5 font - semibold rounded - full ${staff.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} `}>
+                  <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${staff.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                     {staff.status === 'Active' ? 'Activo' : 'Inactivo'}
                   </span>
                 </td>
