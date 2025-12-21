@@ -203,7 +203,7 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
     }
 
     // Special handling for amounts
-    if (sortConfig.key === 'amount') {
+    if (['amount', 'paidAmount', 'balanceDue'].includes(sortConfig.key)) {
       aVal = typeof aVal === 'string' ? parseFloat(aVal.replace(/[^0-9.-]+/g, "")) : parseFloat(aVal || 0);
       bVal = typeof bVal === 'string' ? parseFloat(bVal.replace(/[^0-9.-]+/g, "")) : parseFloat(bVal || 0);
     }
@@ -228,10 +228,19 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
     return sortConfig.direction === 'asc' ? <ChevronUp size={14} className="ml-1 text-blue-600" /> : <ChevronDown size={14} className="ml-1 text-blue-600" />;
   };
 
-  const balance = filteredReceivables.filter(i => i.status === 'Pending' || i.status === 'Overdue')
-    .reduce((acc, curr) => acc + parseFloat(String(curr.amount || 0).replace(/[^0-9.-]+/g, "") || 0), 0);
-  const overdueTotal = filteredReceivables.filter(i => i.status === 'Overdue')
-    .reduce((acc, curr) => acc + parseFloat(String(curr.amount || 0).replace(/[^0-9.-]+/g, "") || 0), 0);
+  const calculateBalance = (items) => items.reduce((acc, curr) => {
+    const total = parseFloat(String(curr.amount || 0).replace(/[^0-9.-]+/g, "") || 0);
+    const paid = parseFloat(String(curr.amount_paid || curr.paid_amount || 0).replace(/[^0-9.-]+/g, "") || 0);
+    return acc + (total - paid);
+  }, 0);
+
+  const balance = calculateBalance(filteredReceivables.filter(i =>
+    ['pending', 'pendiente', 'partial', 'parcial', 'overdue'].includes(i.status.toLowerCase())
+  ));
+
+  const overdueTotal = calculateBalance(filteredReceivables.filter(i =>
+    i.status.toLowerCase() === 'overdue'
+  ));
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -329,7 +338,7 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
         {/* Financial Summary Cards */}
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
-            <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Saldo Total Pendiente</div>
+            <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Saldo Total del Contrato</div>
             <div className="text-2xl font-bold text-gray-900 mt-1">${balance.toLocaleString()}</div>
           </div>
           <div className="bg-white p-4 rounded-lg shadow border-l-4 border-red-500">
@@ -619,6 +628,18 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                     <div className="flex items-center justify-end">Monto {getSortIcon('amount')}</div>
                   </th>
                   <th
+                    className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => requestSort('paidAmount')}
+                  >
+                    <div className="flex items-center justify-end text-green-700">Pagado {getSortIcon('paidAmount')}</div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => requestSort('balanceDue')}
+                  >
+                    <div className="flex items-center justify-end text-blue-700">Saldo {getSortIcon('balanceDue')}</div>
+                  </th>
+                  <th
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
                     onClick={() => requestSort('status')}
                   >
@@ -672,10 +693,13 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">
-                      {(() => {
-                        const amt = typeof item.amount === 'string' ? parseFloat(item.amount.replace(/[^0-9.-]+/g, "")) : item.amount;
-                        return isNaN(amt) ? item.amount : `$${amt.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                      })()}
+                      {item.amount}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600 text-right">
+                      {item.paidAmount}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-700 text-right">
+                      {item.balanceDue}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={item.status} /></td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -708,7 +732,7 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                 ))}
                 {!receivablesLoading && sortedReceivables.length === 0 && (
                   <tr>
-                    <td colSpan="6" className="px-6 py-20 text-center text-sm text-gray-500">
+                    <td colSpan="9" className="px-6 py-20 text-center text-sm text-gray-500">
                       <FileText size={40} className="mx-auto text-gray-200 mb-3" />
                       No hay movimientos registrados para este contrato.
                     </td>
@@ -849,12 +873,37 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
         >
           <form onSubmit={async (e) => {
             e.preventDefault();
+
+            // 1. Prevenir doble envío si ya se está procesando
+            if (isGenerating) return;
+
+            // 2. Validar que el movimiento aún requiera pago
+            if (receivableToPay && (receivableToPay.status === 'Paid' || receivableToPay.status === 'Pagado')) {
+              alert('Este movimiento ya ha sido liquidado.');
+              setRegisterPaymentModalOpen(false);
+              return;
+            }
+
+            const formData = new FormData(e.target);
+            const paymentAmount = parseFloat(formData.get('amount'));
+            const currentBalance = parseFloat(String(receivableToPay.balanceDue || receivableToPay.balance_due || receivableToPay.amount || 0).replace(/[^0-9.-]+/g, ""));
+
+            // 3. Validar límites de monto
+            if (paymentAmount > (currentBalance + 0.01)) { // Pequeño margen por redondeo
+              alert(`El monto del pago ($${paymentAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}) no puede ser mayor al saldo pendiente ($${currentBalance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}).`);
+              return;
+            }
+
+            if (paymentAmount <= 0) {
+              alert('El monto del pago debe ser mayor a cero.');
+              return;
+            }
+
             setIsGenerating(true);
             try {
-              const formData = new FormData(e.target);
               const paymentData = {
                 receivableId: receivableToPay.id,
-                amount: parseFloat(formData.get('amount')),
+                amount: paymentAmount,
                 paymentDate: formData.get('paymentDate'),
                 clientId: client.id,
                 unitId: client.unitId || client.unit_id
