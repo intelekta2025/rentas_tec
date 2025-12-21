@@ -243,6 +243,18 @@ const getUserProfile = async (userId) => {
           localStorage.removeItem(`user_role_${userId}`);
         } else {
           console.warn('⚠️ Error al buscar cliente (Timeout/Red), manteniendo cache por supervivencia:', result.error);
+
+          // Intentar reconstruir perfil completo desde cache
+          const cachedProfileStr = localStorage.getItem(`user_profile_${userId}`);
+          if (cachedProfileStr) {
+            try {
+              const cachedProfile = JSON.parse(cachedProfileStr);
+              return { data: { ...cachedProfile, from_cache: true }, error: null };
+            } catch (e) {
+              console.warn('Error parseando perfil cache:', e);
+            }
+          }
+
           return { data: { id: userId, role: cachedRole, from_cache: true }, error: null };
         }
       }
@@ -259,6 +271,19 @@ const getUserProfile = async (userId) => {
           localStorage.removeItem(`user_role_${userId}`);
         } else {
           console.warn('⚠️ Error al buscar admin (Timeout/Red), manteniendo cache por supervivencia:', result.error);
+
+          // Intentar reconstruir perfil completo desde cache
+          const cachedProfileStr = localStorage.getItem(`user_profile_${userId}`);
+          if (cachedProfileStr) {
+            try {
+              const cachedProfile = JSON.parse(cachedProfileStr);
+              console.log('🛡️ Recuperando perfil COMPLETO desde caché:', cachedProfile);
+              return { data: { ...cachedProfile, from_cache: true }, error: null };
+            } catch (e) {
+              console.warn('Error parseando perfil cache:', e);
+            }
+          }
+
           return { data: { id: userId, role: cachedRole, from_cache: true }, error: null };
         }
       }
@@ -459,9 +484,9 @@ export const signOut = async () => {
       localStorage.removeItem(`user_role_${user.id}`)
     }
 
-    // Limpieza general de claves de rol por seguridad
+    // Limpieza general de claves de rol y perfil por seguridad
     Object.keys(localStorage).forEach(key => {
-      if (key.startsWith('user_role_')) {
+      if (key.startsWith('user_role_') || key.startsWith('user_profile_')) {
         localStorage.removeItem(key)
       }
     })

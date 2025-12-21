@@ -34,27 +34,34 @@ const mapClientFromDB = (dbClient) => {
  */
 const mapClientToDB = (clientData) => {
   const mapped = {}
-  
-  // Mapear campos del frontend a la BD
-  if (clientData.name !== undefined) mapped.business_name = clientData.name
-  if (clientData.contact !== undefined) mapped.contact_name = clientData.contact
-  if (clientData.email !== undefined) mapped.contact_email = clientData.email
-  if (clientData.contactPhone !== undefined) mapped.contact_phone = clientData.contactPhone
-  if (clientData.address !== undefined) mapped.address_fiscal = clientData.address
-  if (clientData.unitId !== undefined) mapped.unit_id = clientData.unitId
-  
-  // Campos que no necesitan mapeo
-  if (clientData.status !== undefined) mapped.status = clientData.status
+
+  // Mapear solo los campos que vienen con valor o están definidos
+  // business_name
+  const bName = clientData.business_name || clientData.name
+  if (bName !== undefined) mapped.business_name = bName
+
+  // contact_name
+  const cName = clientData.contact_name || clientData.contact
+  if (cName !== undefined) mapped.contact_name = cName
+
+  // contact_email
+  const cEmail = clientData.contact_email || clientData.email
+  if (cEmail !== undefined) mapped.contact_email = cEmail
+
+  // contact_phone
+  const cPhone = clientData.contact_phone || clientData.contactPhone
+  if (cPhone !== undefined) mapped.contact_phone = cPhone
+
+  // rfc
   if (clientData.rfc !== undefined) mapped.rfc = clientData.rfc
-  
-  // Si ya vienen en formato de BD, mantenerlos
-  if (clientData.business_name !== undefined) mapped.business_name = clientData.business_name
-  if (clientData.contact_name !== undefined) mapped.contact_name = clientData.contact_name
-  if (clientData.contact_email !== undefined) mapped.contact_email = clientData.contact_email
-  if (clientData.contact_phone !== undefined) mapped.contact_phone = clientData.contact_phone
-  if (clientData.address_fiscal !== undefined) mapped.address_fiscal = clientData.address_fiscal
-  if (clientData.unit_id !== undefined) mapped.unit_id = clientData.unit_id
-  
+
+  // status
+  if (clientData.status !== undefined) mapped.status = clientData.status
+
+  // User_market_tec (Casing exacto de BD)
+  const umt = clientData.User_market_tec || clientData.user_market_tec
+  if (umt !== undefined) mapped.User_market_tec = umt
+
   return mapped
 }
 
@@ -123,7 +130,7 @@ export const createClient = async (clientData) => {
   try {
     // Mapear los datos al formato de la BD
     const mappedData = mapClientToDB(clientData)
-    
+
     const { data, error } = await supabase
       .from('clients')
       .insert([mappedData])
@@ -152,7 +159,12 @@ export const updateClient = async (id, clientData) => {
   try {
     // Mapear los datos al formato de la BD
     const mappedData = mapClientToDB(clientData)
-    
+
+    // IMPORTANTE: Para la actualización, no enviamos id ni unit_id
+    delete mappedData.id
+    delete mappedData.unit_id
+
+    // 2. Ejecutar UPDATE
     const { data, error } = await supabase
       .from('clients')
       .update(mappedData)

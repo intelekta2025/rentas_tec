@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Users, CreditCard, AlertTriangle, Mail, Menu, Home,
   FileSpreadsheet, Settings, LogOut, CheckCircle, UserPlus,
@@ -14,7 +14,7 @@ import { ClientPortalDashboard, ClientPortalPayments } from './components/client
 import {
   DashboardView, ClientsView, ClientDetailView,
   MarketTecView, OverdueView, RemindersView, SettingsView,
-  ContractForm
+  ContractForm, ClientForm
 } from './components/admin/AdminViews';
 
 // Importar hooks de Supabase
@@ -60,7 +60,7 @@ const ContractFormWrapper = ({ client, user, onClose, onContractCreated, contrac
 };
 
 // Componente wrapper para ClientDetailView que carga los usuarios del portal y contratos
-const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModalOpen, generateContractPreview, setTerminationModalOpen, contractsRefreshKey, onPrepareEdit }) => {
+const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModalOpen, generateContractPreview, setTerminationModalOpen, contractsRefreshKey, onPrepareEdit, onEditClient }) => {
   const { portalUsers, loading: portalUsersLoading } = useClientPortalUsers(client?.id);
   const { contracts, loading: contractsLoading, addContract, finalizeContract, refreshContracts } = useContracts(client?.id);
 
@@ -111,6 +111,7 @@ const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModa
       onEditContract={handleEditContract}
       onAddContract={handleAddContract}
       onRefreshContracts={refreshContracts}
+      onEditClient={onEditClient}
     />
   );
 };
@@ -136,6 +137,7 @@ export default function App() {
   const [terminationDate, setTerminationDate] = useState('');
   const [contractsRefreshKey, setContractsRefreshKey] = useState(0); // Para forzar recarga de contratos
   const [contractToEdit, setContractToEdit] = useState(null);
+  const [clientToEdit, setClientToEdit] = useState(null);
 
   // Hooks de datos de Supabase
   // Solo ejecutar hooks si el usuario tiene los datos necesarios
@@ -218,15 +220,20 @@ export default function App() {
     }
   };
 
-  // Efecto para cambiar de tab cuando el usuario cambia
+  // Efecto para cambiar de tab SOLAMENTE cuando el usuario se loguea por primera vez
+  // Evitar redirecciones si el usuario solo se actualiza (ej. refresh de token o fallback de cache)
+  const prevUserRef = useRef(null);
   useEffect(() => {
-    if (user) {
+    // Si pasamos de NO tener usuario a TENER usuario (Login inicial)
+    if (user && !prevUserRef.current) {
       if (user.role === 'Client') {
         setActiveTab('clientPortal_account');
       } else {
+        // Solo ir a dashboard si es login fresco, respetar navegación actual si ya estaba
         setActiveTab('dashboard');
       }
     }
+    prevUserRef.current = user;
   }, [user]);
 
   const handleLogout = async () => {
@@ -299,6 +306,29 @@ export default function App() {
       nextPayment: nextPayment ? new Date(nextPayment).toLocaleDateString('es-MX') : null
     };
   }, [user, myCXC]);
+
+  const handleEditClientProfile = (client) => {
+    setClientToEdit(client);
+    setAddClientModalOpen(true);
+  };
+
+  const handleSaveClient = async (clientData) => {
+    try {
+      if (clientToEdit) {
+        const result = await editClient(clientToEdit.id, clientData);
+        // Actualizar el cliente seleccionado si es el mismo que estamos editando
+        if (result.success && selectedClient && selectedClient.id === clientToEdit.id) {
+          setSelectedClient(result.data);
+        }
+      } else {
+        await addClient(clientData);
+      }
+      setAddClientModalOpen(false);
+      setClientToEdit(null);
+    } catch (err) {
+      console.error('Error al guardar cliente:', err);
+    }
+  };
 
   // Mostrar loading solo durante la carga inicial (cuando authLoading es true y no hay usuario aún)
   if (authLoading && !user) {
@@ -457,6 +487,7 @@ export default function App() {
                   setTerminationModalOpen={setTerminationModalOpen}
                   contractsRefreshKey={contractsRefreshKey}
                   onPrepareEdit={setContractToEdit}
+                  onEditClient={handleEditClientProfile}
                 />
               )}
               {activeTab === 'overdue' && (
@@ -496,11 +527,17 @@ export default function App() {
       </div>
 
       {/* Modals placed here for cleaner DOM structure (using the Shared Modal component) */}
-      <Modal isOpen={isAddClientModalOpen} onClose={() => setAddClientModalOpen(false)} title="Nuevo Cliente">
-        <div className="p-4">
-          {/* Aquí puedes agregar un formulario que use addClient del hook */}
-          <p className="text-gray-600">Formulario de Nuevo Cliente (usar addClient del hook)</p>
-        </div>
+      <Modal
+        isOpen={isAddClientModalOpen}
+        onClose={() => { setAddClientModalOpen(false); setClientToEdit(null); }}
+        title={clientToEdit ? "Editar Cliente" : "Nuevo Cliente"}
+      >
+        <ClientForm
+          clientToEdit={clientToEdit}
+          onSave={handleSaveClient}
+          onClose={() => { setAddClientModalOpen(false); setClientToEdit(null); }}
+          unitId={user.unitId}
+        />
       </Modal>
       <Modal isOpen={isContractModalOpen} onClose={() => { setContractModalOpen(false); setContractToEdit(null); }} title={contractToEdit ? "Editar Contrato" : "Crear Contrato"}>
         {selectedClient && user ? (

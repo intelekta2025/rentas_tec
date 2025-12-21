@@ -1,5 +1,7 @@
 // src/components/admin/AdminViews.jsx
 import React, { useState, useEffect } from 'react';
+import ClientForm from './ClientForm';
+export { ClientForm };
 import {
   Users, CreditCard, AlertTriangle, Mail, Menu, Home,
   FileSpreadsheet, Settings, LogOut, CheckCircle, UserPlus,
@@ -13,10 +15,10 @@ import { useContracts } from '../../hooks/useContracts';
 
 export const DashboardView = ({ adminStats, mockMonthlyStats, user, unitName }) => (
   <div className="space-y-6 animate-fade-in">
-    <h2 className="text-2xl font-bold text-gray-800">Panel General - {unitName || `Unidad ${user.unitId}` || 'Sin unidad'}</h2>
+    <h2 className="text-2xl font-bold text-gray-800">Panel General - {unitName || (user?.unitId ? `Unidad ${user.unitId}` : 'Sin unidad')}</h2>
     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
       <KPICard title="Total Clientes" value={adminStats.totalClients} icon={Users} color="#003DA5" subtext="En esta unidad" />
-      <KPICard title="Por Cobrar" value={`$${adminStats.totalCXC.toLocaleString()}`} icon={CreditCard} color="#F59E0B" subtext="Facturación pendiente" />
+      <KPICard title="Por Cobrar" value={`$${adminStats.totalCXC.toLocaleString()} `} icon={CreditCard} color="#F59E0B" subtext="Facturación pendiente" />
       <KPICard title="Cuentas Vencidas" value={adminStats.overdueCount} icon={AlertTriangle} color="#EF4444" subtext="Requiere atención" />
     </div>
 
@@ -40,7 +42,7 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800">Clientes - {unitName || `Unidad ${user.unitId}` || 'Sin unidad'}</h2>
+        <h2 className="text-2xl font-bold text-gray-800">Clientes - {unitName || `Unidad ${user.unitId} ` || 'Sin unidad'}</h2>
         <button onClick={() => setAddClientModalOpen(true)} className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg flex items-center shadow-sm">
           <Plus size={18} className="mr-2" /> Nuevo Cliente
         </button>
@@ -112,13 +114,8 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
   );
 };
 
-export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, generateContractPreview, setTerminationModalOpen, portalUsers = [], portalUsersLoading = false, contracts = [], contractsLoading = false, onFinalizeContract, onEditContract }) => {
-  // Debug: Verificar campos del cliente
-  if (client && !client.user_market_tec) {
-    console.log('🔍 ClientDetailView: Campos del cliente:', Object.keys(client))
-    console.log('🔍 ClientDetailView: user_market_tec:', client.user_market_tec)
-    console.log('🔍 ClientDetailView: Cliente completo:', client)
-  }
+export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, generateContractPreview, setTerminationModalOpen, portalUsers = [], portalUsersLoading = false, contracts = [], contractsLoading = false, onFinalizeContract, onEditContract, onEditClient }) => {
+
 
   // Filter Mock CXC for this specific client
   const clientCXC = mockCXC.filter(item => item.clientId === client.id);
@@ -154,7 +151,11 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
           </div>
         </div>
         <div className="flex space-x-3 w-full md:w-auto">
-          <button className="p-2 border border-gray-300 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-gray-50">
+          <button
+            onClick={() => onEditClient && onEditClient(client)}
+            className="p-2 border border-gray-300 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-gray-50"
+            title="Editar perfil del cliente"
+          >
             <Edit size={18} />
           </button>
         </div>
@@ -276,7 +277,8 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                             monthlyRentFormatted = `$${amount.toLocaleString('es-MX', {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2
-                            })}`
+                            })
+                              } `
                           }
                         } catch (e) {
                           console.warn('Error al formatear monthlyRent:', e)
@@ -295,7 +297,8 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                             serviceRentFormatted = `$${amount.toLocaleString('es-MX', {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2
-                            })}`
+                            })
+                              } `
                           }
                         } catch (e) {
                           console.warn('Error al formatear serviceRent:', e)
@@ -345,10 +348,10 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${isActive
+                            <span className={`inline - flex items - center px - 2.5 py - 0.5 rounded - full text - xs font - medium ${isActive
                               ? 'bg-green-100 text-green-800'
                               : 'bg-gray-100 text-gray-800'
-                              }`}>
+                              } `}>
                               {contractStatus === 'Active' || contractStatus === 'activo' || contractStatus === 'Activo'
                                 ? 'Activo'
                                 : isTerminated
@@ -481,7 +484,7 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                 {portalUsers.map((user) => (
                   <li key={user.id} className="flex items-center justify-between text-sm">
                     <div className="flex items-center flex-1 min-w-0">
-                      <div className={`rounded-full p-1 mr-2 flex-shrink-0 ${user.isActive ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                      <div className={`rounded - full p - 1 mr - 2 flex - shrink - 0 ${user.isActive ? 'bg-blue-100' : 'bg-gray-100'} `}>
                         <Users size={12} className={user.isActive ? 'text-blue-600' : 'text-gray-600'} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -493,10 +496,10 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                       </div>
                     </div>
                     <div className="flex items-center space-x-2 flex-shrink-0">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${user.isActive
+                      <span className={`inline - flex items - center px - 2 py - 0.5 rounded text - xs font - medium ${user.isActive
                         ? 'bg-green-100 text-green-800'
                         : 'bg-gray-100 text-gray-600'
-                        }`}>
+                        } `}>
                         {user.isActive ? 'Activo' : 'Inactivo'}
                       </span>
                       <button
@@ -573,7 +576,7 @@ export const MarketTecView = ({ user }) => {
     <div className="space-y-6 animate-fade-in">
       <div>
         <h2 className="text-2xl font-bold text-gray-800">Recepción de Cobros - Market Tec</h2>
-        <p className="text-sm text-gray-500">Unidad: {unitName || `Unidad ${user.unitId}` || 'Sin unidad'}</p>
+        <p className="text-sm text-gray-500">Unidad: {unitName || `Unidad ${user.unitId} ` || 'Sin unidad'}</p>
       </div>
 
       <div className="bg-gray-100 p-2 rounded text-xs text-gray-500 font-mono mb-4 border border-gray-200">
@@ -583,8 +586,8 @@ export const MarketTecView = ({ user }) => {
       {(fileStatus === 'idle' || fileStatus === 'uploading') && (
         <div
           onClick={fileStatus === 'idle' ? handleFileUpload : undefined}
-          className={`bg-white shadow rounded-lg p-8 text-center border-2 border-dashed transition-colors group relative
-                  ${fileStatus === 'idle' ? 'border-gray-300 hover:border-blue-500 cursor-pointer' : 'border-blue-300 cursor-wait'}`}
+          className={`bg - white shadow rounded - lg p - 8 text - center border - 2 border - dashed transition - colors group relative
+                  ${fileStatus === 'idle' ? 'border-gray-300 hover:border-blue-500 cursor-pointer' : 'border-blue-300 cursor-wait'} `}
         >
           {fileStatus === 'idle' ? (
             <>
@@ -598,7 +601,7 @@ export const MarketTecView = ({ user }) => {
               <Loader className="h-10 w-10 text-blue-500 animate-spin mb-3" />
               <p className="text-sm font-medium text-gray-600">Subiendo archivo...</p>
               <div className="w-64 bg-gray-200 rounded-full h-2.5 mt-4">
-                <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
+                <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${uploadProgress}% ` }}></div>
               </div>
             </div>
           )}
@@ -714,7 +717,7 @@ export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelecti
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Cuentas Vencidas</h2>
-          <p className="text-sm text-gray-500">Unidad: {unitName || `Unidad ${user.unitId}` || 'Sin unidad'}</p>
+          <p className="text-sm text-gray-500">Unidad: {unitName || `Unidad ${user.unitId} ` || 'Sin unidad'}</p>
         </div>
         <div className="flex space-x-3">
           <button className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg flex items-center shadow-sm text-sm font-medium">
@@ -722,7 +725,7 @@ export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelecti
             Descargar Excel
           </button>
           <button
-            className={`px-4 py-2 rounded-lg flex items-center shadow-sm text-sm font-medium transition-colors ${selectedOverdue.length > 0 ? 'bg-blue-700 hover:bg-blue-800 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+            className={`px - 4 py - 2 rounded - lg flex items - center shadow - sm text - sm font - medium transition - colors ${selectedOverdue.length > 0 ? 'bg-blue-700 hover:bg-blue-800 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'} `}
             disabled={selectedOverdue.length === 0}
           >
             <Send size={16} className="mr-2" />
@@ -807,7 +810,7 @@ export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelecti
             <tbody className="bg-white divide-y divide-gray-200">
               {overdueItems.length > 0 ? (
                 overdueItems.map((item) => (
-                  <tr key={item.id} className={`hover:bg-red-50 transition-colors ${selectedOverdue.includes(item.id) ? 'bg-blue-50' : ''}`}>
+                  <tr key={item.id} className={`hover: bg - red - 50 transition - colors ${selectedOverdue.includes(item.id) ? 'bg-blue-50' : ''} `}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <input
                         type="checkbox"
@@ -865,7 +868,7 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
       <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-800">Recordatorios de Pago</h2>
-          <p className="text-sm text-gray-500">Unidad: {unitName || `Unidad ${user.unitId}` || 'Sin unidad'}</p>
+          <p className="text-sm text-gray-500">Unidad: {unitName || `Unidad ${user.unitId} ` || 'Sin unidad'}</p>
         </div>
         <div className="flex space-x-3">
           <button className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg flex items-center shadow-sm text-sm font-medium">
@@ -873,7 +876,7 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
             Configurar Anticipación
           </button>
           <button
-            className={`px-4 py-2 rounded-lg flex items-center shadow-sm text-sm font-medium transition-colors ${selectedReminders.length > 0 ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+            className={`px - 4 py - 2 rounded - lg flex items - center shadow - sm text - sm font - medium transition - colors ${selectedReminders.length > 0 ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'} `}
             disabled={selectedReminders.length === 0}
           >
             <Send size={16} className="mr-2" />
@@ -945,7 +948,7 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredUpcoming.length > 0 ? (
                 filteredUpcoming.map((item) => (
-                  <tr key={item.id} className={`hover:bg-gray-50 transition-colors ${selectedReminders.includes(item.id) ? 'bg-blue-50' : ''}`}>
+                  <tr key={item.id} className={`hover: bg - gray - 50 transition - colors ${selectedReminders.includes(item.id) ? 'bg-blue-50' : ''} `}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {!item.sent && (
                         <input
@@ -963,7 +966,7 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap gap-1">
                         {item.concepts.map((c, idx) => (
-                          <span key={idx} className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${c.includes('Luz') ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'}`}>
+                          <span key={idx} className={`inline - flex items - center px - 2 py - 0.5 rounded text - xs font - medium ${c.includes('Luz') ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'} `}>
                             {c.includes('Luz') && <Zap size={10} className="mr-1 fill-current" />}
                             {c}
                           </span>
@@ -974,7 +977,7 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
                       <div className="text-sm font-bold text-gray-900">{item.amount}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`text-sm font-medium ${item.daysUntil <= 5 ? 'text-orange-600' : 'text-green-600'}`}>
+                      <span className={`text - sm font - medium ${item.daysUntil <= 5 ? 'text-orange-600' : 'text-green-600'} `}>
                         {item.daysUntil} días
                       </span>
                     </td>
@@ -1291,10 +1294,10 @@ export const SettingsView = ({ setAddUserModalOpen }) => (
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {staff.unitId ? (staff.unitName || `Unidad ${staff.unitId}`) : <span className="text-gray-400 italic">Acceso Global</span>}
+                  {staff.unitId ? (staff.unitName || `Unidad ${staff.unitId} `) : <span className="text-gray-400 italic">Acceso Global</span>}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${staff.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                  <span className={`px - 2 py - 1 inline - flex text - xs leading - 5 font - semibold rounded - full ${staff.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} `}>
                     {staff.status === 'Active' ? 'Activo' : 'Inactivo'}
                   </span>
                 </td>
@@ -1310,3 +1313,5 @@ export const SettingsView = ({ setAddUserModalOpen }) => (
     </div>
   </div>
 );
+
+
