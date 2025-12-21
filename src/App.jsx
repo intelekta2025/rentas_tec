@@ -23,7 +23,7 @@ import { useClients } from './hooks/useClients';
 import { useInvoices, useOverdueInvoices, useUpcomingReminders } from './hooks/useInvoices';
 import { useBusinessUnit } from './hooks/useBusinessUnit';
 import { useClientPortalUsers } from './hooks/useClientPortalUsers';
-import { generateBulkInvoices } from './services/invoiceService';
+import { generateBulkInvoices, cancelReceivables } from './services/invoiceService';
 import { useContracts } from './hooks/useContracts';
 
 // Componente wrapper para el formulario de contrato que usa el mismo hook que ClientDetailView
@@ -76,13 +76,19 @@ const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModa
     }
   }, [contractsRefreshKey]);
 
-  const handleFinalizeContract = async (contractId) => {
-    if (window.confirm('¿Estás seguro de que deseas finalizar este contrato?')) {
-      const result = await finalizeContract(contractId);
-      if (result.success) {
-        await refreshContracts();
-      }
+  const handleFinalizeContract = async (contractId, receivableIdsToCancel = []) => {
+    // Si hay receivables para cancelar, lo hacemos primero
+    if (receivableIdsToCancel.length > 0) {
+      await cancelReceivables(receivableIdsToCancel);
     }
+
+    const result = await finalizeContract(contractId);
+    if (result.success) {
+      await refreshContracts();
+      // También refrescar facturas ya que cambiamos estados
+      await refreshInvoices();
+    }
+    return result;
   };
 
   const handleEditContract = (contract) => {
@@ -290,12 +296,15 @@ export default function App() {
     if (!user || user.role === 'Client') return { totalClients: 0, totalCXC: 0, overdueCount: 0 };
 
     const totalCXC = filteredCXC.reduce((acc, curr) => {
-      const amount = parseFloat(String(curr.amount || 0).replace(/[^0-9.-]+/g, '') || 0);
-      return acc + amount;
+      // Ignorar cancelados
+      if (['cancelled', 'cancelado'].includes((curr.status || '').toLowerCase())) return acc;
+
+      const balance = parseFloat(String(curr.balanceDue || curr.balance_due || curr.amount || 0).replace(/[^0-9.-]+/g, '') || 0);
+      return acc + balance;
     }, 0);
 
     return {
-      totalClients: filteredClients.length,
+      totalClients: filteredClients.filter(c => (c.status || '').toLowerCase() === 'activo').length,
       totalCXC,
       overdueCount: filteredCXC.filter(i => i.status === 'Overdue').length
     };
@@ -311,11 +320,8 @@ export default function App() {
     if (!user || user.role !== 'Client') return { balance: 0, pendingInvoices: 0 };
 
     const balance = myCXC
-      .filter(i => i.status === 'Pending' || i.status === 'Overdue')
-      .reduce((acc, curr) => {
-        const amount = parseFloat(String(curr.amount || 0).replace(/[^0-9.-]+/g, '') || 0);
-        return acc + amount;
-      }, 0);
+      .filter(i => ['pending', 'pendiente', 'partial', 'parcial', 'overdue', 'vencido'].includes((i.status || '').toLowerCase()))
+      .reduce((acc, curr) => acc + parseFloat(String(curr.balanceDue || curr.balance_due || curr.amount || 0).replace(/[^0-9.-]+/g, "") || 0), 0);
 
     // Obtener próxima fecha de pago
     const nextPayment = myCXC

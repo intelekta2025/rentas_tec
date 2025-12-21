@@ -19,7 +19,7 @@ export const DashboardView = ({ adminStats, mockMonthlyStats, user, unitName }) 
     <h2 className="text-2xl font-bold text-gray-800">Panel General - {unitName || (user?.unitId ? `Unidad ${user.unitId}` : 'Sin unidad')}</h2>
     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
       <KPICard title="Total Clientes" value={adminStats.totalClients} icon={Users} color="#003DA5" subtext="En esta unidad" />
-      <KPICard title="Por Cobrar" value={`$${adminStats.totalCXC.toLocaleString()} `} icon={CreditCard} color="#F59E0B" subtext="Facturación pendiente" />
+      <KPICard title="Por Cobrar" value={`$${adminStats.totalCXC.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} `} icon={CreditCard} color="#F59E0B" subtext="Facturación pendiente" />
       <KPICard title="Cuentas Vencidas" value={adminStats.overdueCount} icon={AlertTriangle} color="#EF4444" subtext="Requiere atención" />
     </div>
 
@@ -51,7 +51,12 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800">Clientes - {unitName || `Unidad ${user.unitId}`}</h2>
+        <h2 className="text-2xl font-bold text-gray-800 flex items-center">
+          Clientes - {unitName || `Unidad ${user.unitId}`}
+          <span className="ml-3 px-2.5 py-0.5 bg-gray-100 text-gray-600 text-sm font-semibold rounded-full border border-gray-200">
+            {finalFilteredClients.length}
+          </span>
+        </h2>
         <button onClick={() => setAddClientModalOpen(true)} className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg flex items-center shadow-sm transition-all active:scale-95">
           <Plus size={18} className="mr-2" /> Nuevo Cliente
         </button>
@@ -165,6 +170,9 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
   const [isRegisterPaymentModalOpen, setRegisterPaymentModalOpen] = useState(false);
   const [receivableToPay, setReceivableToPay] = useState(null);
   const [movementStatusFilter, setMovementStatusFilter] = useState('Todos');
+  const [isFinalizeConfirmationModalOpen, setFinalizeConfirmationModalOpen] = useState(false);
+  const [contractToTerminate, setContractToTerminate] = useState(null);
+  const [receivablesToCancel, setReceivablesToCancel] = useState([]);
 
   // Seleccionar automáticamente el primer contrato activo si no hay ninguno seleccionado
   useEffect(() => {
@@ -226,6 +234,18 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
   const getSortIcon = (key) => {
     if (sortConfig.key !== key) return <ChevronUp size={14} className="ml-1 text-gray-300" />;
     return sortConfig.direction === 'asc' ? <ChevronUp size={14} className="ml-1 text-blue-600" /> : <ChevronDown size={14} className="ml-1 text-blue-600" />;
+  };
+
+  const handleFinalizeClick = (contract) => {
+    // Buscar CXC pendientes (saldo > 0) para este contrato
+    const pending = receivables.filter(r =>
+      r.contractId === contract.id &&
+      !['paid', 'pagado', 'cancelled', 'cancelado'].includes(r.status.toLowerCase())
+    );
+
+    setContractToTerminate(contract);
+    setReceivablesToCancel(pending);
+    setFinalizeConfirmationModalOpen(true);
   };
 
   const calculateBalance = (items) => items.reduce((acc, curr) => {
@@ -535,7 +555,7 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  onFinalizeContract && onFinalizeContract(contract.id);
+                                  handleFinalizeClick(contract);
                                 }}
                                 className="p-1 text-gray-400 hover:text-red-500 transition-colors"
                                 title="Finalizar contrato"
@@ -989,6 +1009,104 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
           </form>
         </Modal>
 
+        {/* Modal para confirmar finalización de contrato con listado de CXC */}
+        <Modal
+          isOpen={isFinalizeConfirmationModalOpen}
+          onClose={() => !isGenerating && setFinalizeConfirmationModalOpen(false)}
+          title="Confirmar Finalización de Contrato"
+        >
+          <div className="space-y-4">
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <AlertTriangle className="h-5 w-5 text-yellow-400" aria-hidden="true" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-yellow-700 font-medium">
+                    ¿Estás seguro de que deseas finalizar este contrato?
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {receivablesToCancel.length > 0 && (
+              <div className="mt-4">
+                <p className="text-sm text-gray-600 mb-2">
+                  Los siguientes movimientos (CXC) aún no han sido liquidados y serán marcados como <span className="font-bold text-red-600">Cancelados</span>:
+                </p>
+                <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-md bg-white">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">Período</th>
+                        <th className="px-4 py-2 text-left text-[10px] font-bold text-gray-500 uppercase">Concepto</th>
+                        <th className="px-4 py-2 text-right text-[10px] font-bold text-gray-500 uppercase">Saldo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {receivablesToCancel.map((r) => (
+                        <tr key={r.id}>
+                          <td className="px-4 py-2 text-xs text-gray-600">
+                            {(() => {
+                              const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+                              return `${months[r.periodMonth - 1]} ${r.periodYear}`;
+                            })()}
+                          </td>
+                          <td className="px-4 py-2 text-xs text-gray-900 font-medium">{r.concept}</td>
+                          <td className="px-4 py-2 text-xs text-right text-red-600 font-bold">
+                            ${parseFloat(String(r.balance_due || r.amount).replace(/[^0-9.-]+/g, "")).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setFinalizeConfirmationModalOpen(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isGenerating}
+                onClick={async () => {
+                  setIsGenerating(true);
+                  try {
+                    const receivableIds = receivablesToCancel.map(r => r.id);
+                    const result = await onFinalizeContract(contractToTerminate.id, receivableIds);
+                    if (result.success) {
+                      setFinalizeConfirmationModalOpen(false);
+                      setContractToTerminate(null);
+                      setReceivablesToCancel([]);
+                    } else {
+                      alert('Error al finalizar contrato: ' + (result.error?.message || 'Error desconocido'));
+                    }
+                  } catch (err) {
+                    console.error('Error finalizing contract:', err);
+                    alert('Error inesperado: ' + err.message);
+                  } finally {
+                    setIsGenerating(false);
+                  }
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-bold hover:bg-red-700 disabled:opacity-50 shadow-sm flex items-center"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader size={16} className="animate-spin mr-2" />
+                    Procesando...
+                  </>
+                ) : 'Confirmar Finalización'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+
 
         {/* Modal de Confirmación para Generar CXC Rentas */}
         <Modal
@@ -1310,7 +1428,12 @@ export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelecti
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Cuentas Vencidas</h2>
+          <h2 className="text-2xl font-bold text-gray-800 flex items-center">
+            Cuentas Vencidas
+            <span className="ml-3 px-2.5 py-0.5 bg-gray-100 text-gray-600 text-sm font-semibold rounded-full border border-gray-200">
+              {overdueItems.length}
+            </span>
+          </h2>
           <p className="text-sm text-gray-500">Unidad: {unitName || `Unidad ${user.unitId} ` || 'Sin unidad'}</p>
         </div>
         <div className="flex space-x-3">
@@ -1461,7 +1584,12 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Recordatorios de Pago</h2>
+          <h2 className="text-2xl font-bold text-gray-800 flex items-center">
+            Recordatorios de Pago
+            <span className="ml-3 px-2.5 py-0.5 bg-gray-100 text-gray-600 text-sm font-semibold rounded-full border border-gray-200">
+              {filteredUpcoming.length}
+            </span>
+          </h2>
           <p className="text-sm text-gray-500">Unidad: {unitName || `Unidad ${user.unitId} ` || 'Sin unidad'}</p>
         </div>
         <div className="flex space-x-3">

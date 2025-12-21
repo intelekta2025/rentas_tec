@@ -155,10 +155,11 @@ export const useInvoices = (filters = {}) => {
 
   const totalAmount = useMemo(() =>
     invoices.reduce((acc, inv) => {
-      // amount puede venir como string formateado o como número
-      const amountStr = String(inv.amount || '0');
-      const amount = parseFloat(amountStr.replace(/[^0-9.-]+/g, '') || 0);
-      return acc + amount;
+      if (['cancelled', 'cancelado'].includes((inv.status || '').toLowerCase())) return acc;
+      // Usar balanceDue si existe, de lo contrario amount
+      const balanceStr = String(inv.balanceDue || inv.balance_due || inv.amount || '0');
+      const balance = parseFloat(balanceStr.replace(/[^0-9.-]+/g, '') || 0);
+      return acc + balance;
     }, 0),
     [invoices]
   );

@@ -452,3 +452,26 @@ export const registerPayment = async (paymentData) => {
     return { data: null, error };
   }
 };
+
+/**
+ * Cancela múltiples receivables (actualiza su estado a 'Cancelled')
+ * @param {array} ids - Array de IDs de receivables a cancelar
+ * @returns {Promise<{success: boolean, error: object}>}
+ */
+export const cancelReceivables = async (ids) => {
+  try {
+    if (!ids || ids.length === 0) return { success: true, error: null };
+
+    const { error } = await supabase
+      .from('receivables')
+      .update({ status: 'Cancelled' })
+      .in('id', ids);
+
+    if (error) throw error;
+
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('Error al cancelar receivables:', error);
+    return { success: false, error };
+  }
+};
