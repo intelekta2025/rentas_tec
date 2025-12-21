@@ -7,9 +7,9 @@ import {
   FileSpreadsheet, Settings, LogOut, CheckCircle, UserPlus,
   Building, DollarSign, FileText, Calendar, Download, School,
   Plus, Send, ChevronRight, FileCheck, Ban, Edit, Zap, Trash2,
-  Key, UploadCloud, Loader, Play, Filter, Shield, Eye
+  Key, UploadCloud, Loader, Play, Filter, Shield, Eye, User, Phone
 } from 'lucide-react';
-import { StatusBadge, OverdueBadge, KPICard, RevenueChart } from '../ui/Shared';
+import { StatusBadge, OverdueBadge, KPICard, RevenueChart, Modal } from '../ui/Shared';
 import { UNITS, mockCXC, mockStaff } from '../../data/constants';
 import { useContracts } from '../../hooks/useContracts';
 
@@ -31,19 +31,27 @@ export const DashboardView = ({ adminStats, mockMonthlyStats, user, unitName }) 
 
 export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClientClick, user, unitName, loading, error }) => {
   const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('Activo') // 'Todos', 'Activo', 'Inactivo'
 
-  // Filtrar clientes por término de búsqueda
-  const filteredBySearch = filteredClients.filter(client =>
-    client.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.contact?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // Filtrar clientes por término de búsqueda y estado
+  const finalFilteredClients = filteredClients.filter(client => {
+    // Filtro de búsqueda (ahora incluye user_market_tec)
+    const matchesSearch =
+      client.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      client.contact?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (client.user_market_tec || client.User_market_tec || '').toLowerCase().includes(searchTerm.toLowerCase())
+
+    // Filtro de estado
+    const matchesStatus = statusFilter === 'Todos' || client.status === statusFilter
+
+    return matchesSearch && matchesStatus
+  })
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800">Clientes - {unitName || `Unidad ${user.unitId} ` || 'Sin unidad'}</h2>
-        <button onClick={() => setAddClientModalOpen(true)} className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg flex items-center shadow-sm">
+        <h2 className="text-2xl font-bold text-gray-800">Clientes - {unitName || `Unidad ${user.unitId}`}</h2>
+        <button onClick={() => setAddClientModalOpen(true)} className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg flex items-center shadow-sm transition-all active:scale-95">
           <Plus size={18} className="mr-2" /> Nuevo Cliente
         </button>
       </div>
@@ -55,15 +63,34 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
         </div>
       )}
 
-      <div className="bg-white shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
-        <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-          <input
-            type="text"
-            className="border rounded p-1 w-full"
-            placeholder="Buscar por nombre, contacto o email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <div className="bg-white shadow-sm border border-gray-200 rounded-xl overflow-hidden">
+        <div className="p-4 bg-gray-50/50 border-b border-gray-200 flex flex-col md:flex-row md:items-center space-y-3 md:space-y-0 md:space-x-4">
+          {/* Barra de Búsqueda */}
+          <div className="relative flex-1">
+            <input
+              type="text"
+              className="w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none"
+              placeholder="Buscar por nombre, contacto o usuario..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          {/* Filtros de Estado */}
+          <div className="flex items-center space-x-1 p-1 bg-gray-100 rounded-lg">
+            {['Todos', 'Activo', 'Inactivo'].map((filter) => (
+              <button
+                key={filter}
+                onClick={() => setStatusFilter(filter)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${statusFilter === filter
+                  ? 'bg-white text-blue-700 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
+                  }`}
+              >
+                {filter === 'Todos' ? 'Todos' : filter === 'Activo' ? 'Activos' : 'Inactivos'}
+              </button>
+            ))}
+          </div>
         </div>
 
         {loading ? (
@@ -71,10 +98,15 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-900 mx-auto"></div>
             <p className="mt-4 text-gray-600">Cargando clientes...</p>
           </div>
-        ) : filteredBySearch.length === 0 ? (
-          <div className="px-6 py-12 text-center">
-            <p className="text-gray-500">
-              {searchTerm ? 'No se encontraron clientes que coincidan con la búsqueda.' : 'No hay clientes registrados.'}
+        ) : finalFilteredClients.length === 0 ? (
+          <div className="px-6 py-20 text-center">
+            <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Users className="text-gray-300" size={32} />
+            </div>
+            <p className="text-gray-500 font-medium">
+              {searchTerm || statusFilter !== 'Todos'
+                ? 'No se encontraron clientes con estos filtros.'
+                : 'No hay clientes registrados.'}
             </p>
           </div>
         ) : (
@@ -82,23 +114,29 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contacto</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Cliente</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Contacto</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Usuario Market Tec</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Estado</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredBySearch.map((client) => (
-                  <tr key={client.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleClientClick(client)}>
+              <tbody className="bg-white divide-y divide-gray-100">
+                {finalFilteredClients.map((client) => (
+                  <tr
+                    key={client.id}
+                    className="hover:bg-blue-50/30 cursor-pointer transition-colors"
+                    onClick={() => handleClientClick(client)}
+                  >
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{client.name || 'Sin nombre'}</div>
+                      <div className="text-sm font-bold text-gray-900 uppercase">{client.name || 'Sin nombre'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">{client.contact || '-'}</div>
+                      <div className="text-sm text-gray-600">{client.contact || '-'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">{client.email || '-'}</div>
+                      <div className="text-sm text-gray-500 font-medium italic">
+                        {client.user_market_tec || client.User_market_tec || '-'}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <StatusBadge status={client.status} />
@@ -114,15 +152,30 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
   );
 };
 
-export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, generateContractPreview, setTerminationModalOpen, portalUsers = [], portalUsersLoading = false, contracts = [], contractsLoading = false, onFinalizeContract, onEditContract, onEditClient }) => {
+export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, generateContractPreview, setTerminationModalOpen, portalUsers = [], portalUsersLoading = false, contracts = [], contractsLoading = false, onFinalizeContract, onEditContract, onEditClient, onGenerateCXC, receivables = [], receivablesLoading = false }) => {
+  const [isGenerateModalOpen, setGenerateModalOpen] = useState(false);
+  const [contractToGenerate, setContractToGenerate] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [selectedContractId, setSelectedContractId] = useState(null);
+
+  // Seleccionar automáticamente el primer contrato activo si no hay ninguno seleccionado
+  useEffect(() => {
+    if (!selectedContractId && contracts.length > 0) {
+      const activeContract = contracts.find(c => c.status === 'Activo' || c.status === 'activo') || contracts[0];
+      setSelectedContractId(activeContract.id);
+    }
+  }, [contracts, selectedContractId]);
+
+  const selectedContract = contracts.find(c => c.id === selectedContractId);
 
 
-  // Filter Mock CXC for this specific client
-  const clientCXC = mockCXC.filter(item => item.clientId === client.id);
-  const balance = clientCXC.filter(i => i.status === 'Pending' || i.status === 'Overdue')
-    .reduce((acc, curr) => acc + parseFloat(curr.amount.replace(/[^0-9.-]+/g, "")), 0);
-  const overdueTotal = clientCXC.filter(i => i.status === 'Overdue')
-    .reduce((acc, curr) => acc + parseFloat(curr.amount.replace(/[^0-9.-]+/g, "")), 0);
+  // Filter CXC for this specific client and selected contract
+  const filteredReceivables = receivables.filter(item => item.contractId === selectedContractId);
+
+  const balance = filteredReceivables.filter(i => i.status === 'Pending' || i.status === 'Overdue')
+    .reduce((acc, curr) => acc + parseFloat(String(curr.amount || 0).replace(/[^0-9.-]+/g, "") || 0), 0);
+  const overdueTotal = filteredReceivables.filter(i => i.status === 'Overdue')
+    .reduce((acc, curr) => acc + parseFloat(String(curr.amount || 0).replace(/[^0-9.-]+/g, "") || 0), 0);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -141,11 +194,24 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
           </div>
           <div>
             <h2 className="text-2xl font-bold text-gray-900">{client.name}</h2>
-            <div className="flex flex-col sm:flex-row sm:space-x-4 text-sm text-gray-500 mt-1">
-              <span className="flex items-center"><Mail size={14} className="mr-1" /> {client.email}</span>
-              <span className="flex items-center"><FileText size={14} className="mr-1" /> ID: {client.id}</span>
+            <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-600 mt-2">
+              <span className="flex items-center" title="Correo de contacto">
+                <Mail size={14} className="mr-1.5 text-blue-600" /> {client.email}
+              </span>
+              <span className="flex items-center" title="Contacto principal">
+                <User size={14} className="mr-1.5 text-blue-600" /> {client.contact}
+              </span>
+              <span className="flex items-center" title="Teléfono">
+                <Phone size={14} className="mr-1.5 text-blue-600" /> {client.contactPhone || client.contact_phone || '-'}
+              </span>
+              <span className="flex items-center" title="Usuario Market Tec">
+                <Users size={14} className="mr-1.5 text-blue-600" /> {client.user_market_tec || client.User_market_tec || '-'}
+              </span>
+              <span className="flex items-center">
+                <FileText size={14} className="mr-1.5 text-gray-400" /> <span className="text-gray-400">ID: {client.id}</span>
+              </span>
             </div>
-            <div className="mt-2 flex space-x-2">
+            <div className="mt-3 flex space-x-2">
               <StatusBadge status={client.status} />
             </div>
           </div>
@@ -209,6 +275,7 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Período</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Meses</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Renta de Servicios</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Renta Mensual</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Terminación</th>
@@ -218,99 +285,71 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {contracts.map((contract) => {
+                      const isSelected = selectedContractId === contract.id;
                       // Usar directamente los campos de la BD (snake_case)
                       const startDateRaw = contract.start_date
                       const endDateRaw = contract.end_date
                       const terminationDateRaw = contract.termination_date
 
-                      // Formatear fechas
-                      let startDateFormatted = '-'
-                      if (startDateRaw) {
-                        try {
-                          // Parsear como fecha local (evitar conversión de zona horaria)
-                          const [year, month, day] = startDateRaw.split('T')[0].split('-')
-                          const date = new Date(year, month - 1, day) // mes es 0-indexed
-                          if (!isNaN(date.getTime())) {
-                            startDateFormatted = date.toLocaleDateString('es-MX', {
-                              year: 'numeric',
-                              month: '2-digit',
-                              day: '2-digit'
-                            })
-                          }
-                        } catch (e) {
-                          console.warn('Error al formatear startDate:', e)
-                        }
-                      }
+                      // ... (rest of formatting logic remains the same)
 
-                      let endDateFormatted = 'Activo'
-                      if (endDateRaw) {
-                        try {
-                          // Parsear como fecha local (evitar conversión de zona horaria)
-                          const [year, month, day] = endDateRaw.split('T')[0].split('-')
-                          const date = new Date(year, month - 1, day)
-                          if (!isNaN(date.getTime())) {
-                            endDateFormatted = date.toLocaleDateString('es-MX', {
-                              year: 'numeric',
-                              month: '2-digit',
-                              day: '2-digit'
-                            })
-                          }
-                        } catch (e) {
-                          console.warn('Error al formatear endDate:', e)
-                        }
-                      }
+                      // Let's use the provided code but fix the row part
 
                       // Usar el campo status directamente de la BD
                       const contractStatus = contract.status || 'Active'
                       const isActive = contractStatus === 'Active' || contractStatus === 'activo' || contractStatus === 'Activo'
                       const isTerminated = contractStatus === 'Terminado' || contractStatus === 'terminado' || contractStatus === 'Terminated'
 
-                      // Usar directamente el campo de la BD (snake_case)
-                      const monthlyRentRaw = contract.monthly_rent_amount
-                      let monthlyRentFormatted = '$0.00'
-                      if (monthlyRentRaw !== null && monthlyRentRaw !== undefined && monthlyRentRaw !== '') {
+                      // Formatear fechas (reutilizando lógica existente)
+                      let startDateFormatted = '-'
+                      if (startDateRaw) {
                         try {
-                          const amount = typeof monthlyRentRaw === 'string'
-                            ? parseFloat(monthlyRentRaw.replace(/[^0-9.-]+/g, ''))
-                            : parseFloat(monthlyRentRaw)
-                          if (!isNaN(amount)) {
-                            monthlyRentFormatted = `$${amount.toLocaleString('es-MX', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2
-                            })
-                              } `
+                          const [year, month, day] = startDateRaw.split('T')[0].split('-')
+                          const date = new Date(year, month - 1, day)
+                          if (!isNaN(date.getTime())) {
+                            startDateFormatted = date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' }).replace('.', '')
                           }
-                        } catch (e) {
-                          console.warn('Error al formatear monthlyRent:', e)
-                        }
+                        } catch (e) { }
                       }
 
-                      // Obtener renta de servicios - usar el campo de la BD
+                      let endDateFormatted = 'Activo'
+                      if (endDateRaw) {
+                        try {
+                          const [year, month, day] = endDateRaw.split('T')[0].split('-')
+                          const date = new Date(year, month - 1, day)
+                          if (!isNaN(date.getTime())) {
+                            endDateFormatted = date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' }).replace('.', '')
+                          }
+                        } catch (e) { }
+                      }
+
+                      const monthlyRentRaw = contract.monthly_rent_amount
+                      let monthlyRentFormatted = '$0.00'
+                      if (monthlyRentRaw) {
+                        const amount = typeof monthlyRentRaw === 'string' ? parseFloat(monthlyRentRaw.replace(/[^0-9.-]+/g, '')) : parseFloat(monthlyRentRaw)
+                        if (!isNaN(amount)) monthlyRentFormatted = `$${amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      }
+
                       const serviceRentRaw = contract.monthly_services_amount
                       let serviceRentFormatted = '$0.00'
-                      if (serviceRentRaw !== null && serviceRentRaw !== undefined && serviceRentRaw !== '') {
-                        try {
-                          const amount = typeof serviceRentRaw === 'string'
-                            ? parseFloat(serviceRentRaw.replace(/[^0-9.-]+/g, ''))
-                            : parseFloat(serviceRentRaw)
-                          if (!isNaN(amount)) {
-                            serviceRentFormatted = `$${amount.toLocaleString('es-MX', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2
-                            })
-                              } `
-                          }
-                        } catch (e) {
-                          console.warn('Error al formatear serviceRent:', e)
-                        }
+                      if (serviceRentRaw) {
+                        const amount = typeof serviceRentRaw === 'string' ? parseFloat(serviceRentRaw.replace(/[^0-9.-]+/g, '')) : parseFloat(serviceRentRaw)
+                        if (!isNaN(amount)) serviceRentFormatted = `$${amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                       }
 
                       return (
-                        <tr key={contract.id} className="hover:bg-gray-50">
+                        <tr
+                          key={contract.id}
+                          onClick={() => setSelectedContractId(contract.id)}
+                          className={`transition-colors cursor-pointer border-l-4 ${isSelected ? 'bg-blue-50 border-blue-500' : 'hover:bg-gray-50 border-transparent'}`}
+                        >
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">
                               {startDateFormatted} - {endDateFormatted}
                             </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center md:text-left font-bold text-blue-700">
+                            {contract.num_months || '-'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">
@@ -334,10 +373,10 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                                     const date = new Date(year, month - 1, day)
                                     if (!isNaN(date.getTime())) {
                                       terminationDateFormatted = date.toLocaleDateString('es-MX', {
-                                        year: 'numeric',
-                                        month: '2-digit',
-                                        day: '2-digit'
-                                      })
+                                        day: '2-digit',
+                                        month: 'short',
+                                        year: '2-digit'
+                                      }).replace('.', '')
                                     }
                                   } catch (e) {
                                     console.warn('Error al formatear terminationDate:', e)
@@ -362,22 +401,32 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div className="flex justify-end space-x-2">
                               {isActive && (
-                                <>
-                                  <button
-                                    onClick={() => onEditContract && onEditContract(contract)}
-                                    className="text-blue-600 hover:text-blue-900"
-                                    title="Editar contrato"
-                                  >
-                                    <Edit size={16} />
-                                  </button>
-                                  <button
-                                    onClick={() => onFinalizeContract && onFinalizeContract(contract.id)}
-                                    className="text-red-600 hover:text-red-900"
-                                    title="Finalizar contrato"
-                                  >
-                                    <Ban size={16} />
-                                  </button>
-                                </>
+                                <button
+                                  onClick={() => {
+                                    setContractToGenerate(contract);
+                                    setGenerateModalOpen(true);
+                                  }}
+                                  className="p-1 text-gray-400 hover:text-green-600 transition-colors"
+                                  title="Generar CXC de Rentas"
+                                >
+                                  <Zap size={18} />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => onEditContract && onEditContract(contract)}
+                                className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                                title="Editar contrato"
+                              >
+                                <Edit size={16} />
+                              </button>
+                              {isActive && (
+                                <button
+                                  onClick={() => onFinalizeContract && onFinalizeContract(contract.id)}
+                                  className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                                  title="Finalizar contrato"
+                                >
+                                  <Ban size={16} />
+                                </button>
                               )}
                             </div>
                           </td>
@@ -393,15 +442,24 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
           {/* Transactions Table */}
           <div className="bg-white shadow rounded-lg overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-              <h3 className="text-lg font-medium text-gray-900">Estado de Cuenta (Movimientos)</h3>
-              <div className="flex space-x-2">
-                <select className="text-sm border-gray-300 rounded shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                  <option>2023</option>
-                  <option>2022</option>
-                </select>
-                <button className="text-gray-400 hover:text-blue-600">
-                  <Download size={18} />
-                </button>
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">Estado de Cuenta (Movimientos)</h3>
+                <p className="text-xs text-blue-600 font-bold uppercase mt-0.5">
+                  {selectedContract ? (
+                    (() => {
+                      const formatDateShort = (dateStr) => {
+                        if (!dateStr) return '';
+                        try {
+                          const [y, m, d] = dateStr.split('-');
+                          const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+                          const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+                          return `${months[date.getMonth()]} ${y.substring(2)}`;
+                        } catch (e) { return dateStr; }
+                      };
+                      return `${formatDateShort(selectedContract.start_date)} - ${formatDateShort(selectedContract.end_date)}`;
+                    })()
+                  ) : 'Seleccione un contrato'}
+                </p>
               </div>
             </div>
 
@@ -417,13 +475,25 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {clientCXC.map((item) => (
+                  {receivablesLoading ? (
+                    <tr><td colSpan="5" className="px-6 py-8 text-center"><Loader size={24} className="animate-spin mx-auto text-blue-600" /></td></tr>
+                  ) : filteredReceivables.map((item) => (
                     <tr key={item.id} className="hover:bg-gray-50 group">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">{item.concept}</div>
-                        {item.concept.includes("Luz") && <span className="text-xs text-yellow-600 flex items-center"><Zap size={10} className="mr-1" />Variable</span>}
+                        {item.type === 'Service' && <span className="text-xs text-yellow-600 flex items-center"><Zap size={10} className="mr-1" />Servicio</span>}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.dueDate}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {(() => {
+                          if (!item.dueDate) return '-';
+                          try {
+                            const [y, m, d] = item.dueDate.split('-');
+                            const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+                            const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+                            return `${d} ${months[date.getMonth()]} ${y.substring(2)}`;
+                          } catch (e) { return item.dueDate; }
+                        })()}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{item.amount}</td>
                       <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={item.status} /></td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -434,8 +504,11 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                       </td>
                     </tr>
                   ))}
-                  {clientCXC.length === 0 && (
-                    <tr><td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">No hay movimientos registrados este año.</td></tr>
+                  {!receivablesLoading && filteredReceivables.length === 0 && (
+                    <tr><td colSpan="5" className="px-6 py-20 text-center text-sm text-gray-500">
+                      <FileText size={40} className="mx-auto text-gray-200 mb-3" />
+                      No hay movimientos registrados para este contrato.
+                    </td></tr>
                   )}
                 </tbody>
               </table>
@@ -445,24 +518,6 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
 
         {/* Sidebar Area (Right) */}
         <div className="space-y-6">
-          {/* General Info Card */}
-          <div className="bg-white shadow rounded-lg p-6">
-            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-4">Datos Generales</h3>
-            <dl className="space-y-3">
-              <div>
-                <dt className="text-xs text-gray-500">Contacto Principal</dt>
-                <dd className="text-sm text-gray-900 mt-1">{client.contact}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-gray-500">Teléfono</dt>
-                <dd className="text-sm text-gray-900 mt-1">{client.contactPhone || client.contact_phone || '-'}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-gray-500">Usuario Market Tec</dt>
-                <dd className="text-sm text-gray-900 mt-1">{client.user_market_tec || client.User_market_tec || '-'}</dd>
-              </div>
-            </dl>
-          </div>
 
           {/* NEW: Portal Access Card */}
           <div className="bg-white shadow rounded-lg p-6">
@@ -532,6 +587,125 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
         </div>
 
       </div>
+
+      {/* Modal de Confirmación para Generar CXC Rentas */}
+      <Modal
+        isOpen={isGenerateModalOpen}
+        onClose={() => !isGenerating && setGenerateModalOpen(false)}
+        title="Generar CXC de Rentas"
+      >
+        <div className="p-2">
+          {contractToGenerate && (
+            <div className="space-y-4">
+              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                <p className="text-sm text-blue-800">
+                  Se generarán <strong>{contractToGenerate.num_months || '0'}</strong> registros de cobro correspondientes a la <strong>Renta Mensual</strong> de este contrato.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-100">
+                <div>
+                  <span className="block text-xs text-gray-500 uppercase font-bold tracking-wider">Monto Mensual</span>
+                  <span className="text-lg font-bold text-gray-900">${(contractToGenerate.monthly_rent_amount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div>
+                  <span className="block text-xs text-gray-500 uppercase font-bold tracking-wider">Total a Generar</span>
+                  <span className="text-lg font-bold text-blue-700">${((contractToGenerate.monthly_rent_amount || 0) * (contractToGenerate.num_months || 0)).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="col-span-2">
+                  <span className="block text-xs text-gray-500 uppercase font-bold tracking-wider">Concepto Sugerido</span>
+                  <span className="text-sm text-gray-700 italic">"Renta [Mes] [Año]"</span>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <p className="text-xs text-gray-500 text-center italic">
+                  Esta acción creará los registros en el Estado de Cuenta de forma automática.
+                </p>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100">
+                <button
+                  onClick={() => setGenerateModalOpen(false)}
+                  disabled={isGenerating}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    setIsGenerating(true);
+                    try {
+                      // Preparar los datos
+                      const invoices = [];
+                      const startDateStr = contractToGenerate.start_date;
+                      // Parsear como fecha local YYYY-MM-DD
+                      const [yearStr, monthStr, dayStr] = startDateStr.split('-');
+                      const startDate = new Date(parseInt(yearStr), parseInt(monthStr) - 1, parseInt(dayStr));
+
+                      const monthsCount = parseInt(contractToGenerate.num_months) || 0;
+
+                      const monthNames = [
+                        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+                      ];
+
+                      for (let i = 0; i < monthsCount; i++) {
+                        const currentMonthDate = new Date(startDate);
+                        currentMonthDate.setMonth(startDate.getMonth() + i);
+
+                        const mIndex = currentMonthDate.getMonth();
+                        const year = currentMonthDate.getFullYear();
+
+                        const y = currentMonthDate.getFullYear();
+                        const m = String(currentMonthDate.getMonth() + 1).padStart(2, '0');
+                        const d = String(currentMonthDate.getDate()).padStart(2, '0');
+                        const dueDateStr = `${y}-${m}-${d}`;
+
+                        invoices.push({
+                          unitId: contractToGenerate.unit_id,
+                          clientId: contractToGenerate.client_id,
+                          contractId: contractToGenerate.id,
+                          amount: contractToGenerate.monthly_rent_amount,
+                          concept: `Renta ${monthNames[mIndex]} ${year}`,
+                          dueDate: dueDateStr,
+                          status: 'Pending',
+                          type: 'Rent',
+                          periodMonth: mIndex + 1,
+                          periodYear: year,
+                        });
+                      }
+
+                      if (onGenerateCXC) {
+                        const result = await onGenerateCXC(invoices);
+                        if (result.success) {
+                          setGenerateModalOpen(false);
+                        } else {
+                          alert('Error al generar CXC: ' + (result.error?.message || 'Error desconocido'));
+                        }
+                      }
+                    } catch (err) {
+                      console.error('Error in generation loop:', err);
+                      alert('Ocurrió un error inesperado al generar los cobros.');
+                    } finally {
+                      setIsGenerating(false);
+                    }
+                  }}
+                  disabled={isGenerating}
+                  className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold rounded-md shadow-sm transition-all flex items-center"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader size={16} className="animate-spin mr-2" />
+                      Generando...
+                    </>
+                  ) : 'Confirmar y Guardar'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 };
@@ -710,7 +884,7 @@ export const MarketTecView = ({ user }) => {
 
 export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelection, user, unitName }) => {
   const overdueItems = filteredCXC.filter(i => i.status === 'Overdue');
-  const totalOverdue = overdueItems.reduce((acc, curr) => acc + parseFloat(curr.amount.replace(/[^0-9.-]+/g, "")), 0);
+  const totalOverdue = overdueItems.reduce((acc, curr) => acc + parseFloat(String(curr.amount || 0).replace(/[^0-9.-]+/g, "") || 0), 0);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -1023,6 +1197,7 @@ export const ContractForm = ({ client, user, onClose, onSuccess, onAddContract, 
     monthlyRentAmount: '',
     monthlyServicesAmount: '',
     cutoffDay: '',
+    numMonths: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -1035,9 +1210,27 @@ export const ContractForm = ({ client, user, onClose, onSuccess, onAddContract, 
         monthlyRentAmount: contractToEdit.monthly_rent_amount ? String(contractToEdit.monthly_rent_amount) : '',
         monthlyServicesAmount: (contractToEdit.monthly_services_amount || contractToEdit.monthly_services_account) ? String(contractToEdit.monthly_services_amount || contractToEdit.monthly_services_account) : '',
         cutoffDay: contractToEdit.cutoff_day ? String(contractToEdit.cutoff_day) : '',
+        numMonths: contractToEdit.num_months ? String(contractToEdit.num_months) : '',
       });
     }
   }, [contractToEdit]);
+
+  // Calcular numMonths automáticamente cuando cambian las fechas
+  useEffect(() => {
+    if (formData.startDate && formData.endDate) {
+      const d1 = new Date(formData.startDate + 'T00:00:00');
+      const d2 = new Date(formData.endDate + 'T00:00:00');
+
+      if (d2 >= d1) {
+        const months = (d2.getFullYear() - d1.getFullYear()) * 12 + (d2.getMonth() - d1.getMonth()) + 1;
+        if (String(months) !== formData.numMonths) {
+          setFormData(prev => ({ ...prev, numMonths: String(months) }));
+        }
+      } else if (formData.numMonths !== '') {
+        setFormData(prev => ({ ...prev, numMonths: '' }));
+      }
+    }
+  }, [formData.startDate, formData.endDate, formData.numMonths]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1068,6 +1261,7 @@ export const ContractForm = ({ client, user, onClose, onSuccess, onAddContract, 
         monthlyRentAmount: formData.monthlyRentAmount ? parseFloat(formData.monthlyRentAmount) : null,
         monthlyServicesAmount: formData.monthlyServicesAmount ? parseFloat(formData.monthlyServicesAmount) : null,
         cutoffDay: formData.cutoffDay ? parseInt(formData.cutoffDay) : null,
+        numMonths: formData.numMonths ? parseInt(formData.numMonths) : null,
         status: contractToEdit ? contractToEdit.status : 'Activo',
       };
 
@@ -1143,6 +1337,23 @@ export const ContractForm = ({ client, user, onClose, onSuccess, onAddContract, 
             min={formData.startDate || undefined}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
           />
+        </div>
+
+        {/* Duración (meses) - CALCULADO */}
+        <div>
+          <label htmlFor="numMonths" className="block text-sm font-medium text-gray-700 mb-1">
+            Duración del Contrato (meses)
+          </label>
+          <input
+            type="number"
+            id="numMonths"
+            name="numMonths"
+            value={formData.numMonths}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 font-bold text-blue-700 focus:outline-none"
+            placeholder="Calculado automáticamente..."
+          />
+          <p className="mt-1 text-xs text-gray-500">Se calcula basado en la fecha de inicio y fin.</p>
         </div>
 
         {/* Monto Renta Mensual */}

@@ -79,7 +79,7 @@ const ClientForm = ({ clientToEdit, onSave, onClose, unitId }) => {
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                     <input
-                        type="email"
+                        type="text"
                         name="contact_email"
                         value={formData.contact_email}
                         onChange={handleChange}

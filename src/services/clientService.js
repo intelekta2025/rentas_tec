@@ -58,6 +58,10 @@ const mapClientToDB = (clientData) => {
   // status
   if (clientData.status !== undefined) mapped.status = clientData.status
 
+  // unit_id
+  const uId = clientData.unit_id || clientData.unitId
+  if (uId !== undefined) mapped.unit_id = uId
+
   // User_market_tec (Casing exacto de BD)
   const umt = clientData.User_market_tec || clientData.user_market_tec
   if (umt !== undefined) mapped.User_market_tec = umt
@@ -130,6 +134,9 @@ export const createClient = async (clientData) => {
   try {
     // Mapear los datos al formato de la BD
     const mappedData = mapClientToDB(clientData)
+
+    // IMPORTANTE: Eliminamos id si existe para que la BD use su secuencia automática
+    delete mappedData.id
 
     const { data, error } = await supabase
       .from('clients')

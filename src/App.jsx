@@ -23,6 +23,7 @@ import { useClients } from './hooks/useClients';
 import { useInvoices, useOverdueInvoices, useUpcomingReminders } from './hooks/useInvoices';
 import { useBusinessUnit } from './hooks/useBusinessUnit';
 import { useClientPortalUsers } from './hooks/useClientPortalUsers';
+import { generateBulkInvoices } from './services/invoiceService';
 import { useContracts } from './hooks/useContracts';
 
 // Componente wrapper para el formulario de contrato que usa el mismo hook que ClientDetailView
@@ -60,14 +61,18 @@ const ContractFormWrapper = ({ client, user, onClose, onContractCreated, contrac
 };
 
 // Componente wrapper para ClientDetailView que carga los usuarios del portal y contratos
-const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModalOpen, generateContractPreview, setTerminationModalOpen, contractsRefreshKey, onPrepareEdit, onEditClient }) => {
+const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModalOpen, generateContractPreview, setTerminationModalOpen, contractsRefreshKey, onPrepareEdit, onEditClient, onGenerateCXC }) => {
   const { portalUsers, loading: portalUsersLoading } = useClientPortalUsers(client?.id);
   const { contracts, loading: contractsLoading, addContract, finalizeContract, refreshContracts } = useContracts(client?.id);
+
+  // Cargar receivables (Estado de Cuenta) reales
+  const { invoices: receivables, loading: receivablesLoading, refreshInvoices } = useInvoices({ clientId: client?.id });
 
   // Recargar contratos cuando cambie contractsRefreshKey
   useEffect(() => {
     if (contractsRefreshKey > 0) {
       refreshContracts();
+      refreshInvoices();
     }
   }, [contractsRefreshKey]);
 
@@ -112,6 +117,15 @@ const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModa
       onAddContract={handleAddContract}
       onRefreshContracts={refreshContracts}
       onEditClient={onEditClient}
+      onGenerateCXC={async (invoices) => {
+        const result = await onGenerateCXC(invoices);
+        if (result.success) {
+          await refreshInvoices();
+        }
+        return result;
+      }}
+      receivables={receivables}
+      receivablesLoading={receivablesLoading}
     />
   );
 };
@@ -268,7 +282,7 @@ export default function App() {
     if (!user || user.role === 'Client') return { totalClients: 0, totalCXC: 0, overdueCount: 0 };
 
     const totalCXC = filteredCXC.reduce((acc, curr) => {
-      const amount = parseFloat(curr.amount?.replace(/[^0-9.-]+/g, '') || 0);
+      const amount = parseFloat(String(curr.amount || 0).replace(/[^0-9.-]+/g, '') || 0);
       return acc + amount;
     }, 0);
 
@@ -291,7 +305,7 @@ export default function App() {
     const balance = myCXC
       .filter(i => i.status === 'Pending' || i.status === 'Overdue')
       .reduce((acc, curr) => {
-        const amount = parseFloat(curr.amount?.replace(/[^0-9.-]+/g, '') || 0);
+        const amount = parseFloat(String(curr.amount || 0).replace(/[^0-9.-]+/g, '') || 0);
         return acc + amount;
       }, 0);
 
@@ -321,7 +335,9 @@ export default function App() {
           setSelectedClient(result.data);
         }
       } else {
-        await addClient(clientData);
+        // Asegurar que el nuevo cliente tenga el unitId del usuario actual
+        const newClientData = { ...clientData, unitId: user?.unitId };
+        await addClient(newClientData);
       }
       setAddClientModalOpen(false);
       setClientToEdit(null);
@@ -488,6 +504,12 @@ export default function App() {
                   contractsRefreshKey={contractsRefreshKey}
                   onPrepareEdit={setContractToEdit}
                   onEditClient={handleEditClientProfile}
+                  onGenerateCXC={async (invoices) => {
+                    const result = await generateBulkInvoices(invoices);
+                    // Forzar recarga de movimientos del cliente si fuera necesario
+                    // Por ahora, el estado de cuenta se recarga al entrar a la pestaña o refrescar
+                    return { success: !result.error, error: result.error };
+                  }}
                 />
               )}
               {activeTab === 'overdue' && (

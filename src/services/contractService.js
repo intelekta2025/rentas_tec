@@ -64,6 +64,7 @@ export const createContract = async (contractData) => {
       cutoff_day: contractData.cutoffDay || null,
       monthly_rent_amount: contractData.monthlyRentAmount || contractData.monthly_rent_amount || null,
       monthly_services_amount: contractData.monthlyServicesAmount || contractData.monthly_services_amount || null,
+      num_months: contractData.numMonths || null,
       status: contractData.status || 'Activo',
     }
 
@@ -99,6 +100,7 @@ export const updateContract = async (contractId, contractData) => {
     // Fix: Save monthly services amount (correct field name: monthly_services_amount)
     if (contractData.monthlyServicesAmount !== undefined) mappedData.monthly_services_amount = contractData.monthlyServicesAmount
     if (contractData.monthly_services_amount !== undefined) mappedData.monthly_services_amount = contractData.monthly_services_amount
+    if (contractData.numMonths !== undefined) mappedData.num_months = contractData.numMonths
 
     const { data, error } = await supabase
       .from('contracts')

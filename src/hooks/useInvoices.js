@@ -2,16 +2,16 @@
 // Hook personalizado para manejar facturas/CXC con Supabase
 
 import { useState, useEffect, useMemo } from 'react'
-import { 
-  getInvoices, 
-  getOverdueInvoices, 
+import {
+  getInvoices,
+  getOverdueInvoices,
   getPendingInvoices,
   getScheduledInvoices,
   getUpcomingReminders,
-  createInvoice, 
-  updateInvoice, 
+  createInvoice,
+  updateInvoice,
   updateInvoiceStatus,
-  deleteInvoice 
+  deleteInvoice
 } from '../services/invoiceService'
 
 export const useInvoices = (filters = {}) => {
@@ -52,7 +52,7 @@ export const useInvoices = (filters = {}) => {
     try {
       const { data, error } = await createInvoice(invoiceData)
       if (error) throw error
-      
+
       // Actualizar la lista local
       setInvoices(prev => [...prev, data])
       return { success: true, data, error: null }
@@ -67,9 +67,9 @@ export const useInvoices = (filters = {}) => {
     try {
       const { data, error } = await updateInvoice(id, invoiceData)
       if (error) throw error
-      
+
       // Actualizar la lista local
-      setInvoices(prev => prev.map(invoice => 
+      setInvoices(prev => prev.map(invoice =>
         invoice.id === id ? data : invoice
       ))
       return { success: true, data, error: null }
@@ -84,9 +84,9 @@ export const useInvoices = (filters = {}) => {
     try {
       const { data, error } = await updateInvoiceStatus(id, status)
       if (error) throw error
-      
+
       // Actualizar la lista local
-      setInvoices(prev => prev.map(invoice => 
+      setInvoices(prev => prev.map(invoice =>
         invoice.id === id ? data : invoice
       ))
       return { success: true, data, error: null }
@@ -101,7 +101,7 @@ export const useInvoices = (filters = {}) => {
     try {
       const { error } = await deleteInvoice(id)
       if (error) throw error
-      
+
       // Actualizar la lista local
       setInvoices(prev => prev.filter(invoice => invoice.id !== id))
       return { success: true, error: null }
@@ -127,24 +127,25 @@ export const useInvoices = (filters = {}) => {
   }
 
   // Valores calculados
-  const overdueInvoices = useMemo(() => 
-    invoices.filter(inv => inv.status === 'Overdue'), 
+  const overdueInvoices = useMemo(() =>
+    invoices.filter(inv => inv.status === 'Overdue'),
     [invoices]
   )
 
-  const pendingInvoices = useMemo(() => 
-    invoices.filter(inv => inv.status === 'Pending'), 
+  const pendingInvoices = useMemo(() =>
+    invoices.filter(inv => inv.status === 'Pending'),
     [invoices]
   )
 
-  const totalAmount = useMemo(() => 
+  const totalAmount = useMemo(() =>
     invoices.reduce((acc, inv) => {
-      // amount ya viene como string formateado desde el servicio
-      const amount = parseFloat(inv.amount?.replace(/[^0-9.-]+/g, '') || 0)
-      return acc + amount
-    }, 0), 
+      // amount puede venir como string formateado o como número
+      const amountStr = String(inv.amount || '0');
+      const amount = parseFloat(amountStr.replace(/[^0-9.-]+/g, '') || 0);
+      return acc + amount;
+    }, 0),
     [invoices]
-  )
+  );
 
   return {
     invoices,

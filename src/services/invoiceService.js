@@ -36,22 +36,22 @@ const parseCurrency = (value) => {
  */
 const mapReceivableFromDB = (dbReceivable) => {
   if (!dbReceivable) return null
-  
+
   const today = new Date()
   const dueDate = dbReceivable.due_date ? new Date(dbReceivable.due_date) : null
-  
+
   // Calcular días vencidos si está vencida
   let daysOverdue = 0
   if (dbReceivable.status === 'Overdue' && dueDate) {
     daysOverdue = Math.max(0, Math.floor((today - dueDate) / (1000 * 60 * 60 * 24)))
   }
-  
+
   // Calcular días hasta vencimiento si está pendiente o programada
   let daysUntil = null
   if ((dbReceivable.status === 'Pending' || dbReceivable.status === 'Scheduled') && dueDate) {
     daysUntil = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24))
   }
-  
+
   return {
     id: dbReceivable.id,
     unitId: dbReceivable.unit_id,
@@ -85,23 +85,23 @@ const mapReceivableFromDB = (dbReceivable) => {
  */
 const mapReceivableToDB = (receivableData) => {
   const mapped = {}
-  
+
   // Mapear campos del frontend a la BD
   if (receivableData.unitId !== undefined) mapped.unit_id = receivableData.unitId
   if (receivableData.clientId !== undefined) mapped.client_id = receivableData.clientId
   if (receivableData.contractId !== undefined) mapped.contract_id = receivableData.contractId
-  
+
   // Convertir amount de string a numeric
   if (receivableData.amount !== undefined) {
     mapped.amount = parseCurrency(receivableData.amount)
   }
-  
+
   // Campos de texto
   if (receivableData.concept !== undefined) mapped.concept = receivableData.concept
   if (receivableData.dueDate !== undefined) mapped.due_date = receivableData.dueDate
   if (receivableData.status !== undefined) mapped.status = receivableData.status
   if (receivableData.type !== undefined) mapped.type = receivableData.type
-  
+
   // Campos nuevos
   if (receivableData.periodMonth !== undefined) mapped.period_month = receivableData.periodMonth
   if (receivableData.periodYear !== undefined) mapped.period_year = receivableData.periodYear
@@ -111,7 +111,7 @@ const mapReceivableToDB = (receivableData) => {
   if (receivableData.balanceDue !== undefined) {
     mapped.balance_due = parseCurrency(receivableData.balanceDue)
   }
-  
+
   // Si ya vienen en formato de BD, mantenerlos (tienen prioridad)
   if (receivableData.unit_id !== undefined) mapped.unit_id = receivableData.unit_id
   if (receivableData.client_id !== undefined) mapped.client_id = receivableData.client_id
@@ -121,12 +121,12 @@ const mapReceivableToDB = (receivableData) => {
   if (receivableData.due_date !== undefined) mapped.due_date = receivableData.due_date
   if (receivableData.paid_amount !== undefined) mapped.paid_amount = receivableData.paid_amount
   if (receivableData.balance_due !== undefined) mapped.balance_due = receivableData.balance_due
-  
+
   // Si amount viene como número, mantenerlo
   if (receivableData.amount !== undefined && typeof receivableData.amount === 'number') {
     mapped.amount = receivableData.amount
   }
-  
+
   return mapped
 }
 
@@ -230,7 +230,7 @@ export const createInvoice = async (invoiceData) => {
   try {
     // Mapear los datos al formato de la BD
     const mappedData = mapReceivableToDB(invoiceData)
-    
+
     const { data, error } = await supabase
       .from('receivables') // Tabla real: receivables
       .insert([mappedData])
@@ -259,7 +259,7 @@ export const updateInvoice = async (id, invoiceData) => {
   try {
     // Mapear los datos al formato de la BD
     const mappedData = mapReceivableToDB(invoiceData)
-    
+
     const { data, error } = await supabase
       .from('receivables') // Tabla real: receivables
       .update(mappedData)
@@ -344,6 +344,36 @@ export const getUpcomingReminders = async (unitId = null, daysAhead = 30) => {
     return { data: mappedData, error: null }
   } catch (error) {
     console.error('Error al obtener recordatorios:', error)
+    return { data: null, error }
+  }
+}
+/**
+ * Crea múltiples receivables de una sola vez
+ * @param {array} invoices - Array de objetos de receivable
+ * @returns {Promise<{data: array, error: object}>}
+ */
+export const generateBulkInvoices = async (invoices) => {
+  try {
+    if (!invoices || !Array.isArray(invoices) || invoices.length === 0) {
+      return { data: [], error: null }
+    }
+
+    // Mapear cada registro al formato de la BD
+    const mappedInvoices = invoices.map(mapReceivableToDB)
+
+    const { data, error } = await supabase
+      .from('receivables')
+      .insert(mappedInvoices)
+      .select()
+
+    if (error) throw error
+
+    // Mapear la respuesta al formato del frontend
+    const mappedResponse = (data || []).map(mapReceivableFromDB)
+
+    return { data: mappedResponse, error: null }
+  } catch (error) {
+    console.error('Error al generar CXC en bloque:', error)
     return { data: null, error }
   }
 }

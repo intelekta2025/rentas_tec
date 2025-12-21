@@ -1,22 +1,25 @@
 // src/components/ui/Shared.jsx
 import React, { useState } from 'react';
-import { 
-  AlertTriangle, 
-  Clock, 
-  School 
+import {
+  AlertTriangle,
+  Clock,
+  School
 } from 'lucide-react';
 import { LOGO_URL } from '../../data/constants';
 
 export const StatusBadge = ({ status }) => {
   const styles = {
     Active: "bg-green-100 text-green-800",
+    Activo: "bg-green-100 text-green-800",
     Paid: "bg-green-100 text-green-800",
     Pending: "bg-yellow-100 text-yellow-800",
     Overdue: "bg-red-100 text-red-800",
     Scheduled: "bg-gray-100 text-gray-500 border border-gray-200",
-    Inactive: "bg-gray-300 text-gray-700"
+    Inactive: "bg-gray-100 text-gray-600",
+    Inactivo: "bg-gray-100 text-gray-600",
+    Baja: "bg-gray-100 text-gray-600"
   };
-  
+
   const labels = {
     Active: "Activo",
     Paid: "Pagado",
@@ -37,7 +40,7 @@ export const StatusBadge = ({ status }) => {
 export const OverdueBadge = ({ days }) => {
   let colorClass = "bg-yellow-100 text-yellow-800";
   let label = "Reciente";
-  
+
   if (days > 30) {
     colorClass = "bg-orange-100 text-orange-800";
     label = "> 30 Días";
@@ -46,7 +49,7 @@ export const OverdueBadge = ({ days }) => {
     colorClass = "bg-red-100 text-red-800";
     label = "> 60 Días";
   }
-  
+
   return (
     <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${colorClass}`}>
       <Clock size={12} className="mr-1 mt-0.5" />
@@ -56,13 +59,12 @@ export const OverdueBadge = ({ days }) => {
 };
 
 export const SidebarItem = ({ icon: Icon, label, active, onClick }) => (
-  <button 
+  <button
     onClick={onClick}
-    className={`w-full flex items-center space-x-3 px-6 py-3 transition-colors duration-200 ${
-      active 
-        ? "bg-blue-900 text-white border-r-4 border-white" 
+    className={`w-full flex items-center space-x-3 px-6 py-3 transition-colors duration-200 ${active
+        ? "bg-blue-900 text-white border-r-4 border-white"
         : "text-blue-100 hover:bg-blue-800 hover:text-white"
-    }`}
+      }`}
   >
     <Icon size={20} />
     <span className="font-medium">{label}</span>
@@ -100,9 +102,9 @@ export const AppLogo = ({ className, whiteBg = false }) => {
   }
 
   return (
-    <img 
-      src={LOGO_URL} 
-      alt="Logo Tec" 
+    <img
+      src={LOGO_URL}
+      alt="Logo Tec"
       className={`${className} ${whiteBg ? 'bg-white p-1 rounded-full' : 'object-contain'}`}
       onError={() => setError(true)}
     />
@@ -132,7 +134,7 @@ export const Modal = ({ isOpen, onClose, title, children, size = "md" }) => {
 
 export const RevenueChart = ({ data }) => {
   const maxVal = Math.max(...data.map(d => Math.max(d.collected, d.pending)));
-  
+
   return (
     <div className="bg-white p-6 rounded-lg shadow mt-6">
       <div className="flex justify-between items-center mb-6">
@@ -151,23 +153,23 @@ export const RevenueChart = ({ data }) => {
           </div>
         </div>
       </div>
-      
+
       <div className="flex items-end space-x-2 sm:space-x-4 h-64 pb-2 border-b border-gray-100 overflow-x-auto">
         {data.map((d, i) => {
           const collectedHeight = (d.collected / maxVal) * 100;
           const pendingHeight = (d.pending / maxVal) * 100;
-          
+
           return (
             <div key={i} className="flex-1 flex flex-col items-center group relative h-full justify-end min-w-[30px]">
               <div className="w-full flex items-end justify-center space-x-1">
-                 <div style={{ height: `${collectedHeight}%` }} className="w-2 sm:w-3 md:w-4 bg-green-500 rounded-t-sm hover:bg-green-600 transition-all cursor-pointer relative"></div>
-                 <div style={{ height: `${pendingHeight}%` }} className="w-2 sm:w-3 md:w-4 bg-orange-400 rounded-t-sm hover:bg-orange-500 transition-all cursor-pointer relative"></div>
+                <div style={{ height: `${collectedHeight}%` }} className="w-2 sm:w-3 md:w-4 bg-green-500 rounded-t-sm hover:bg-green-600 transition-all cursor-pointer relative"></div>
+                <div style={{ height: `${pendingHeight}%` }} className="w-2 sm:w-3 md:w-4 bg-orange-400 rounded-t-sm hover:bg-orange-500 transition-all cursor-pointer relative"></div>
               </div>
               <span className="text-[10px] sm:text-xs text-gray-500 mt-2">{d.month}</span>
               <div className="absolute bottom-16 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800 text-white text-xs rounded p-2 z-20 w-32 text-center pointer-events-none shadow-lg left-1/2 transform -translate-x-1/2 hidden sm:block">
                 <div className="font-bold border-b border-gray-600 pb-1 mb-1">{d.month}</div>
-                <div className="flex justify-between text-[10px]"><span className="text-green-300">Cob:</span><span>${(d.collected/1000).toFixed(1)}k</span></div>
-                <div className="flex justify-between text-[10px]"><span className="text-orange-300">Pen:</span><span>${(d.pending/1000).toFixed(1)}k</span></div>
+                <div className="flex justify-between text-[10px]"><span className="text-green-300">Cob:</span><span>${(d.collected / 1000).toFixed(1)}k</span></div>
+                <div className="flex justify-between text-[10px]"><span className="text-orange-300">Pen:</span><span>${(d.pending / 1000).toFixed(1)}k</span></div>
               </div>
             </div>
           );
