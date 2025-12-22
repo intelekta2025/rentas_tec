@@ -379,11 +379,11 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
         {/* Financial Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white p-4 rounded-lg shadow border-l-4 border-gray-400">
-            <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Total Recibo Manual (Luz/Rentas)</div>
+            <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Total del contrato</div>
             <div className="text-2xl font-bold text-gray-900 mt-1">${contractTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
           </div>
           <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
-            <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Saldo Total del Contrato</div>
+            <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Saldo del contrato</div>
             <div className="text-2xl font-bold text-gray-900 mt-1">${balance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
           </div>
           <div className="bg-white p-4 rounded-lg shadow border-l-4 border-red-500">
