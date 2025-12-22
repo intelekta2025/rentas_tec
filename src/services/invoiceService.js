@@ -102,7 +102,7 @@ const mapReceivableFromDB = (dbReceivable) => {
     client: dbReceivable.clients?.business_name || dbReceivable.client_name || dbReceivable.client,
     // Campos formateados adicionales
     paidAmount: formatCurrency(dbReceivable.amount_paid),
-    balanceDue: formatCurrency(dbReceivable.balance_due || dbReceivable.balance),
+    balanceDue: formatCurrency(dbReceivable.balance),
     // Asegurar compatibilidad con alias si es necesario
     unitId: dbReceivable.unit_id,
     clientId: dbReceivable.client_id,
@@ -110,7 +110,7 @@ const mapReceivableFromDB = (dbReceivable) => {
     // Valores numéricos crudos para cálculos
     amountRaw: parseFloat(dbReceivable.amount || 0),
     paidAmountRaw: parseFloat(dbReceivable.amount_paid || 0),
-    balanceDueRaw: parseFloat(dbReceivable.balance_due || dbReceivable.balance || 0),
+    balanceDueRaw: parseFloat(dbReceivable.balance || 0),
   }
 }
 

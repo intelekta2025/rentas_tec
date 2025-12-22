@@ -277,9 +277,7 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
   };
 
   const calculateBalance = (items) => items.reduce((acc, curr) => {
-    const total = parseFloat(String(curr.amount || 0).replace(/[^0-9.-]+/g, "") || 0);
-    const paid = parseFloat(String(curr.amount_paid || 0).replace(/[^0-9.-]+/g, "") || 0);
-    return acc + (total - paid);
+    return acc + (curr.balanceDueRaw || 0);
   }, 0);
 
   const balance = calculateBalance(filteredReceivables.filter(i =>
@@ -759,7 +757,7 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
                       {`$${parseFloat(item.amount_paid || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-700 text-right">
-                      {item.balanceDue}
+                      {`$${(item.balanceDueRaw || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={item.status} /></td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
