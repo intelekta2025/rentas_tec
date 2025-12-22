@@ -89,6 +89,7 @@ const mapReceivableFromDB = (dbReceivable) => {
     id: dbReceivable.id,
     amount: formatCurrency(dbReceivable.amount), // Convertir numeric a string formateado
     concept: dbReceivable.concept,
+    concepts: [dbReceivable.concept],
     dueDate: dbReceivable.due_date,
     status: effectiveStatus,
     type: dbReceivable.type,
@@ -144,7 +145,7 @@ const mapReceivableToDB = (receivableData) => {
     mapped.amount_paid = parseCurrency(receivableData.paidAmount)
   }
   if (receivableData.balanceDue !== undefined) {
-    mapped.balance_due = parseCurrency(receivableData.balanceDue)
+    mapped.balance = parseCurrency(receivableData.balanceDue)
   }
 
   // Si ya vienen en formato de BD, mantenerlos (tienen prioridad)
@@ -156,8 +157,8 @@ const mapReceivableToDB = (receivableData) => {
   if (receivableData.due_date !== undefined) mapped.due_date = receivableData.due_date
   if (receivableData.amount_paid !== undefined) mapped.amount_paid = receivableData.amount_paid
   if (receivableData.paid_amount !== undefined) mapped.amount_paid = receivableData.paid_amount
-  if (receivableData.balance_due !== undefined) mapped.balance_due = receivableData.balance_due
-  if (receivableData.balance !== undefined) mapped.balance_due = receivableData.balance
+  if (receivableData.balance_due !== undefined) mapped.balance = receivableData.balance_due
+  if (receivableData.balance !== undefined) mapped.balance = receivableData.balance
 
   // Si amount viene como número, mantenerlo
   if (receivableData.amount !== undefined && typeof receivableData.amount === 'number') {
@@ -443,13 +444,12 @@ export const registerPayment = async (paymentData) => {
       newStatus = 'Partial';
     }
 
-    // 2. Insertar el registro de pago
+    // 2. Insertar el registro de pago (sin receivable_id)
     const { data: payment, error: paymentError } = await supabase
       .from('payments')
       .insert([{
         client_id: clientId,
         unit_id: unitId,
-        receivable_id: receivableId,
         amount: parseFloat(amount),
         payment_date: paymentDate
       }])
@@ -458,7 +458,18 @@ export const registerPayment = async (paymentData) => {
 
     if (paymentError) throw paymentError;
 
-    // 3. Actualizar el movimiento
+    // 3. Crear la aplicación del pago (Tabla Pivote)
+    const { error: appError } = await supabase
+      .from('payment_applications')
+      .insert([{
+        payment_id: payment.id,
+        receivable_id: receivableId,
+        amount_applied: parseFloat(amount)
+      }]);
+
+    if (appError) throw appError;
+
+    // 4. Actualizar el movimiento (receivable)
     const { error: updateError } = await supabase
       .from('receivables')
       .update({

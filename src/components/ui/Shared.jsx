@@ -143,14 +143,23 @@ export const Modal = ({ isOpen, onClose, title, children, size = "md" }) => {
   );
 };
 
-export const RevenueChart = ({ data }) => {
-  const maxVal = Math.max(...data.map(d => Math.max(d.collected, d.pending)));
+export const RevenueChart = ({ data, year = new Date().getFullYear(), title = "Comportamiento de Cobranza" }) => {
+  const rawMax = Math.max(...data.map(d => Math.max(d.collected, d.pending, 0)), 100);
+
+  // Calcular un máximo "redondo" para la escala
+  let maxVal;
+  if (rawMax <= 100) maxVal = 100;
+  else if (rawMax <= 1000) maxVal = Math.ceil(rawMax / 100) * 100;
+  else if (rawMax <= 10000) maxVal = Math.ceil(rawMax / 1000) * 1000;
+  else maxVal = Math.ceil(rawMax / 5000) * 5000;
+
+  const steps = [maxVal, maxVal * 0.75, maxVal * 0.5, maxVal * 0.25, 0];
 
   return (
     <div className="bg-white p-6 rounded-lg shadow mt-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h3 className="text-lg font-bold text-gray-800">Comportamiento de Cobranza 2023</h3>
+          <h3 className="text-lg font-bold text-gray-800">{title} {year}</h3>
           <p className="text-xs text-gray-500">Comparativo Mensual: Cobrado vs. Pendiente</p>
         </div>
         <div className="flex space-x-4">
@@ -165,26 +174,55 @@ export const RevenueChart = ({ data }) => {
         </div>
       </div>
 
-      <div className="flex items-end space-x-2 sm:space-x-4 h-64 pb-2 border-b border-gray-100 overflow-x-auto">
-        {data.map((d, i) => {
-          const collectedHeight = (d.collected / maxVal) * 100;
-          const pendingHeight = (d.pending / maxVal) * 100;
+      <div className="relative h-72 flex">
+        {/* Y-Axis Labels */}
+        <div className="hidden sm:flex flex-col justify-between h-64 pr-4 pb-2 text-[10px] text-gray-400 font-medium text-right w-16 select-none">
+          {steps.map((s, i) => (
+            <span key={i}>${s >= 1000 ? `${(s / 1000).toFixed(1)}k` : s}</span>
+          ))}
+        </div>
 
-          return (
-            <div key={i} className="flex-1 flex flex-col items-center group relative h-full justify-end min-w-[30px]">
-              <div className="w-full flex items-end justify-center space-x-1">
-                <div style={{ height: `${collectedHeight}%` }} className="w-2 sm:w-3 md:w-4 bg-green-500 rounded-t-sm hover:bg-green-600 transition-all cursor-pointer relative"></div>
-                <div style={{ height: `${pendingHeight}%` }} className="w-2 sm:w-3 md:w-4 bg-orange-400 rounded-t-sm hover:bg-orange-500 transition-all cursor-pointer relative"></div>
-              </div>
-              <span className="text-[10px] sm:text-xs text-gray-500 mt-2">{d.month}</span>
-              <div className="absolute bottom-16 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800 text-white text-xs rounded p-2 z-20 w-32 text-center pointer-events-none shadow-lg left-1/2 transform -translate-x-1/2 hidden sm:block">
-                <div className="font-bold border-b border-gray-600 pb-1 mb-1">{d.month}</div>
-                <div className="flex justify-between text-[10px]"><span className="text-green-300">Cob:</span><span>${(d.collected / 1000).toFixed(1)}k</span></div>
-                <div className="flex justify-between text-[10px]"><span className="text-orange-300">Pen:</span><span>${(d.pending / 1000).toFixed(1)}k</span></div>
-              </div>
-            </div>
-          );
-        })}
+        {/* Chart Container */}
+        <div className="flex-1 relative h-64 pb-2 border-b border-gray-100 overflow-x-auto">
+          {/* Grid Lines */}
+          <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-2">
+            {[0, 1, 2, 3].map(i => (
+              <div key={i} className="w-full border-t border-gray-50 h-0"></div>
+            ))}
+          </div>
+
+          <div className="flex items-end space-x-2 sm:space-x-4 h-full relative z-10 px-2">
+            {data.map((d, i) => {
+              const collectedHeight = (d.collected / maxVal) * 100;
+              const pendingHeight = (d.pending / maxVal) * 100;
+
+              return (
+                <div key={i} className="flex-1 flex flex-col items-center group relative h-full justify-end min-w-[40px]">
+                  <div className="flex-1 w-full flex items-end justify-center space-x-1 px-1">
+                    <div
+                      style={{ height: `${collectedHeight}%` }}
+                      className={`w-full bg-green-500 rounded-t-sm hover:bg-green-600 transition-all cursor-pointer relative ${d.collected > 0 ? 'min-h-[2px]' : 'h-0'}`}
+                      title={`Cobrado: $${d.collected.toLocaleString()}`}
+                    ></div>
+                    <div
+                      style={{ height: `${pendingHeight}%` }}
+                      className={`w-full bg-orange-400 rounded-t-sm hover:bg-orange-500 transition-all cursor-pointer relative ${d.pending > 0 ? 'min-h-[2px]' : 'h-0'}`}
+                      title={`Pendiente: $${d.pending.toLocaleString()}`}
+                    ></div>
+                  </div>
+                  <span className="text-[10px] sm:text-xs text-gray-500 mt-2 font-medium">{d.month}</span>
+
+                  {/* Tooltip */}
+                  <div className="absolute bottom-16 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800 text-white text-[10px] rounded p-2 z-20 w-32 text-center pointer-events-none shadow-lg left-1/2 transform -translate-x-1/2 hidden sm:block">
+                    <div className="font-bold border-b border-gray-600 pb-1 mb-1">{d.month} {year}</div>
+                    <div className="flex justify-between"><span className="text-green-300">Cobrado:</span><span>${d.collected.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span className="text-orange-300">Pendiente:</span><span>${d.pending.toLocaleString()}</span></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );

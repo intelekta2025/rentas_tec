@@ -36,12 +36,11 @@ const parseCurrency = (value) => {
  */
 const mapPaymentFromDB = (dbPayment) => {
   if (!dbPayment) return null
-  
+
   return {
     id: dbPayment.id,
     clientId: dbPayment.client_id,
     unitId: dbPayment.unit_id,
-    receivableId: dbPayment.receivable_id, // invoice_id → receivable_id
     marketTecUploadId: dbPayment.market_tec_upload_id,
     amount: formatCurrency(dbPayment.amount), // Convertir numeric a string formateado
     date: dbPayment.payment_date, // payment_date → date (alias para compatibilidad)
@@ -55,12 +54,12 @@ const mapPaymentFromDB = (dbPayment) => {
     invoicePdfUrl: dbPayment.invoice_pdf_url,
     invoiceXmlUrl: dbPayment.invoice_xml_url,
     created_at: dbPayment.created_at,
+    unappliedAmount: dbPayment.unapplied_amount,
     // Mantener también los campos originales para compatibilidad
     ...dbPayment,
     // Alias para compatibilidad con código existente
     client_id: dbPayment.client_id,
     unit_id: dbPayment.unit_id,
-    invoice_id: dbPayment.receivable_id, // Alias para compatibilidad
   }
 }
 
@@ -71,57 +70,42 @@ const mapPaymentFromDB = (dbPayment) => {
  */
 const mapPaymentToDB = (paymentData) => {
   const mapped = {}
-  
+
   // Mapear campos del frontend a la BD
   if (paymentData.clientId !== undefined) mapped.client_id = paymentData.clientId
   if (paymentData.unitId !== undefined) mapped.unit_id = paymentData.unitId
-  if (paymentData.receivableId !== undefined) mapped.receivable_id = paymentData.receivableId
   if (paymentData.marketTecUploadId !== undefined) mapped.market_tec_upload_id = paymentData.marketTecUploadId
-  
+
   // Convertir amount de string a numeric
   if (paymentData.amount !== undefined) {
     mapped.amount = parseCurrency(paymentData.amount)
   }
-  
+
   // Fecha: aceptar date o paymentDate
   if (paymentData.date !== undefined) mapped.payment_date = paymentData.date
   if (paymentData.paymentDate !== undefined) mapped.payment_date = paymentData.paymentDate
-  
+
   // Referencia: aceptar reference o referenceNumber
   if (paymentData.reference !== undefined) mapped.reference_number = paymentData.reference
   if (paymentData.referenceNumber !== undefined) mapped.reference_number = paymentData.referenceNumber
-  
+
   // Método: aceptar method o paymentMethod
   if (paymentData.method !== undefined) mapped.payment_method = paymentData.method
   if (paymentData.paymentMethod !== undefined) mapped.payment_method = paymentData.paymentMethod
-  
+
   // Campos de facturación
   if (paymentData.invoiceStatus !== undefined) mapped.invoice_status = paymentData.invoiceStatus
   if (paymentData.invoiceUuid !== undefined) mapped.invoice_uuid = paymentData.invoiceUuid
   if (paymentData.invoicePdfUrl !== undefined) mapped.invoice_pdf_url = paymentData.invoicePdfUrl
   if (paymentData.invoiceXmlUrl !== undefined) mapped.invoice_xml_url = paymentData.invoiceXmlUrl
-  
-  // Si ya vienen en formato de BD, mantenerlos (tienen prioridad)
-  if (paymentData.client_id !== undefined) mapped.client_id = paymentData.client_id
-  if (paymentData.unit_id !== undefined) mapped.unit_id = paymentData.unit_id
-  if (paymentData.receivable_id !== undefined) mapped.receivable_id = paymentData.receivable_id
-  if (paymentData.market_tec_upload_id !== undefined) mapped.market_tec_upload_id = paymentData.market_tec_upload_id
-  if (paymentData.payment_date !== undefined) mapped.payment_date = paymentData.payment_date
-  if (paymentData.reference_number !== undefined) mapped.reference_number = paymentData.reference_number
-  if (paymentData.payment_method !== undefined) mapped.payment_method = paymentData.payment_method
-  if (paymentData.invoice_status !== undefined) mapped.invoice_status = paymentData.invoice_status
-  if (paymentData.invoice_uuid !== undefined) mapped.invoice_uuid = paymentData.invoice_uuid
-  if (paymentData.invoice_pdf_url !== undefined) mapped.invoice_pdf_url = paymentData.invoice_pdf_url
-  if (paymentData.invoice_xml_url !== undefined) mapped.invoice_xml_url = paymentData.invoice_xml_url
-  
-  // Compatibilidad: invoice_id → receivable_id
-  if (paymentData.invoice_id !== undefined) mapped.receivable_id = paymentData.invoice_id
-  
+
+  // No más receivable_id directo en la tabla payments
+
   // Si amount viene como número, mantenerlo
   if (paymentData.amount !== undefined && typeof paymentData.amount === 'number') {
     mapped.amount = paymentData.amount
   }
-  
+
   return mapped
 }
 
@@ -196,7 +180,7 @@ export const createPayment = async (paymentData) => {
   try {
     // Mapear los datos al formato de la BD
     const mappedData = mapPaymentToDB(paymentData)
-    
+
     const { data, error } = await supabase
       .from('payments')
       .insert([mappedData])
@@ -205,28 +189,36 @@ export const createPayment = async (paymentData) => {
 
     if (error) throw error
 
-    // Opcional: Actualizar el estado del receivable relacionado si existe receivable_id
-    if (mappedData.receivable_id) {
-      // Calcular el nuevo paid_amount del receivable
+    // 2. Si se proporciona un receivableId, crear la aplicación del pago
+    const rId = paymentData.receivableId || paymentData.receivable_id || paymentData.invoice_id;
+    if (rId) {
+      // Crear la aplicación en la tabla pivote
+      await supabase
+        .from('payment_applications')
+        .insert([{
+          payment_id: data.id,
+          receivable_id: rId,
+          amount_applied: mappedData.amount
+        }]);
+
+      // Actualizar el estado del receivable relacionado
       const { data: receivable } = await supabase
         .from('receivables')
         .select('paid_amount, amount')
-        .eq('id', mappedData.receivable_id)
-        .single()
+        .eq('id', rId)
+        .single();
 
       if (receivable) {
         const newPaidAmount = (parseFloat(receivable.paid_amount) || 0) + parseFloat(mappedData.amount)
-        const balanceDue = parseFloat(receivable.amount) - newPaidAmount
-        
-        // Actualizar el receivable
+        const balanceDue = Math.max(0, parseFloat(receivable.amount) - newPaidAmount)
+
         await supabase
           .from('receivables')
-          .update({ 
-            paid_amount: newPaidAmount,
-            balance_due: balanceDue,
-            status: balanceDue <= 0 ? 'Paid' : 'Pending'
+          .update({
+            amount_paid: newPaidAmount,
+            status: balanceDue <= 0 ? 'Paid' : 'Partial'
           })
-          .eq('id', mappedData.receivable_id)
+          .eq('id', rId)
       }
     }
 
@@ -250,7 +242,7 @@ export const updatePayment = async (id, paymentData) => {
   try {
     // Mapear los datos al formato de la BD
     const mappedData = mapPaymentToDB(paymentData)
-    
+
     const { data, error } = await supabase
       .from('payments')
       .update(mappedData)
@@ -279,28 +271,35 @@ export const deletePayment = async (id) => {
   try {
     // Obtener el pago antes de eliminarlo para actualizar el receivable
     const { data: payment } = await getPaymentById(id)
-    
-    if (payment && payment.receivableId) {
-      // Revertir el pago en el receivable
-      const { data: receivable } = await supabase
-        .from('receivables')
-        .select('paid_amount, amount')
-        .eq('id', payment.receivableId)
-        .single()
 
-      if (receivable) {
-        const paymentAmount = parseCurrency(payment.amount)
-        const newPaidAmount = Math.max(0, (parseFloat(receivable.paid_amount) || 0) - paymentAmount)
-        const balanceDue = parseFloat(receivable.amount) - newPaidAmount
-        
-        await supabase
+    // 1. Buscar aplicaciones de este pago para revertir los montos en los receivables
+    const { data: applications } = await supabase
+      .from('payment_applications')
+      .select('receivable_id, amount_applied')
+      .eq('payment_id', id);
+
+    if (applications && applications.length > 0) {
+      for (const app of applications) {
+        // Revertir el pago en el receivable
+        const { data: receivable } = await supabase
           .from('receivables')
-          .update({ 
-            paid_amount: newPaidAmount,
-            balance_due: balanceDue,
-            status: balanceDue <= 0 ? 'Paid' : (balanceDue === parseFloat(receivable.amount) ? 'Pending' : 'Pending')
-          })
-          .eq('id', payment.receivableId)
+          .select('paid_amount, amount')
+          .eq('id', app.receivable_id)
+          .single();
+
+        if (receivable) {
+          const appliedAmount = parseFloat(app.amount_applied || 0);
+          const newPaidAmount = Math.max(0, (parseFloat(receivable.paid_amount) || 0) - appliedAmount);
+          const balanceDue = parseFloat(receivable.amount) - newPaidAmount;
+
+          await supabase
+            .from('receivables')
+            .update({
+              amount_paid: newPaidAmount,
+              status: balanceDue <= 0 ? 'Paid' : (newPaidAmount > 0 ? 'Partial' : 'Pending')
+            })
+            .eq('id', app.receivable_id);
+        }
       }
     }
 

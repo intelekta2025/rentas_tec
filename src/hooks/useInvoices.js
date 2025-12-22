@@ -5,8 +5,6 @@ import { useState, useEffect, useMemo } from 'react'
 import {
   getInvoices,
   getOverdueInvoices,
-  getPendingInvoices,
-  getScheduledInvoices,
   getUpcomingReminders,
   createInvoice,
   updateInvoice,

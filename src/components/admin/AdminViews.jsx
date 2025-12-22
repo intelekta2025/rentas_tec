@@ -11,38 +11,41 @@ import {
   ChevronUp, ChevronDown
 } from 'lucide-react';
 import { StatusBadge, OverdueBadge, KPICard, RevenueChart, Modal } from '../ui/Shared';
-import { UNITS, mockCXC, mockStaff } from '../../data/constants';
-import { useContracts } from '../../hooks/useContracts';
+import { UNITS, mockStaff } from '../../data/constants';
 
-export const DashboardView = ({ adminStats, mockMonthlyStats, user, unitName, setActiveTab }) => (
-  <div className="space-y-6 animate-fade-in">
-    <h2 className="text-2xl font-bold text-gray-800">Panel General - {unitName || (user?.unitId ? `Unidad ${user.unitId}` : 'Sin unidad')}</h2>
-    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-      <KPICard title="Total Clientes" value={adminStats.totalClients} icon={Users} color="#003DA5" subtext="En esta unidad" />
-      <KPICard title="Por Cobrar" value={`$${adminStats.totalCXC.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} `} icon={CreditCard} color="#F59E0B" subtext="Facturación pendiente" />
-      <KPICard
-        title="Monto Vencido"
-        value={`$${(adminStats.overdueAmount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} `}
-        icon={AlertTriangle}
-        color="#EF4444"
-        subtext={`${adminStats.overdueCount || 0} cuentas requieren atención`}
-        onClick={() => setActiveTab('overdue')}
-      />
-      <KPICard
-        title="Proyección Ingresos"
-        value={`$${(adminStats.nextMonthIncome || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} `}
-        icon={Calendar}
-        color="#10B981"
-        subtext="Cobros del próximo mes"
-      />
-    </div>
+export const DashboardView = ({ adminStats, user, unitName, setActiveTab }) => {
+  const currentYear = new Date().getFullYear();
 
-    {/* Revenue Chart */}
-    <div className="overflow-x-auto">
-      <RevenueChart data={mockMonthlyStats} />
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <h2 className="text-2xl font-bold text-gray-800">Panel General - {unitName || (user?.unitId ? `Unidad ${user.unitId}` : 'Sin unidad')}</h2>
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <KPICard title="Total Clientes" value={adminStats.totalClients} icon={Users} color="#003DA5" subtext="En esta unidad" />
+        <KPICard title="Por Cobrar" value={`$${adminStats.totalCXC.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} `} icon={CreditCard} color="#F59E0B" subtext="Facturación pendiente" />
+        <KPICard
+          title="Monto Vencido"
+          value={`$${(adminStats.overdueAmount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} `}
+          icon={AlertTriangle}
+          color="#EF4444"
+          subtext={`${adminStats.overdueCount || 0} cuentas requieren atención`}
+          onClick={() => setActiveTab('overdue')}
+        />
+        <KPICard
+          title="Proyección Ingresos"
+          value={`$${(adminStats.nextMonthIncome || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} `}
+          icon={Calendar}
+          color="#10B981"
+          subtext="Cobros del próximo mes"
+        />
+      </div>
+
+      {/* Revenue Chart */}
+      <div className="overflow-x-auto">
+        <RevenueChart data={adminStats.monthlyStats || []} year={currentYear} />
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClientClick, user, unitName, loading, error }) => {
   const [searchTerm, setSearchTerm] = useState('')
@@ -172,7 +175,7 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
   );
 };
 
-export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, generateContractPreview, setTerminationModalOpen, portalUsers = [], portalUsersLoading = false, contracts = [], contractsLoading = false, onFinalizeContract, onEditContract, onEditClient, onGenerateCXC, onUpdateReceivable, onAddPayment, receivables = [], receivablesLoading = false }) => {
+export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, portalUsers = [], portalUsersLoading = false, contracts = [], contractsLoading = false, onFinalizeContract, onEditContract, onEditClient, onGenerateCXC, onUpdateReceivable, onAddPayment, receivables = [], receivablesLoading = false }) => {
   const [isGenerateModalOpen, setGenerateModalOpen] = useState(false);
   const [contractToGenerate, setContractToGenerate] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -276,6 +279,10 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
     i.status.toLowerCase() === 'overdue'
   ));
 
+  const contractTotal = filteredReceivables.reduce((acc, curr) => {
+    return acc + parseFloat(String(curr.amount || 0).replace(/[^0-9.-]+/g, "") || 0);
+  }, 0);
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Breadcrumb */}
@@ -370,15 +377,19 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
       {/* Main Content Area */}
       <div className="space-y-6">
         {/* Financial Summary Cards */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-gray-400">
+            <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Total Recibo Manual (Luz/Rentas)</div>
+            <div className="text-2xl font-bold text-gray-900 mt-1">${contractTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
+          </div>
           <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
             <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Saldo Total del Contrato</div>
-            <div className="text-2xl font-bold text-gray-900 mt-1">${balance.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-gray-900 mt-1">${balance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
           </div>
           <div className="bg-white p-4 rounded-lg shadow border-l-4 border-red-500">
             <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Deuda Vencida</div>
             <div className="text-2xl font-bold text-red-600 mt-1 flex items-center">
-              ${overdueTotal.toLocaleString()}
+              ${overdueTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
               {overdueTotal > 0 && <AlertTriangle size={16} className="ml-2" />}
             </div>
           </div>
@@ -438,7 +449,9 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                         if (!isNaN(date.getTime())) {
                           startDateFormatted = date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' }).replace('.', '')
                         }
-                      } catch (e) { }
+                      } catch (_) {
+                        // Ignorar errores de parsing
+                      }
                     }
 
                     let endDateFormatted = 'Activo'
@@ -449,7 +462,9 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                         if (!isNaN(date.getTime())) {
                           endDateFormatted = date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' }).replace('.', '')
                         }
-                      } catch (e) { }
+                      } catch (_) {
+                        // Ignorar errores de parsing
+                      }
                     }
 
                     const monthlyRentRaw = contract.monthly_rent_amount
@@ -603,7 +618,7 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                         const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
                         const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
                         return `${months[date.getMonth()]} ${y.substring(2)}`;
-                      } catch (e) { return dateStr; }
+                      } catch (_) { return dateStr; }
                     };
                     return `${formatDateShort(selectedContract.start_date)} - ${formatDateShort(selectedContract.end_date)}`;
                   })()
@@ -713,7 +728,7 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                           const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
                           const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
                           return `${d} ${months[date.getMonth()]} ${y.substring(2)}`;
-                        } catch (e) { return item.dueDate; }
+                        } catch (_) { return item.dueDate; }
                       })()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -963,7 +978,7 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
                   <span className="font-medium text-blue-900">{receivableToPay.concept}</span>
                   <div className="text-right">
                     <span className="block font-bold text-blue-900">
-                      Saldo: ${parseFloat(String(receivableToPay.balance_due || receivableToPay.amount).replace(/[^0-9.-]+/g, "")).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                      Saldo: ${parseFloat(String(receivableToPay.balanceDue || receivableToPay.balance_due || receivableToPay.amount).replace(/[^0-9.-]+/g, "")).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                     </span>
                     {receivableToPay.paid_amount > 0 && (
                       <span className="text-[10px] text-blue-600 block">Pagado: ${parseFloat(receivableToPay.paid_amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
@@ -978,10 +993,11 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, g
               <div className="relative">
                 <span className="absolute left-3 top-2 text-gray-500">$</span>
                 <input
+                  key={receivableToPay?.id}
                   type="number"
                   name="amount"
                   step="0.01"
-                  defaultValue={receivableToPay ? parseFloat(String(receivableToPay.balance_due || receivableToPay.amount).replace(/[^0-9.-]+/g, "")) : 0}
+                  defaultValue={receivableToPay ? parseFloat(String(receivableToPay.balanceDue || receivableToPay.balance_due || receivableToPay.amount).replace(/[^0-9.-]+/g, "")) : 0}
                   required
                   className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
@@ -1590,7 +1606,7 @@ export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelecti
   );
 };
 
-export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleReminderSelection, user, unitName }) => {
+export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleReminderSelection, setSelectedReminders, user, unitName }) => {
   const pendingReminders = filteredUpcoming.filter(i => !i.sent);
 
   return (
@@ -1702,7 +1718,7 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap gap-1">
-                        {item.concepts.map((c, idx) => (
+                        {(item.concepts || [item.concept]).map((c, idx) => (
                           <span key={idx} className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${c.includes('Luz') ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'}`}>
                             {c.includes('Luz') && <Zap size={10} className="mr-1 fill-current" />}
                             {c}

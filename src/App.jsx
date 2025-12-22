@@ -5,7 +5,7 @@ import {
   FileSpreadsheet, Settings, LogOut, CheckCircle, UserPlus,
   Building, DollarSign, FileText, Calendar, Download, School
 } from 'lucide-react';
-import { UNITS, mockMonthlyStats } from './data/constants'; // Solo constantes estáticas
+import { UNITS } from './data/constants'; // Solo constantes estáticas
 import {
   SidebarItem, AppLogo, Modal
 } from './components/ui/Shared';
@@ -30,7 +30,7 @@ import { useContracts } from './hooks/useContracts';
 // Este componente debe compartir el mismo hook que ClientDetailViewWithPortalUsers
 // Para que cuando se cree un contrato, se actualice automáticamente la lista
 const ContractFormWrapper = ({ client, user, onClose, onContractCreated, contractToEdit }) => {
-  const { addContract, editContract, refreshContracts } = useContracts(client?.id);
+  const { addContract, editContract } = useContracts(client?.id);
 
   const handleSuccess = async () => {
     // Cerrar modal primero para mejor UX
@@ -74,7 +74,7 @@ const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModa
       refreshContracts();
       refreshInvoices();
     }
-  }, [contractsRefreshKey]);
+  }, [contractsRefreshKey, refreshContracts, refreshInvoices]);
 
   const handleFinalizeContract = async (contractId, receivableIdsToCancel = []) => {
     // Si hay receivables para cancelar, lo hacemos primero
@@ -159,10 +159,8 @@ export default function App() {
 
   // Selection & State
   const [selectedClient, setSelectedClient] = useState(null);
-  const [generatedSchedule, setGeneratedSchedule] = useState([]);
   const [selectedOverdue, setSelectedOverdue] = useState([]);
   const [selectedReminders, setSelectedReminders] = useState([]);
-  const [terminationDate, setTerminationDate] = useState('');
   const [contractsRefreshKey, setContractsRefreshKey] = useState(0); // Para forzar recarga de contratos
   const [contractToEdit, setContractToEdit] = useState(null);
   const [clientToEdit, setClientToEdit] = useState(null);
@@ -173,7 +171,7 @@ export default function App() {
   const shouldLoadClientData = user && user.role === 'Client' && user.clientId != null
 
   // Obtener información de la unidad de negocio
-  const { unitName: businessUnitName, loading: unitLoading } = useBusinessUnit(
+  const { unitName: businessUnitName } = useBusinessUnit(
     user?.role !== 'Client' ? user?.unitId : null
   )
 
@@ -190,9 +188,7 @@ export default function App() {
   // Facturas/CXC - filtradas según el rol
   const {
     invoices: filteredCXC,
-    loading: invoicesLoading,
-    overdueInvoices,
-    totalAmount: totalCXCAmount
+    loading: invoicesLoading
   } = useInvoices(
     shouldLoadAdminData
       ? { unitId: user.unitId }
@@ -275,7 +271,6 @@ export default function App() {
   };
 
   // Mock functions needed for views (puedes reemplazarlos con funciones reales)
-  const generateContractPreview = () => { /* ... logic ... */ };
   const toggleOverdueSelection = (id) => {
     setSelectedOverdue(prev =>
       prev.includes(id)
@@ -313,6 +308,7 @@ export default function App() {
 
       const balance = curr.balanceDueRaw || 0;
       const fullAmount = curr.amountRaw || 0;
+      const paid = curr.paidAmountRaw || 0;
 
       if (!isCancelled) {
         acc.totalCXC += balance;
@@ -323,7 +319,7 @@ export default function App() {
         }
       }
 
-      // Proyección: cualquier CXC (no cancelado) que venza el mes siguiente
+      // 1. Proyección: cualquier CXC (no cancelado) que venza el mes siguiente
       // O que su periodo explícito sea el mes siguiente
       const dateParts = curr.dueDate ? String(curr.dueDate).split('-') : null;
       let dYear = dateParts && dateParts.length >= 1 ? Number(dateParts[0]) : 0;
@@ -341,8 +337,39 @@ export default function App() {
         acc.nextMonthIncome += fullAmount;
       }
 
+      // 2. Comportamiento Mensual (Gráfica): Solo para el año actual
+      if (!isCancelled) {
+        // Usar principalmente el periodo, si no el dueDate
+        const mYear = pYear || dYear;
+        const mMonth = pMonth || dMonth;
+
+        if (mYear === currentYear && mMonth >= 1 && mMonth <= 12) {
+          acc.monthlyStats[mMonth - 1].collected += paid;
+          acc.monthlyStats[mMonth - 1].pending += balance;
+        }
+      }
+
       return acc;
-    }, { totalCXC: 0, overdueAmount: 0, overdueCount: 0, nextMonthIncome: 0 });
+    }, {
+      totalCXC: 0,
+      overdueAmount: 0,
+      overdueCount: 0,
+      nextMonthIncome: 0,
+      monthlyStats: [
+        { month: 'Ene', collected: 0, pending: 0 },
+        { month: 'Feb', collected: 0, pending: 0 },
+        { month: 'Mar', collected: 0, pending: 0 },
+        { month: 'Abr', collected: 0, pending: 0 },
+        { month: 'May', collected: 0, pending: 0 },
+        { month: 'Jun', collected: 0, pending: 0 },
+        { month: 'Jul', collected: 0, pending: 0 },
+        { month: 'Ago', collected: 0, pending: 0 },
+        { month: 'Sep', collected: 0, pending: 0 },
+        { month: 'Oct', collected: 0, pending: 0 },
+        { month: 'Nov', collected: 0, pending: 0 },
+        { month: 'Dic', collected: 0, pending: 0 },
+      ]
+    });
 
     return {
       totalClients: filteredClients.filter(c => (c.status || '').toLowerCase() === 'activo').length,
@@ -531,7 +558,6 @@ export default function App() {
               {activeTab === 'dashboard' && (
                 <DashboardView
                   adminStats={adminStats}
-                  mockMonthlyStats={mockMonthlyStats}
                   user={user}
                   unitName={businessUnitName || user.unitName}
                   setActiveTab={setActiveTab}
@@ -554,7 +580,6 @@ export default function App() {
                   client={selectedClient}
                   setActiveTab={setActiveTab}
                   setContractModalOpen={setContractModalOpen}
-                  generateContractPreview={generateContractPreview}
                   setTerminationModalOpen={setTerminationModalOpen}
                   contractsRefreshKey={contractsRefreshKey}
                   onPrepareEdit={setContractToEdit}
