@@ -1,7 +1,7 @@
 // src/hooks/useInvoices.js
 // Hook personalizado para manejar facturas/CXC con Supabase
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   getInvoices,
   getOverdueInvoices,
@@ -126,7 +126,7 @@ export const useInvoices = (filters = {}) => {
   };
 
   // Función para recargar facturas
-  const refreshInvoices = async () => {
+  const refreshInvoices = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -138,7 +138,7 @@ export const useInvoices = (filters = {}) => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [JSON.stringify(filters)])
 
   // Valores calculados
   const overdueInvoices = useMemo(() =>

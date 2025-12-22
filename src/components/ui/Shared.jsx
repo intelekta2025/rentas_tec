@@ -144,16 +144,45 @@ export const Modal = ({ isOpen, onClose, title, children, size = "md" }) => {
 };
 
 export const RevenueChart = ({ data, year = new Date().getFullYear(), title = "Comportamiento de Cobranza" }) => {
-  const rawMax = Math.max(...data.map(d => Math.max(d.collected, d.pending, 0)), 100);
+  const allValues = data.flatMap(d => [d.collected, d.pending]);
+  const rawMax = Math.max(...allValues, 100);
+  const rawMin = Math.min(...allValues, 0);
 
-  // Calcular un máximo "redondo" para la escala
-  let maxVal;
-  if (rawMax <= 100) maxVal = 100;
-  else if (rawMax <= 1000) maxVal = Math.ceil(rawMax / 100) * 100;
-  else if (rawMax <= 10000) maxVal = Math.ceil(rawMax / 1000) * 1000;
-  else maxVal = Math.ceil(rawMax / 5000) * 5000;
+  // Función para obtener límites "redondos"
+  const getRoundedLimit = (val) => {
+    const absVal = Math.abs(val);
+    if (absVal === 0) return 0;
+    let limit;
+    if (absVal <= 100) limit = 100;
+    else if (absVal <= 1000) limit = Math.ceil(absVal / 100) * 100;
+    else if (absVal <= 10000) limit = Math.ceil(absVal / 1000) * 1000;
+    else limit = Math.ceil(absVal / 5000) * 5000;
+    return val < 0 ? -limit : limit;
+  };
 
-  const steps = [maxVal, maxVal * 0.75, maxVal * 0.5, maxVal * 0.25, 0];
+  const maxVal = getRoundedLimit(rawMax);
+  let minVal = getRoundedLimit(rawMin);
+  // Asegurar que si hay valores negativos, el eje 0 no esté pegado al fondo absoluto
+  // Forzamos que el rango cubra al menos un 10% de espacio negativo si hay negativos pequeñitos
+  if (minVal < 0) {
+    const minHeight = maxVal * 0.05; // 5% del positivo
+    if (Math.abs(minVal) < minHeight) {
+      minVal = -getRoundedLimit(minHeight);
+    }
+  }
+
+  const totalRange = maxVal - minVal;
+  const zeroPercentage = ((0 - minVal) / totalRange) * 100;
+
+  // Generar pasos (5 líneas aprox)
+  const steps = [];
+  const stepCount = 5;
+  const stepValue = totalRange / (stepCount - 1); // 4 intervalos
+  for (let i = 0; i < stepCount; i++) {
+    steps.push(maxVal - (stepValue * i));
+  }
+  // Asegurarnos de que el 0 esté perfectamente alineado si está cerca
+  // O simplemente renderizar el eje 0 explícitamente
 
   return (
     <div className="bg-white p-6 rounded-lg shadow mt-6">
@@ -178,7 +207,7 @@ export const RevenueChart = ({ data, year = new Date().getFullYear(), title = "C
         {/* Y-Axis Labels */}
         <div className="hidden sm:flex flex-col justify-between h-64 pr-4 pb-2 text-[10px] text-gray-400 font-medium text-right w-16 select-none">
           {steps.map((s, i) => (
-            <span key={i}>${s >= 1000 ? `${(s / 1000).toFixed(1)}k` : s}</span>
+            <span key={i}>${Math.abs(s) >= 1000 ? `${(s / 1000).toFixed(1)}k` : s.toFixed(0)}</span>
           ))}
         </div>
 
@@ -186,34 +215,63 @@ export const RevenueChart = ({ data, year = new Date().getFullYear(), title = "C
         <div className="flex-1 relative h-64 pb-2 border-b border-gray-100 overflow-x-auto">
           {/* Grid Lines */}
           <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-2">
-            {[0, 1, 2, 3].map(i => (
+            {steps.map((_, i) => (
               <div key={i} className="w-full border-t border-gray-50 h-0"></div>
             ))}
           </div>
 
-          <div className="flex items-end space-x-2 sm:space-x-4 h-full relative z-10 px-2">
+          {/* Zero Line - Highlighted */}
+          <div
+            className="absolute w-full border-t border-gray-400 border-dashed pointer-events-none z-0"
+            style={{ bottom: `${zeroPercentage}%`, left: 0 }}
+          ></div>
+
+          <div className="flex items-end space-x-2 sm:space-x-4 h-full relative z-10 px-2 pointer-events-none">
             {data.map((d, i) => {
-              const collectedHeight = (d.collected / maxVal) * 100;
-              const pendingHeight = (d.pending / maxVal) * 100;
+              const collectedHeight = (Math.abs(d.collected) / totalRange) * 100;
+              const pendingHeight = (Math.abs(d.pending) / totalRange) * 100;
+
+              // Calcular posición 'bottom' basándose en si es positivo o negativo
+              // Si es positivo, bottom = zeroPercentage
+              // Si es negativo, top = (100 - zeroPercentage) -> bottom = zeroPercentage - height
+
+              const collectedBottom = d.collected >= 0 ? zeroPercentage : zeroPercentage - collectedHeight;
+              const pendingBottom = d.pending >= 0 ? zeroPercentage : zeroPercentage - pendingHeight;
 
               return (
-                <div key={i} className="flex-1 flex flex-col items-center group relative h-full justify-end min-w-[40px]">
-                  <div className="flex-1 w-full flex items-end justify-center space-x-1 px-1">
+                <div key={i} className="flex-1 flex flex-col items-center group relative h-full justify-end min-w-[40px] pointer-events-auto">
+
+                  {/* Container for bars rendering relative to full height */}
+                  <div className="flex-1 w-full relative h-full">
+                    {/* Collected Bar */}
                     <div
-                      style={{ height: `${collectedHeight}%` }}
-                      className={`w-full bg-green-500 rounded-t-sm hover:bg-green-600 transition-all cursor-pointer relative ${d.collected > 0 ? 'min-h-[2px]' : 'h-0'}`}
+                      style={{
+                        height: `${Math.max(collectedHeight, 0.5)}%`, // min 0.5% visual
+                        bottom: `${collectedBottom}%`,
+                        left: '5%',
+                        width: '40%'
+                      }}
+                      className={`absolute bg-green-500 hover:bg-green-600 transition-all cursor-pointer ${d.collected >= 0 ? 'rounded-t-sm' : 'rounded-b-sm'}`}
                       title={`Cobrado: $${d.collected.toLocaleString()}`}
                     ></div>
+
+                    {/* Pending Bar */}
                     <div
-                      style={{ height: `${pendingHeight}%` }}
-                      className={`w-full bg-orange-400 rounded-t-sm hover:bg-orange-500 transition-all cursor-pointer relative ${d.pending > 0 ? 'min-h-[2px]' : 'h-0'}`}
+                      style={{
+                        height: `${Math.max(pendingHeight, 0.5)}%`,
+                        bottom: `${pendingBottom}%`,
+                        right: '5%',
+                        width: '40%'
+                      }}
+                      className={`absolute bg-orange-400 hover:bg-orange-500 transition-all cursor-pointer ${d.pending >= 0 ? 'rounded-t-sm' : 'rounded-b-sm'}`}
                       title={`Pendiente: $${d.pending.toLocaleString()}`}
                     ></div>
                   </div>
-                  <span className="text-[10px] sm:text-xs text-gray-500 mt-2 font-medium">{d.month}</span>
+
+                  <span className="text-[10px] sm:text-xs text-gray-500 mt-2 font-medium absolute -bottom-6 w-full text-center truncate">{d.month}</span>
 
                   {/* Tooltip */}
-                  <div className="absolute bottom-16 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800 text-white text-[10px] rounded p-2 z-20 w-32 text-center pointer-events-none shadow-lg left-1/2 transform -translate-x-1/2 hidden sm:block">
+                  <div className="absolute bottom-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800 text-white text-[10px] rounded p-2 z-20 w-32 text-center pointer-events-none shadow-lg left-1/2 transform -translate-x-1/2 hidden sm:block">
                     <div className="font-bold border-b border-gray-600 pb-1 mb-1">{d.month} {year}</div>
                     <div className="flex justify-between"><span className="text-green-300">Cobrado:</span><span>${d.collected.toLocaleString()}</span></div>
                     <div className="flex justify-between"><span className="text-orange-300">Pendiente:</span><span>${d.pending.toLocaleString()}</span></div>

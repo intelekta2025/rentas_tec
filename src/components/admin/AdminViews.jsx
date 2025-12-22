@@ -138,7 +138,9 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Cliente</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Contacto</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Total del contrato</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Saldo pendiente</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Saldo vencido</th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Usuario Market Tec</th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Estado</th>
                 </tr>
@@ -154,7 +156,16 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
                       <div className="text-sm font-bold text-gray-900 uppercase">{client.name || 'Sin nombre'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-600">{client.contact || '-'}</div>
+                      <div className="text-sm text-gray-900 font-bold">${(client.totalContract || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 font-medium">${(client.pendingBalance || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className={`text-sm font-bold flex items-center ${client.overdueBalance > 0 ? 'text-red-600' : 'text-gray-500'}`}>
+                        ${(client.overdueBalance || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                        {client.overdueBalance > 0 && <AlertTriangle size={14} className="ml-1" />}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-500 font-medium italic">
