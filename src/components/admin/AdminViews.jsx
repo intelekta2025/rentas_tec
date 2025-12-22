@@ -278,7 +278,7 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
 
   const calculateBalance = (items) => items.reduce((acc, curr) => {
     const total = parseFloat(String(curr.amount || 0).replace(/[^0-9.-]+/g, "") || 0);
-    const paid = parseFloat(String(curr.amount_paid || curr.paid_amount || 0).replace(/[^0-9.-]+/g, "") || 0);
+    const paid = parseFloat(String(curr.amount_paid || 0).replace(/[^0-9.-]+/g, "") || 0);
     return acc + (total - paid);
   }, 0);
 
@@ -756,7 +756,7 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
                       {item.amount}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600 text-right">
-                      {item.paidAmount}
+                      {`$${parseFloat(item.amount_paid || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-700 text-right">
                       {item.balanceDue}
@@ -991,8 +991,8 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
                     <span className="block font-bold text-blue-900">
                       Saldo: ${parseFloat(String(receivableToPay.balanceDue || receivableToPay.balance_due || receivableToPay.amount).replace(/[^0-9.-]+/g, "")).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                     </span>
-                    {receivableToPay.paid_amount > 0 && (
-                      <span className="text-[10px] text-blue-600 block">Pagado: ${parseFloat(receivableToPay.paid_amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+                    {receivableToPay.amount_paid > 0 && (
+                      <span className="text-[10px] text-blue-600 block">Pagado: ${parseFloat(receivableToPay.amount_paid).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
                     )}
                   </div>
                 </div>
