@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import ClientForm from './ClientForm';
 export { ClientForm };
@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { StatusBadge, OverdueBadge, KPICard, RevenueChart, Modal } from '../ui/Shared';
 import { UNITS, mockStaff } from '../../data/constants';
+import * as invoiceService from '../../services/invoiceService';
+import { marketTecService } from '../../services/marketTecService';
 
 export const DashboardView = ({ adminStats, user, unitName, setActiveTab }) => {
   const currentYear = new Date().getFullYear();
@@ -1658,6 +1660,57 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
   );
 };
 
+const MarketTecUploadModal = ({ isOpen, onClose, onFileProcess, isLoading }) => {
+  const fileInputRef = useRef(null);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+          <h3 className="text-lg font-bold text-slate-800">Cargar Archivo</h3>
+          <button onClick={() => !isLoading && onClose()} disabled={isLoading}>
+            <X size={20} className="text-slate-400" />
+          </button>
+        </div>
+        <div className="p-8">
+          <div className={`relative border-2 border-dashed border-blue-200 bg-blue-50/50 rounded-xl p-10 text-center hover:bg-blue-50 transition-colors ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
+            <input
+              type="file"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+              accept=".csv, .xlsx, .xls"
+              onChange={(e) => {
+                if (e.target.files?.[0]) onFileProcess(e.target.files[0]);
+              }}
+            />
+            <div className="z-0 pointer-events-none">
+              {isLoading ? (
+                <Loader2 size={32} className="mx-auto text-blue-500 mb-4 animate-spin" />
+              ) : (
+                <Upload size={32} className="mx-auto text-blue-500 mb-4" />
+              )}
+              <p className="text-slate-700 font-medium">
+                {isLoading ? 'Procesando archivo...' : 'Arrastra tu CSV aquí o haz clic'}
+              </p>
+              <p className="text-xs text-slate-400 mt-2">Soporta .csv y .xlsx</p>
+            </div>
+          </div>
+        </div>
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-slate-600 font-medium text-sm"
+            disabled={isLoading}
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const MarketTecView = ({ user, unitName }) => {
   // 'list' = Dashboard principal
   // 'review' = NUEVA: Revisión de datos crudos antes de n8n
@@ -1665,43 +1718,116 @@ export const MarketTecView = ({ user, unitName }) => {
   const [currentView, setCurrentView] = useState('list');
   const [isUploadModalOpen, setUploadModalOpen] = useState(false);
   const [selectedUploadId, setSelectedUploadId] = useState(null);
+  const [uploads, setUploads] = useState([]);
+  const [stagingData, setStagingData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [uploadLoading, setUploadLoading] = useState(false);
 
-  // --- DATOS MOCKUP ---
+  // Cargar historial al inicio
+  useEffect(() => {
+    loadUploads();
+  }, [user.unitId]);
 
-  // Tabla: market_tec_uploads
-  const uploadsData = [
-    { id: 105, filename: 'Report_Octubre.csv', date: '2025-10-02', total_records: 120, total_amount: 45200.00, status: 'COMPLETED', n8n_id: 'exec_9921', errors: 0 },
-    { id: 106, filename: 'Report_Nov_Sem1.csv', date: '2025-11-05', total_records: 50, total_amount: 12500.50, status: 'PARTIAL_ERROR', n8n_id: 'exec_9988', errors: 3 },
-  ];
+  const loadUploads = async () => {
+    try {
+      setLoading(true);
+      const data = await marketTecService.getUploads(user.unitId);
+      setUploads(data || []);
+    } catch (error) {
+      console.error('Error loading uploads:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Datos para la NUEVA pantalla de Revisión (Raw Staging Data)
-  // Simulamos datos que acaban de subir del CSV
-  const rawStagingData = [
-    { id: 1, reference: 'MKT-1578902021620', amount: 234.00, client_raw: 'Juan Perez', email: 'juan@tec.mx', date: '2025-11-25', issue: null },
-    { id: 2, reference: 'MKT-1578902021621', amount: 500.00, client_raw: 'Empresa ABC', email: 'conta@abc.com', date: '2025-11-25', issue: null },
-    { id: 3, reference: '', amount: 1200.00, client_raw: 'Cliente Nuevo', email: '', date: '2025-11-26', issue: 'Falta Referencia y Email' },
-    { id: 4, reference: 'MKT-1578902021623', amount: 0.00, client_raw: 'Pago Cancelado', email: 'cancel@test.com', date: '2025-11-26', issue: 'Monto es 0.00' },
-    { id: 5, reference: 'MKT-ERR-999', amount: 99.00, client_raw: 'Sin Nombre', email: 'unknown@u.com', date: 'Invalid Date', issue: 'Formato de fecha inválido' },
-  ];
+  const handleFileProcess = async (file) => {
+    try {
+      setUploadLoading(true);
+      // 1. Parsear CSV
+      const allRows = await marketTecService.parseFile(file);
 
-  // Datos Post-Procesamiento (Lo que devuelve n8n)
-  const processedDetails = [
-    { id: 1, reference: 'MKT-1578902021620', amount: 234.00, client_raw: 'Juan Perez', status: 'PROMOTED', message: 'Conciliado con Factura #391' },
-    { id: 2, reference: 'MKT-1578902021621', amount: 500.00, client_raw: 'Empresa ABC', status: 'PROMOTED', message: 'Conciliado con Factura #395' },
-    { id: 5, reference: 'MKT-ERR-999', amount: 99.00, client_raw: 'Sin Nombre', status: 'ERROR', message: 'IA: No se encontró coincidencia.' },
-  ];
+      if (!allRows || allRows.length === 0) {
+        alert('El archivo parece estar vacío o no es válido.');
+        return;
+      }
+
+      // Filtrar registros: Solo "ready for handling" (case insensitive)
+      const rows = allRows.filter(row => {
+        const status = row['Status raw value (temporary)'];
+        return status && status.toLowerCase().trim() === 'ready for handling';
+      });
+
+      if (rows.length === 0) {
+        alert('El archivo no contiene registros con estado "ready for handling".');
+        return;
+      }
+
+      // 2. Calcular totales localmente para el registro maestro
+      const totalRecords = rows.length;
+      const totalAmount = rows.reduce((acc, row) => {
+        const val = parseFloat(row['Total Value'] || row['Monto'] || row['raw_total_value'] || 0);
+        return acc + (isNaN(val) ? 0 : val);
+      }, 0);
+
+      // 3. Crear registro maestro
+      const uploadRecord = await marketTecService.createUploadRecord({
+        unitId: user.unitId,
+        filename: file.name,
+        uploadedBy: user.id, // ID del usuario de supbase auth
+        totalRecords,
+        totalAmount
+      });
+
+      // 4. Insertar detalle en staging
+      await marketTecService.insertStagingData(uploadRecord.id, user.unitId, rows);
+
+      // 5. Actualizar estado y redireccionar
+      await loadUploads(); // Recargar lista
+      setSelectedUploadId(uploadRecord.id);
+
+      // Cargar datos de staging para la vista de revisión
+      await loadStagingForReview(uploadRecord.id);
+
+      setUploadModalOpen(false);
+      setCurrentView('review');
+
+    } catch (error) {
+      console.error('Error processing file:', error);
+      alert('Ocurrió un error al procesar el archivo: ' + (error.message || error));
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
+  const loadStagingForReview = async (uploadId) => {
+    try {
+      setLoading(true);
+      const data = await marketTecService.getStagingData(uploadId);
+      setStagingData(data || []);
+    } catch (error) {
+      console.error('Error loading staging data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleViewDetail = async (id, view) => {
+    setSelectedUploadId(id);
+    if (view === 'review') {
+      await loadStagingForReview(id);
+    }
+    setCurrentView(view);
+  };
 
   // --- COMPONENTES AUXILIARES ---
 
   const StatusBadge = ({ status }) => {
     const styles = {
       'COMPLETED': 'bg-green-100 text-green-700 border-green-200',
-      'PROMOTED': 'bg-green-100 text-green-700 border-green-200',
+      'Procesando': 'bg-purple-100 text-purple-700 border-purple-200 animate-pulse',
+      'PENDING': 'bg-gray-100 text-gray-700 border-gray-200',
       'PARTIAL_ERROR': 'bg-orange-100 text-orange-700 border-orange-200',
       'ERROR': 'bg-red-100 text-red-700 border-red-200',
-      'PROCESSING': 'bg-purple-100 text-purple-700 border-purple-200 animate-pulse',
-      'PENDING': 'bg-gray-100 text-gray-700 border-gray-200',
-      'DRAFT': 'bg-blue-50 text-blue-700 border-blue-200',
     };
     return (
       <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${styles[status] || styles['PENDING']}`}>
@@ -1720,231 +1846,179 @@ export const MarketTecView = ({ user, unitName }) => {
           <h2 className="text-2xl font-bold text-slate-800">Historial de Importaciones</h2>
           <p className="text-slate-500 text-sm">Monitor de cargas y conciliación</p>
         </div>
-        {/* Button moved to main header */}
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full text-sm text-left">
-          <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-            <tr>
-              <th className="px-6 py-4 font-semibold">ID</th>
-              <th className="px-6 py-4 font-semibold">Archivo</th>
-              <th className="px-6 py-4 font-semibold text-center">Registros</th>
-              <th className="px-6 py-4 font-semibold text-right">Total</th>
-              <th className="px-6 py-4 font-semibold text-center">Estado</th>
-              <th className="px-6 py-4 text-right">Acción</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {uploadsData.map((row) => (
-              <tr key={row.id} className="hover:bg-slate-50">
-                <td className="px-6 py-4 text-slate-400 font-mono">#{row.id}</td>
-                <td className="px-6 py-4 font-medium text-slate-800">{row.filename}</td>
-                <td className="px-6 py-4 text-center">{row.total_records}</td>
-                <td className="px-6 py-4 text-right font-mono">${row.total_amount.toLocaleString()}</td>
-                <td className="px-6 py-4 text-center"><StatusBadge status={row.status} /></td>
-                <td className="px-6 py-4 text-right">
-                  <button onClick={() => { setSelectedUploadId(row.id); setCurrentView('detail'); }} className="text-blue-600 hover:text-blue-800 font-medium text-sm">Ver Detalle</button>
-                </td>
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden min-h-[300px]">
+        {loading ? (
+          <div className="flex justify-center items-center h-full py-20">
+            <Loader2 size={30} className="animate-spin text-blue-500" />
+          </div>
+        ) : uploads.length === 0 ? (
+          <div className="flex flex-col justify-center items-center h-full py-20 text-slate-400">
+            <FileSpreadsheet size={48} className="mb-4 opacity-50" />
+            <p>No hay cargas registradas aún.</p>
+          </div>
+        ) : (
+          <table className="w-full text-sm text-left">
+            <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
+              <tr>
+                <th className="px-6 py-4 font-semibold">ID</th>
+                <th className="px-6 py-4 font-semibold">Archivo</th>
+                <th className="px-6 py-4 font-semibold text-center">Registros</th>
+                <th className="px-6 py-4 font-semibold text-right">Total</th>
+                <th className="px-6 py-4 font-semibold text-center">Fecha</th>
+                <th className="px-6 py-4 font-semibold text-center">Estado</th>
+                <th className="px-6 py-4 text-right">Acción</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {uploads.map((row) => (
+                <tr key={row.id} className="hover:bg-slate-50">
+                  <td className="px-6 py-4 text-slate-400 font-mono">#{row.id}</td>
+                  <td className="px-6 py-4 font-medium text-slate-800">{row.filename}</td>
+                  <td className="px-6 py-4 text-center">{row.total_records}</td>
+                  <td className="px-6 py-4 text-right font-mono">${(row.total_amount || 0).toLocaleString()}</td>
+                  <td className="px-6 py-4 text-center text-slate-500">
+                    {new Date(row.upload_date).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4 text-center"><StatusBadge status={row.status} /></td>
+                  <td className="px-6 py-4 text-right">
+                    <button
+                      onClick={() => handleViewDetail(row.id, 'review')}
+                      className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                    >
+                      Ver Detalle
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
 
-  // 2. NUEVA VISTA: REVISIÓN PRE-N8N (Sanity Check)
-  const ReviewStagingView = () => (
-    <div className="animate-in slide-in-from-right-4 duration-300">
-      {/* Header de Revisión */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-200 pb-6">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wide">Borrador</span>
-            <span className="text-slate-400 text-sm">ID: #108 (Temporal)</span>
-          </div>
-          <h2 className="text-2xl font-bold text-slate-800">Revisión Preliminar</h2>
-          <p className="text-slate-500 text-sm">Valida los datos extraídos del CSV antes de enviarlos al motor de IA.</p>
-        </div>
+  // 2. NUEVA VISTA: REVISIÓN PRE-N8N (Staging Data Real)
+  const ReviewStagingView = () => {
+    // Calcular KPIs básicos del staging
+    const totalRecords = stagingData.length;
+    const totalAmount = stagingData.reduce((acc, r) => acc + (r.raw_total_value || 0), 0);
+    // Identificar problemas simples (ej. sin referencia o monto 0)
+    const issuesCount = stagingData.filter(r => !r.raw_order || r.raw_total_value === 0).length;
 
-        <div className="flex gap-3">
-          <button
-            onClick={() => setCurrentView('list')}
-            className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium border border-slate-200"
-          >
-            Cancelar Carga
-          </button>
-          <button
-            onClick={() => setCurrentView('list')} // En realidad iría a 'processing'
-            className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-2 rounded-lg shadow-lg shadow-slate-200 flex items-center gap-2 font-medium transition-all transform hover:scale-105"
-          >
-            <Bot size={18} className="text-purple-300" />
-            Ejecutar Conciliación IA
-          </button>
-        </div>
-      </div>
-
-      {/* Tarjetas de Validación (Sanity Check) */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-slate-500 text-xs font-medium uppercase">Total en Archivo</p>
-          <p className="text-2xl font-bold text-slate-800 mt-1">$2,033.00</p>
-          <p className="text-xs text-slate-400 mt-1">Valida contra tu estado de cuenta</p>
-        </div>
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-slate-500 text-xs font-medium uppercase">Registros Leídos</p>
-          <p className="text-2xl font-bold text-slate-800 mt-1">5</p>
-        </div>
-        <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 shadow-sm">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-orange-800 text-xs font-medium uppercase">Datos Faltantes</p>
-              <p className="text-2xl font-bold text-orange-900 mt-1">1</p>
+    return (
+      <div className="animate-in slide-in-from-right-4 duration-300">
+        {/* Header de Revisión */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-200 pb-6">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wide">Staging</span>
+              <span className="text-slate-400 text-sm">Upload ID: #{selectedUploadId}</span>
             </div>
-            <AlertTriangle size={20} className="text-orange-500" />
+            <h2 className="text-2xl font-bold text-slate-800">Revisión de Carga</h2>
+            <p className="text-slate-500 text-sm">Datos cargados en tabla `payment_staging`. Listos para procesamiento.</p>
           </div>
-          <p className="text-xs text-orange-700 mt-1">Filas sin email o referencia</p>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => setCurrentView('list')}
+              className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium border border-slate-200"
+            >
+              <ChevronLeft size={18} className="inline mr-1" /> Volver
+            </button>
+            <button
+              onClick={() => alert('Disparar Webhook n8n aquí...')}
+              className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-2 rounded-lg shadow-lg shadow-slate-200 flex items-center gap-2 font-medium transition-all transform hover:scale-105"
+            >
+              <Bot size={18} className="text-purple-300" />
+              Ejecutar Conciliación IA
+            </button>
+          </div>
         </div>
-        <div className="bg-red-50 p-4 rounded-xl border border-red-200 shadow-sm">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-red-800 text-xs font-medium uppercase">Montos Inválidos</p>
-              <p className="text-2xl font-bold text-red-900 mt-1">1</p>
+
+        {/* Tarjetas de Validación */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <p className="text-slate-500 text-xs font-medium uppercase">Total en Archivo</p>
+            <p className="text-2xl font-bold text-slate-800 mt-1">${totalAmount.toLocaleString()}</p>
+          </div>
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <p className="text-slate-500 text-xs font-medium uppercase">Registros Leídos</p>
+            <p className="text-2xl font-bold text-slate-800 mt-1">{totalRecords}</p>
+          </div>
+          <div className={`${issuesCount > 0 ? 'bg-orange-50 border-orange-200' : 'bg-green-50 border-green-200'} p-4 rounded-xl border shadow-sm`}>
+            <div className="flex justify-between items-start">
+              <div>
+                <p className={`${issuesCount > 0 ? 'text-orange-800' : 'text-green-800'} text-xs font-medium uppercase`}>
+                  {issuesCount > 0 ? 'Posibles Errores' : 'Validación Básica'}
+                </p>
+                <p className={`${issuesCount > 0 ? 'text-orange-900' : 'text-green-900'} text-2xl font-bold mt-1`}>{issuesCount}</p>
+              </div>
+              {issuesCount > 0 ? <AlertTriangle size={20} className="text-orange-500" /> : <CheckCircle size={20} className="text-green-500" />}
             </div>
-            <AlertCircle size={20} className="text-red-500" />
+            <p className="text-xs text-slate-500 mt-1">Filas vacías o monto $0</p>
           </div>
-          <p className="text-xs text-red-700 mt-1">Montos $0.00 detectados</p>
+        </div>
+
+        {/* Tabla Staging */}
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+            <h3 className="font-semibold text-slate-700">Datos Crudos (Payment Staging)</h3>
+          </div>
+
+          {loading ? (
+            <div className="flex justify-center items-center py-20">
+              <Loader2 size={30} className="animate-spin text-blue-500" />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-slate-100 text-slate-600 border-b border-slate-200">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">ID</th>
+                    <th className="px-4 py-3 font-semibold">Orden / Ref</th>
+                    <th className="px-4 py-3 font-semibold">Receptor</th>
+                    <th className="px-4 py-3 font-semibold">SKU</th>
+                    <th className="px-4 py-3 font-semibold">Fecha Auth</th>
+                    <th className="px-4 py-3 font-semibold text-right">Monto</th>
+                    <th className="px-4 py-3 font-semibold text-center">Status Procesamiento</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {stagingData.map((row) => (
+                    <tr key={row.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 text-slate-400 text-xs">{row.id}</td>
+                      <td className="px-4 py-3 font-mono text-slate-700">
+                        {row.raw_order || <span className="text-red-300 italic">Vacío</span>}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600 truncate max-w-[200px]">{row.raw_receiver_name}</td>
+                      <td className="px-4 py-3 text-slate-600 truncate max-w-[150px]">{row.raw_sku_name}</td>
+                      <td className="px-4 py-3 text-slate-600 text-xs">
+                        {row.raw_authorized_date ? new Date(row.raw_authorized_date).toLocaleDateString() : '-'}
+                      </td>
+                      <td className={`px-4 py-3 text-right font-mono ${row.raw_total_value === 0 ? 'text-red-600 font-bold' : 'text-slate-700'}`}>
+                        ${(row.raw_total_value || 0).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">{row.processing_status}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
+    );
+  };
 
-      {/* Tabla Editable */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-        <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-          <h3 className="font-semibold text-slate-700">Vista Previa de Datos (Staging)</h3>
-          <span className="text-xs text-slate-500 italic">Puedes editar celdas o eliminar filas antes de procesar.</span>
-        </div>
-        <table className="w-full text-sm text-left">
-          <thead className="bg-slate-100 text-slate-600 border-b border-slate-200">
-            <tr>
-              <th className="px-4 py-3 font-semibold">#</th>
-              <th className="px-4 py-3 font-semibold">Referencia</th>
-              <th className="px-4 py-3 font-semibold">Cliente</th>
-              <th className="px-4 py-3 font-semibold">Email</th>
-              <th className="px-4 py-3 font-semibold">Fecha</th>
-              <th className="px-4 py-3 font-semibold text-right">Monto</th>
-              <th className="px-4 py-3 font-semibold text-center">Problemas</th>
-              <th className="px-4 py-3 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {rawStagingData.map((row, idx) => (
-              <tr key={row.id} className={`group hover:bg-slate-50 ${row.issue ? 'bg-red-50/40' : ''}`}>
-                <td className="px-4 py-3 text-slate-400 text-xs">{idx + 1}</td>
-                <td className="px-4 py-3 font-mono text-slate-700">
-                  {/* Simulamos input editable visualmente */}
-                  <div className="flex items-center gap-2">
-                    {row.reference || <span className="text-red-400 italic">Vacío</span>}
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-slate-600">{row.client_raw}</td>
-                <td className="px-4 py-3 text-slate-600">
-                  <div className="flex items-center gap-2">
-                    {row.email || <span className="text-red-400 italic">Faltante</span>}
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-slate-600">
-                  <div className={`flex items-center gap-2 ${row.date === 'Invalid Date' ? 'text-red-500 font-bold' : ''}`}>
-                    {row.date}
-                  </div>
-                </td>
-                <td className={`px-4 py-3 text-right font-mono ${row.amount === 0 ? 'text-red-600 font-bold' : 'text-slate-700'}`}>
-                  ${row.amount.toFixed(2)}
-                </td>
-                <td className="px-4 py-3 text-center">
-                  {row.issue && (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-medium">
-                      <AlertCircle size={10} /> {row.issue}
-                    </span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded" title="Editar">
-                      <Edit2 size={14} />
-                    </button>
-                    <button className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded" title="Eliminar Fila">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-
-  // 3. VISTA DETALLE FINAL
+  // 3. VISTA DETALLE FINAL (Placeholder por ahora)
   const DetailResultView = () => (
     <div className="animate-in fade-in duration-300">
-      <div className="flex items-center gap-4 mb-6">
-        <button onClick={() => setCurrentView('list')} className="p-2 hover:bg-slate-200 rounded-full text-slate-500">
-          <ChevronLeft size={24} />
-        </button>
-        <h2 className="text-2xl font-bold text-slate-800">Resultados de Conciliación #106</h2>
-      </div>
-      {/* Tabla Resultados Procesados */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full text-sm text-left">
-          <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-            <tr>
-              <th className="px-6 py-3 font-semibold">Referencia</th>
-              <th className="px-6 py-3 font-semibold">Monto</th>
-              <th className="px-6 py-3 font-semibold">Mensaje Sistema</th>
-              <th className="px-6 py-3 font-semibold text-center">Estado</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {processedDetails.map((item) => (
-              <tr key={item.id}>
-                <td className="px-6 py-3 font-mono text-slate-700">{item.reference}</td>
-                <td className="px-6 py-3 font-mono">${item.amount.toFixed(2)}</td>
-                <td className="px-6 py-3 text-slate-600">{item.message}</td>
-                <td className="px-6 py-3 text-center"><StatusBadge status={item.status} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-
-  // MODAL UPLOAD
-  const UploadModal = () => (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="text-lg font-bold text-slate-800">Cargar Archivo</h3>
-          <button onClick={() => setUploadModalOpen(false)}><X size={20} className="text-slate-400" /></button>
-        </div>
-        <div className="p-8">
-          <div className="border-2 border-dashed border-blue-200 bg-blue-50/50 rounded-xl p-10 text-center hover:bg-blue-50 cursor-pointer">
-            <Upload size={32} className="mx-auto text-blue-500 mb-4" />
-            <p className="text-slate-700 font-medium">Arrastra tu CSV aquí</p>
-          </div>
-        </div>
-        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-          <button onClick={() => setUploadModalOpen(false)} className="px-4 py-2 text-slate-600 font-medium text-sm">Cancelar</button>
-          <button
-            onClick={() => { setUploadModalOpen(false); setCurrentView('review'); }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700"
-          >
-            Continuar a Revisión
-          </button>
-        </div>
-      </div>
+      <button onClick={() => setCurrentView('list')}>Volver</button>
+      <p>Detalle de resultados (Pendiente de implementar visualización de conciliacion).</p>
     </div>
   );
 
@@ -1970,7 +2044,12 @@ export const MarketTecView = ({ user, unitName }) => {
         {currentView === 'detail' && <DetailResultView />}
       </main>
 
-      {isUploadModalOpen && <UploadModal />}
+      <MarketTecUploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setUploadModalOpen(false)}
+        onFileProcess={handleFileProcess}
+        isLoading={uploadLoading}
+      />
     </div>
   );
 };
