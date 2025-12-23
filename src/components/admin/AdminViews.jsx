@@ -1976,11 +1976,9 @@ export const MarketTecView = ({ user, unitName }) => {
               <table className="w-full text-sm text-left">
                 <thead className="bg-slate-100 text-slate-600 border-b border-slate-200">
                   <tr>
-                    <th className="px-4 py-3 font-semibold">ID</th>
                     <th className="px-4 py-3 font-semibold">Orden / Ref</th>
                     <th className="px-4 py-3 font-semibold">Receptor</th>
-                    <th className="px-4 py-3 font-semibold">SKU</th>
-                    <th className="px-4 py-3 font-semibold">Fecha Auth</th>
+                    <th className="px-4 py-3 font-semibold">Fecha Autorización</th>
                     <th className="px-4 py-3 font-semibold text-right">Monto</th>
                     <th className="px-4 py-3 font-semibold text-center">Status Procesamiento</th>
                   </tr>
@@ -1988,17 +1986,15 @@ export const MarketTecView = ({ user, unitName }) => {
                 <tbody className="divide-y divide-slate-100">
                   {stagingData.map((row) => (
                     <tr key={row.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 text-slate-400 text-xs">{row.id}</td>
-                      <td className="px-4 py-3 font-mono text-slate-700">
+                      <td className="px-4 py-3 text-slate-700">
                         {row.raw_order || <span className="text-red-300 italic">Vacío</span>}
                       </td>
-                      <td className="px-4 py-3 text-slate-600 truncate max-w-[200px]">{row.raw_receiver_name}</td>
-                      <td className="px-4 py-3 text-slate-600 truncate max-w-[150px]">{row.raw_sku_name}</td>
-                      <td className="px-4 py-3 text-slate-600 text-xs">
-                        {row.raw_authorized_date ? new Date(row.raw_authorized_date).toLocaleDateString() : '-'}
+                      <td className="px-4 py-3 text-slate-600">{row.raw_receiver_name}</td>
+                      <td className="px-4 py-3 text-slate-600 text-xs capitalize">
+                        {row.raw_authorized_date ? new Date(row.raw_authorized_date).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: '2-digit' }).replace('.', '') : '-'}
                       </td>
-                      <td className={`px-4 py-3 text-right font-mono ${row.raw_total_value === 0 ? 'text-red-600 font-bold' : 'text-slate-700'}`}>
-                        ${(row.raw_total_value || 0).toFixed(2)}
+                      <td className={`px-4 py-3 text-right ${row.raw_total_value === 0 ? 'text-red-600 font-bold' : 'text-slate-700'}`}>
+                        ${(row.raw_total_value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">{row.processing_status}</span>
