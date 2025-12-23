@@ -813,6 +813,9 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                   >
                     <div className="flex items-center">Concepto {getSortIcon('concept')}</div>
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Market_tec_Referencia
+                  </th>
                   <th
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
                     onClick={() => requestSort('daysOverdue')}
@@ -848,7 +851,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {receivablesLoading ? (
-                  <tr><td colSpan="10" className="px-6 py-8 text-center"><Loader size={24} className="animate-spin mx-auto text-blue-600" /></td></tr>
+                  <tr><td colSpan="11" className="px-6 py-8 text-center"><Loader size={24} className="animate-spin mx-auto text-blue-600" /></td></tr>
                 ) : filteredReceivables.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50 group">
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -882,6 +885,9 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 italic font-medium">
                       {item.concept || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {item.paymentReferences || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       {item.status === 'Overdue' && item.daysOverdue > 0 ? (

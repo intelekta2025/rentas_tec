@@ -111,6 +111,11 @@ const mapReceivableFromDB = (dbReceivable) => {
     amountRaw: parseFloat(dbReceivable.amount || 0),
     paidAmountRaw: parseFloat(dbReceivable.amount_paid || 0),
     balanceDueRaw: parseFloat(dbReceivable.balance || 0),
+    // Extraer referencias de pago (puede haber múltiples pagos)
+    paymentReferences: dbReceivable.payment_applications
+      ?.map(app => app.payments?.Market_tec_Referencia)
+      .filter(ref => ref) // Filtrar valores nulos/undefined
+      .join(', ') || ''
   }
 }
 
@@ -177,7 +182,14 @@ export const getInvoices = async (filters = {}) => {
   try {
     let query = supabase
       .from('receivables') // Tabla real: receivables
-      .select('*, clients(business_name)')
+      .select(`
+        *, 
+        clients(business_name),
+        payment_applications(
+          payment_id,
+          payments(Market_tec_Referencia)
+        )
+      `)
       .order('due_date', { ascending: false })
 
     // Aplicar filtros
