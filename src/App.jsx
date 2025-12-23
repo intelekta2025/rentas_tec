@@ -61,7 +61,7 @@ const ContractFormWrapper = ({ client, user, onClose, onContractCreated, contrac
 };
 
 // Componente wrapper para ClientDetailView que carga los usuarios del portal y contratos
-const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModalOpen, generateContractPreview, setTerminationModalOpen, contractsRefreshKey, onPrepareEdit, onEditClient, onGenerateCXC, onAddManualReceivable }) => {
+const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, onBackToClients, setContractModalOpen, generateContractPreview, setTerminationModalOpen, contractsRefreshKey, onPrepareEdit, onEditClient, onGenerateCXC, onAddManualReceivable }) => {
   const { portalUsers, loading: portalUsersLoading } = useClientPortalUsers(client?.id);
   const { contracts, loading: contractsLoading, addContract, finalizeContract, refreshContracts } = useContracts(client?.id);
 
@@ -111,6 +111,7 @@ const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModa
     <ClientDetailView
       client={client}
       setActiveTab={setActiveTab}
+      onBackToClients={onBackToClients}
       setContractModalOpen={setContractModalOpen}
       generateContractPreview={generateContractPreview}
       setTerminationModalOpen={setTerminationModalOpen}
@@ -141,6 +142,7 @@ const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModa
         const result = await addPayment(paymentData);
         if (result.success) {
           await refreshInvoices();
+          await refreshContracts(); // Refresh contracts to update KPI cards
         }
         return result;
       }}
@@ -148,6 +150,7 @@ const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModa
         const result = await addInvoice(data);
         if (result.success) {
           await refreshInvoices();
+          await refreshContracts(); // Refresh contracts to update KPI cards
         }
         return result;
       }}
@@ -195,7 +198,8 @@ export default function App() {
     error: clientsError,
     addClient,
     editClient,
-    removeClient
+    removeClient,
+    refreshClients
   } = useClients(shouldLoadAdminData ? user.unitId : null);
 
   // Facturas/CXC - filtradas según el rol
@@ -281,6 +285,14 @@ export default function App() {
   const handleClientClick = (client) => {
     setSelectedClient(client);
     setActiveTab('clientDetail');
+  };
+
+  // Refresh clients when navigating back to clients list
+  const handleBackToClients = () => {
+    setActiveTab('clients');
+    if (refreshClients) {
+      refreshClients();
+    }
   };
 
   // Mock functions needed for views (puedes reemplazarlos con funciones reales)
@@ -592,6 +604,7 @@ export default function App() {
                 <ClientDetailViewWithPortalUsers
                   client={selectedClient}
                   setActiveTab={setActiveTab}
+                  onBackToClients={handleBackToClients}
                   setContractModalOpen={setContractModalOpen}
                   setTerminationModalOpen={setTerminationModalOpen}
                   contractsRefreshKey={contractsRefreshKey}

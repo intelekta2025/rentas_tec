@@ -186,7 +186,7 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
   );
 };
 
-export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, portalUsers = [], portalUsersLoading = false, contracts = [], contractsLoading = false, onFinalizeContract, onEditContract, onEditClient, onGenerateCXC, onUpdateReceivable, onAddPayment, onAddManualReceivable, receivables = [], receivablesLoading = false }) => {
+export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setContractModalOpen, portalUsers = [], portalUsersLoading = false, contracts = [], contractsLoading = false, onFinalizeContract, onEditContract, onEditClient, onGenerateCXC, onUpdateReceivable, onAddPayment, onAddManualReceivable, receivables = [], receivablesLoading = false }) => {
   const [isGenerateModalOpen, setGenerateModalOpen] = useState(false);
   const [contractToGenerate, setContractToGenerate] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -404,7 +404,7 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
     <div className="space-y-6 animate-fade-in">
       {/* Breadcrumb */}
       <div className="flex items-center space-x-2 text-sm text-gray-500 mb-4">
-        <button onClick={() => setActiveTab('clients')} className="hover:text-blue-600 hover:underline">Clientes</button>
+        <button onClick={onBackToClients || (() => setActiveTab('clients'))} className="hover:text-blue-600 hover:underline">Clientes</button>
         <ChevronRight size={16} />
         <span className="font-semibold text-gray-800">{client.name}</span>
       </div>

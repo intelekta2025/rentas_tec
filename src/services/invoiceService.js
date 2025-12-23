@@ -465,9 +465,6 @@ export const registerPayment = async (paymentData) => {
       Market_tec_Referencia: ref
     };
 
-    console.log('🔍 DEBUG - Payment Record to insert:', JSON.stringify(paymentRecord, null, 2));
-    console.log('🔍 DEBUG - Original paymentData:', JSON.stringify(paymentData, null, 2));
-
     const { data: payment, error: paymentError } = await supabase
       .from('payments')
       .insert([paymentRecord])
