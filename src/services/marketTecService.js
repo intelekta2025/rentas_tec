@@ -170,7 +170,31 @@ export const marketTecService = {
         return enrichedData;
     },
 
-    // 6. Actualizar estado de la carga
+    // 6. Disparar conciliación en n8n
+    triggerReconciliation: async (uploadId) => {
+        try {
+            const webhookUrl = `https://n8n-t.intelekta.ai/webhook-test/8a737d17-e9cf-4eaa-aae7-8dba9fc61864?upload_id=${uploadId}`;
+
+            // Enviar ID de carga vía GET para que n8n procese
+            const response = await fetch(webhookUrl, {
+                method: 'GET'
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Error n8n: ${response.status} ${errorText}`);
+            }
+
+            const result = await response.json();
+            return { success: true, data: result };
+        } catch (error) {
+            console.error('Error triggering reconciliation:', error);
+            // Retornamos success false para manejarlo en la UI
+            return { success: false, error: error.message };
+        }
+    },
+
+    // 7. Actualizar estado de la carga
     updateUploadStatus: async (uploadId, status) => {
         const { error } = await supabase
             .from('market_tec_uploads')

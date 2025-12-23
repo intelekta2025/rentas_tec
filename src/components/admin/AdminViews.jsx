@@ -1905,6 +1905,26 @@ export const MarketTecView = ({ user, unitName }) => {
 
   // 2. NUEVA VISTA: REVISIÓN PRE-N8N (Staging Data Real)
   const ReviewStagingView = () => {
+    const [isReconciling, setIsReconciling] = useState(false);
+
+    const handleTriggerReconciliation = async () => {
+      setIsReconciling(true);
+      try {
+        const { success, error, data } = await marketTecService.triggerReconciliation(selectedUploadId);
+
+        if (success) {
+          alert('¡Conciliación IA iniciada correctamente!');
+          console.log('n8n response:', data);
+        } else {
+          alert(`Error al iniciar conciliación: ${error}`);
+        }
+      } catch (err) {
+        alert('Error inesperado al contactar n8n.');
+        console.error(err);
+      } finally {
+        setIsReconciling(false);
+      }
+    };
     // Calcular KPIs básicos del staging
     const totalRecords = stagingData.length;
     const totalAmount = stagingData.reduce((acc, r) => acc + (r.raw_total_value || 0), 0);
@@ -1933,11 +1953,12 @@ export const MarketTecView = ({ user, unitName }) => {
               <ChevronLeft size={18} className="inline mr-1" /> Volver
             </button>
             <button
-              onClick={() => alert('Disparar Webhook n8n aquí...')}
-              className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-2 rounded-lg shadow-lg shadow-slate-200 flex items-center gap-2 font-medium transition-all transform hover:scale-105"
+              onClick={handleTriggerReconciliation}
+              disabled={isReconciling}
+              className={`bg-slate-900 hover:bg-slate-800 text-white px-6 py-2 rounded-lg shadow-lg shadow-slate-200 flex items-center gap-2 font-medium transition-all transform hover:scale-105 ${isReconciling ? 'opacity-70 cursor-wait' : ''}`}
             >
-              <Bot size={18} className="text-purple-300" />
-              Ejecutar Conciliación IA
+              {isReconciling ? <Loader2 size={18} className="animate-spin" /> : <Bot size={18} className="text-purple-300" />}
+              {isReconciling ? 'Iniciando...' : 'Ejecutar Conciliación IA'}
             </button>
           </div>
         </div>
@@ -2020,10 +2041,10 @@ export const MarketTecView = ({ user, unitName }) => {
                         ${(row.raw_total_value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        {row.client_user_market_tec ? (
-                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">{row.processing_status}</span>
+                        {row.processing_status === 'SIN CLIENTE' ? (
+                          <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-medium border border-yellow-200">{row.processing_status}</span>
                         ) : (
-                          <span className="text-xs bg-slate-200 text-slate-500 px-2 py-1 rounded font-medium">DISABLED</span>
+                          <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded border border-emerald-200 font-medium">{row.processing_status}</span>
                         )}
                       </td>
                     </tr>
