@@ -137,8 +137,8 @@ const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModa
         }
         return result;
       }}
-      onAddPayment={async (receivableId, paymentData) => {
-        const result = await addPayment(receivableId, paymentData);
+      onAddPayment={async (paymentData) => {
+        const result = await addPayment(paymentData);
         if (result.success) {
           await refreshInvoices();
         }

@@ -420,21 +420,32 @@ export const generateBulkInvoices = async (invoices) => {
  * Registra un pago y actualiza el estado del movimiento
  */
 export const registerPayment = async (paymentData) => {
-  const { receivableId, amount, paymentDate, clientId, unitId } = paymentData;
+  // 1. Extraer datos con fallback para diferentes nombres de campos
+  const targetReceivableId = paymentData.receivableId || paymentData.receivable_id || paymentData.invoice_id;
+  const clientId = paymentData.clientId || paymentData.client_id;
+  const unitId = paymentData.unitId || paymentData.unit_id;
+  const amountToPay = parseFloat(paymentData.amount || 0);
+  const dateOfPayment = paymentData.paymentDate || paymentData.payment_date;
+  const ref = paymentData.Market_tec_Referencia || paymentData.market_tec_referencia || '';
+
+  if (!targetReceivableId) {
+    return { success: false, error: new Error('Falta el ID del movimiento (targetReceivableId)') };
+  }
 
   try {
-    // 1. Obtener el movimiento actual para calcular el nuevo balance
+    // 2. Obtener el movimiento actual
     const { data: receivable, error: fetchError } = await supabase
       .from('receivables')
-      .select('*')
-      .eq('id', receivableId)
+      .select('id, amount, amount_paid, status')
+      .eq('id', targetReceivableId)
       .single();
 
     if (fetchError) throw fetchError;
 
-    const currentPaid = parseFloat(receivable.amount_paid || receivable.paid_amount || 0);
+    // 3. Calcular nuevos valores
+    const currentPaid = parseFloat(receivable.amount_paid || 0);
     const totalAmount = parseFloat(receivable.amount || 0);
-    const newPaidAmount = currentPaid + parseFloat(amount);
+    const newPaidAmount = currentPaid + amountToPay;
     const newBalanceDue = Math.max(0, totalAmount - newPaidAmount);
 
     let newStatus = receivable.status;
@@ -444,39 +455,46 @@ export const registerPayment = async (paymentData) => {
       newStatus = 'Partial';
     }
 
-    // 2. Insertar el registro de pago (sin receivable_id)
+    // 4. Insertar en la tabla 'payments' (Audit log de pagos)
+    // EXPLICITAMENTE NO incluir 'receivable_id' aquí
+    const paymentRecord = {
+      client_id: clientId,
+      unit_id: unitId,
+      amount: amountToPay,
+      payment_date: dateOfPayment,
+      Market_tec_Referencia: ref
+    };
+
+    console.log('🔍 DEBUG - Payment Record to insert:', JSON.stringify(paymentRecord, null, 2));
+    console.log('🔍 DEBUG - Original paymentData:', JSON.stringify(paymentData, null, 2));
+
     const { data: payment, error: paymentError } = await supabase
       .from('payments')
-      .insert([{
-        client_id: clientId,
-        unit_id: unitId,
-        amount: parseFloat(amount),
-        payment_date: paymentDate
-      }])
-      .select()
+      .insert([paymentRecord])
+      .select('id')
       .single();
 
     if (paymentError) throw paymentError;
 
-    // 3. Crear la aplicación del pago (Tabla Pivote)
+    // 5. Vincular el pago con el movimiento en 'payment_applications'
     const { error: appError } = await supabase
       .from('payment_applications')
       .insert([{
         payment_id: payment.id,
-        receivable_id: receivableId,
-        amount_applied: parseFloat(amount)
+        receivable_id: targetReceivableId,
+        amount_applied: amountToPay
       }]);
 
     if (appError) throw appError;
 
-    // 4. Actualizar el movimiento (receivable)
+    // 6. Actualizar el saldo y estado del movimiento
     const { error: updateError } = await supabase
       .from('receivables')
       .update({
         amount_paid: newPaidAmount,
         status: newStatus
       })
-      .eq('id', receivableId);
+      .eq('id', targetReceivableId);
 
     if (updateError) throw updateError;
 

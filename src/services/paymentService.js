@@ -184,7 +184,7 @@ export const createPayment = async (paymentData) => {
     const { data, error } = await supabase
       .from('payments')
       .insert([mappedData])
-      .select()
+      .select('id')
       .single()
 
     if (error) throw error
