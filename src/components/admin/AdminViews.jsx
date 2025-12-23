@@ -198,6 +198,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
   const [isRegisterPaymentModalOpen, setRegisterPaymentModalOpen] = useState(false);
   const [receivableToPay, setReceivableToPay] = useState(null);
   const [movementStatusFilter, setMovementStatusFilter] = useState('Todos');
+  const [serviceTypeFilter, setServiceTypeFilter] = useState('Todos');
   const [isFinalizeConfirmationModalOpen, setFinalizeConfirmationModalOpen] = useState(false);
   const [isAddManualReceivableModalOpen, setAddManualReceivableModalOpen] = useState(false);
   const [contractToTerminate, setContractToTerminate] = useState(null);
@@ -251,10 +252,19 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
       const matchesContract = item.contractId === selectedContractId;
       if (!matchesContract) return false;
 
-      if (movementStatusFilter === 'Todos') return true;
-      if (movementStatusFilter === 'Vencido') return item.status === 'Overdue';
-      if (movementStatusFilter === 'Pendiente') return item.status.toLowerCase() === 'pending' || item.status.toLowerCase() === 'pendiente';
-      if (movementStatusFilter === 'Pagado') return item.status.toLowerCase() === 'paid' || item.status.toLowerCase() === 'pagado';
+      // Filter by Status
+      let matchesStatus = true;
+      if (movementStatusFilter === 'Vencido') matchesStatus = item.status === 'Overdue';
+      else if (movementStatusFilter === 'Pendiente') matchesStatus = item.status.toLowerCase() === 'pending' || item.status.toLowerCase() === 'pendiente';
+      else if (movementStatusFilter === 'Pagado') matchesStatus = item.status.toLowerCase() === 'paid' || item.status.toLowerCase() === 'pagado';
+
+      if (!matchesStatus) return false;
+
+      // Filter by Service Type
+      if (serviceTypeFilter === 'Todos') return true;
+      if (serviceTypeFilter === 'Rent') return item.type === 'Rent' || item.type === 'Renta';
+      if (serviceTypeFilter === 'Service') return item.type === 'Service' || item.type === 'Luz/Servicios' || item.type === 'Servicio';
+
       return true;
     });
 
@@ -773,6 +783,26 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                     }`}
                 >
                   {f}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-200 ml-4">
+              {[
+                { id: 'Todos', label: 'Todos', icon: null },
+                { id: 'Rent', label: 'Renta', icon: <Home size={14} className="mr-1.5" /> },
+                { id: 'Service', label: 'Servicios', icon: <Lightbulb size={14} className="mr-1.5" /> }
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setServiceTypeFilter(f.id)}
+                  className={`px-3 py-1 text-xs font-bold rounded-md transition-all flex items-center ${serviceTypeFilter === f.id
+                    ? "bg-white text-blue-700 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                    }`}
+                >
+                  {f.icon}
+                  {f.label}
                 </button>
               ))}
             </div>
