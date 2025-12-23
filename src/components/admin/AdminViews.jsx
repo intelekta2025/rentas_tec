@@ -287,7 +287,7 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
       const periodStr = item.periodMonth ? `${monthNames[item.periodMonth - 1]} ${String(item.periodYear).substring(2)}` : '-';
 
       return {
-        'Tipo': item.type === 'Rent' ? 'Renta' : 'Luz/Servicios',
+        'Tipo': (item.type === 'Rent' || item.type === 'Renta') ? 'Renta' : 'Luz/Servicios',
         'Mes': periodStr,
         'Vencimiento': item.dueDate || '-',
         'Monto': parseFloat(String(item.amount || 0).replace(/[^0-9.-]+/g, "")),
@@ -474,6 +474,8 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Meses</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Renta de Servicios</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Renta Mensual</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CXC Renta</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CXC Servicios</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Terminación</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
@@ -530,6 +532,9 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
                       if (!isNaN(amount)) serviceRentFormatted = `$${amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                     }
 
+                    const rentCount = (receivables || []).filter(r => r.contractId === contract.id && (r.type === 'Rent' || r.type === 'Renta')).length;
+                    const serviceCount = (receivables || []).filter(r => r.contractId === contract.id && (r.type === 'Service' || r.type === 'Services' || r.type === 'Luz')).length;
+
                     return (
                       <tr
                         key={contract.id}
@@ -553,6 +558,16 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
                           <div className="text-sm font-medium text-gray-900">
                             {monthlyRentFormatted}
                           </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${rentCount > 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-500'}`}>
+                            {rentCount}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${serviceCount > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-500'}`}>
+                            {serviceCount}
+                          </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-500">
@@ -752,7 +767,7 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
                 ) : filteredReceivables.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50 group">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {item.type === 'Rent' ? (
+                      {item.type === 'Rent' || item.type === 'Renta' ? (
                         <div className="flex items-center text-blue-600" title="Renta">
                           <Home size={18} />
                         </div>
