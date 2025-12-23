@@ -1,5 +1,5 @@
-// src/components/admin/AdminViews.jsx
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import ClientForm from './ClientForm';
 export { ClientForm };
 import {
@@ -274,6 +274,38 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
     setContractToTerminate(contract);
     setReceivablesToCancel(pending);
     setFinalizeConfirmationModalOpen(true);
+  };
+
+  const handleExportExcel = () => {
+    if (!filteredReceivables || filteredReceivables.length === 0) {
+      alert('No hay datos para exportar');
+      return;
+    }
+
+    const exportData = filteredReceivables.map(item => {
+      const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+      const periodStr = item.periodMonth ? `${monthNames[item.periodMonth - 1]} ${String(item.periodYear).substring(2)}` : '-';
+
+      return {
+        'Tipo': item.type === 'Rent' ? 'Renta' : 'Luz/Servicios',
+        'Mes': periodStr,
+        'Vencimiento': item.dueDate || '-',
+        'Monto': parseFloat(String(item.amount || 0).replace(/[^0-9.-]+/g, "")),
+        'Pagado': parseFloat(String(item.amount_paid || 0).replace(/[^0-9.-]+/g, "")),
+        'Saldo': item.balanceDueRaw || 0,
+        'Estado': item.status
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Estado de Cuenta");
+
+    // Generar nombre de archivo
+    const date = new Date().toISOString().split('T')[0];
+    const fileName = `Estado_de_Cuenta_${client.name.replace(/\s+/g, '_')}_${date}.xlsx`;
+
+    XLSX.writeFile(workbook, fileName);
   };
 
   const calculateBalance = (items) => items.reduce((acc, curr) => {
@@ -799,7 +831,13 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
               </tbody>
             </table>
           </div>
-          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end">
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end space-x-3">
+            <button
+              onClick={handleExportExcel}
+              className="flex items-center justify-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors"
+            >
+              <Download size={16} className="mr-2" /> Exportar Excel
+            </button>
             <button className="flex items-center justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors">
               <Mail size={16} className="mr-2" /> Enviar Estado de Cuenta por Correo
             </button>
