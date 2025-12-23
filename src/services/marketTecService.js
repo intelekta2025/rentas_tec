@@ -46,9 +46,41 @@ export const marketTecService = {
 
     // 3. Insertar datos en staging (Detail)
     insertStagingData: async (uploadId, unitId, rows) => {
-        // Mapeo de columnas del CSV a la base de datos
-        // Se asumen ciertos nombres de cabecera, adaptar según el CSV real
-        const formattedRows = rows.map(row => ({
+        // 1. Verificar duplicados en tabla payments usando Market_tec_Referencia
+        const orders = rows
+            .map(r => r['Order'] || r['Orden'] || r['raw_order'])
+            .filter(o => o); // Filtrar nulos/vacíos para la consulta
+
+        let existingRefs = [];
+        if (orders.length > 0) {
+            // Consultar en lotes si son muchos (por brevedad aquí consultamos 'in')
+            const { data: duplicates, error: dupError } = await supabase
+                .from('payments')
+                .select('"Market_tec_Referencia"')
+                .in('"Market_tec_Referencia"', orders);
+
+            if (dupError) {
+                console.error('Error checking duplicates:', dupError);
+                throw dupError;
+            }
+            // Extraer referencias existentes
+            existingRefs = (duplicates || []).map(d => d.Market_tec_Referencia);
+        }
+
+        // 2. Filtrar filas que ya existen como pago
+        const newRows = rows.filter(row => {
+            const order = row['Order'] || row['Orden'] || row['raw_order'];
+            return !existingRefs.includes(order);
+        });
+
+        const skippedCount = rows.length - newRows.length;
+
+        if (newRows.length === 0) {
+            return { data: [], skippedCount };
+        }
+
+        // 3. Mapeo para inserción
+        const formattedRows = newRows.map(row => ({
             upload_id: uploadId,
             unit_id: unitId,
             raw_total_value: parseFloat(row['Total Value'] || row['Monto'] || row['raw_total_value'] || 0),
@@ -66,7 +98,7 @@ export const marketTecService = {
             .select();
 
         if (error) throw error;
-        return data;
+        return { data, skippedCount };
     },
 
     // 4. Obtener historial de cargas
@@ -88,14 +120,54 @@ export const marketTecService = {
 
     // 5. Obtener datos de staging para revisión
     getStagingData: async (uploadId) => {
-        const { data, error } = await supabase
+        // 1. Obtener datos de staging
+        const { data: stagingData, error } = await supabase
             .from('payment_staging')
             .select('*')
             .eq('upload_id', uploadId)
             .order('id', { ascending: true });
 
         if (error) throw error;
-        return data;
+        if (!stagingData || stagingData.length === 0) return [];
+
+        // 2. Obtener clientes relacionados para el join
+        // Extraemos los nombres de receptor únicos
+        const receiverNames = [...new Set(stagingData.map(r => r.raw_receiver_name).filter(Boolean))];
+
+        let clientMap = {};
+        if (receiverNames.length > 0) {
+            const { data: clients, error: clientError } = await supabase
+                .from('clients')
+                .select('id, business_name, "User_market_tec"') // Seleccionar User_market_tec con comillas
+                .in('"User_market_tec"', receiverNames);
+
+            if (!clientError && clients) {
+                // Crear mapa por User_market_tec
+                clients.forEach(c => {
+                    if (c.User_market_tec) {
+                        clientMap[c.User_market_tec] = c;
+                    }
+                });
+            } else if (clientError) {
+                console.error("Error fetching clients for join:", clientError);
+            }
+        }
+
+        // 3. Mergear datos
+        const enrichedData = stagingData.map(row => {
+            const client = clientMap[row.raw_receiver_name];
+            return {
+                ...row,
+                client_matched_id: client ? client.id : null,
+                client_business_name: client ? client.business_name : null,
+                client_user_market_tec: client ? client.User_market_tec : null
+            };
+        });
+
+        // Ordenar por Receptor (raw_receiver_name)
+        enrichedData.sort((a, b) => (a.raw_receiver_name || '').localeCompare(b.raw_receiver_name || ''));
+
+        return enrichedData;
     },
 
     // 6. Actualizar estado de la carga

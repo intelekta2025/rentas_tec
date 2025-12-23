@@ -9,7 +9,7 @@ import {
   Plus, Send, ChevronRight, FileCheck, Ban, Edit, Zap, Trash2,
   Key, UploadCloud, Loader, Play, Filter, Shield, Eye, User, Phone, Lightbulb,
   ChevronUp, ChevronDown, Upload, AlertCircle, X, Loader2, Search, Bot, ArrowRight,
-  LayoutGrid, List, RefreshCw, ChevronLeft, Edit2, Save
+  LayoutGrid, List, RefreshCw, ChevronLeft, Edit2, Save, UserCheck, UserX
 } from 'lucide-react';
 import { StatusBadge, OverdueBadge, KPICard, RevenueChart, Modal } from '../ui/Shared';
 import { UNITS, mockStaff } from '../../data/constants';
@@ -1779,7 +1779,11 @@ export const MarketTecView = ({ user, unitName }) => {
       });
 
       // 4. Insertar detalle en staging
-      await marketTecService.insertStagingData(uploadRecord.id, user.unitId, rows);
+      const { skippedCount } = await marketTecService.insertStagingData(uploadRecord.id, user.unitId, rows);
+
+      if (skippedCount > 0) {
+        alert(`Se procesaron correctamente los registros, pero se omitieron ${skippedCount} registros que ya existían en la tabla de Pagos (duplicados).`);
+      }
 
       // 5. Actualizar estado y redireccionar
       await loadUploads(); // Recargar lista
@@ -1904,8 +1908,9 @@ export const MarketTecView = ({ user, unitName }) => {
     // Calcular KPIs básicos del staging
     const totalRecords = stagingData.length;
     const totalAmount = stagingData.reduce((acc, r) => acc + (r.raw_total_value || 0), 0);
-    // Identificar problemas simples (ej. sin referencia o monto 0)
-    const issuesCount = stagingData.filter(r => !r.raw_order || r.raw_total_value === 0).length;
+
+    // Identificar problemas: Sin User_market_tec
+    const unmatchedCount = stagingData.filter(r => !r.client_user_market_tec).length;
 
     return (
       <div className="animate-in slide-in-from-right-4 duration-300">
@@ -1947,17 +1952,17 @@ export const MarketTecView = ({ user, unitName }) => {
             <p className="text-slate-500 text-xs font-medium uppercase">Registros Leídos</p>
             <p className="text-2xl font-bold text-slate-800 mt-1">{totalRecords}</p>
           </div>
-          <div className={`${issuesCount > 0 ? 'bg-orange-50 border-orange-200' : 'bg-green-50 border-green-200'} p-4 rounded-xl border shadow-sm`}>
+          <div className={`${unmatchedCount > 0 ? 'bg-orange-50 border-orange-200' : 'bg-green-50 border-green-200'} p-4 rounded-xl border shadow-sm`}>
             <div className="flex justify-between items-start">
               <div>
-                <p className={`${issuesCount > 0 ? 'text-orange-800' : 'text-green-800'} text-xs font-medium uppercase`}>
-                  {issuesCount > 0 ? 'Posibles Errores' : 'Validación Básica'}
+                <p className={`${unmatchedCount > 0 ? 'text-orange-800' : 'text-green-800'} text-xs font-medium uppercase`}>
+                  {unmatchedCount > 0 ? 'Usuarios No Encontrados' : 'Validación Completa'}
                 </p>
-                <p className={`${issuesCount > 0 ? 'text-orange-900' : 'text-green-900'} text-2xl font-bold mt-1`}>{issuesCount}</p>
+                <p className={`${unmatchedCount > 0 ? 'text-orange-900' : 'text-green-900'} text-2xl font-bold mt-1`}>{unmatchedCount}</p>
               </div>
-              {issuesCount > 0 ? <AlertTriangle size={20} className="text-orange-500" /> : <CheckCircle size={20} className="text-green-500" />}
+              {unmatchedCount > 0 ? <AlertTriangle size={20} className="text-orange-500" /> : <CheckCircle size={20} className="text-green-500" />}
             </div>
-            <p className="text-xs text-slate-500 mt-1">Filas vacías o monto $0</p>
+            <p className="text-xs text-slate-500 mt-1">Registros sin "Usuario MT" asignado</p>
           </div>
         </div>
 
@@ -1978,6 +1983,7 @@ export const MarketTecView = ({ user, unitName }) => {
                   <tr>
                     <th className="px-4 py-3 font-semibold">Orden / Ref</th>
                     <th className="px-4 py-3 font-semibold">Receptor</th>
+                    <th className="px-4 py-3 font-semibold text-center">Usuario MT</th>
                     <th className="px-4 py-3 font-semibold">Fecha Autorización</th>
                     <th className="px-4 py-3 font-semibold text-right">Monto</th>
                     <th className="px-4 py-3 font-semibold text-center">Status Procesamiento</th>
@@ -1990,6 +1996,23 @@ export const MarketTecView = ({ user, unitName }) => {
                         {row.raw_order || <span className="text-red-300 italic">Vacío</span>}
                       </td>
                       <td className="px-4 py-3 text-slate-600">{row.raw_receiver_name}</td>
+                      <td className="px-4 py-3 text-center">
+                        {row.client_user_market_tec ? (
+                          <div className="flex justify-center group relative cursor-help">
+                            <UserCheck size={20} className="text-emerald-500" />
+                            <div className="absolute bottom-full mb-1 hidden group-hover:block bg-slate-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10 shadow-md">
+                              Encontrado: {row.client_user_market_tec}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex justify-center group relative cursor-help">
+                            <UserX size={20} className="text-slate-300" />
+                            <div className="absolute bottom-full mb-1 hidden group-hover:block bg-slate-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10 shadow-md">
+                              No encontrado en tabla Clientes
+                            </div>
+                          </div>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-slate-600 text-xs capitalize">
                         {row.raw_authorized_date ? new Date(row.raw_authorized_date).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: '2-digit' }).replace('.', '') : '-'}
                       </td>
@@ -1997,7 +2020,11 @@ export const MarketTecView = ({ user, unitName }) => {
                         ${(row.raw_total_value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">{row.processing_status}</span>
+                        {row.client_user_market_tec ? (
+                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">{row.processing_status}</span>
+                        ) : (
+                          <span className="text-xs bg-slate-200 text-slate-500 px-2 py-1 rounded font-medium">DISABLED</span>
+                        )}
                       </td>
                     </tr>
                   ))}
