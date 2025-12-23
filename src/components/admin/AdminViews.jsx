@@ -320,8 +320,12 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
     i.status.toLowerCase() === 'overdue'
   ));
 
+  const totalPaid = filteredReceivables.reduce((acc, curr) => {
+    return acc + (curr.paidAmountRaw || 0);
+  }, 0);
+
   const contractTotal = filteredReceivables.reduce((acc, curr) => {
-    return acc + parseFloat(String(curr.amount || 0).replace(/[^0-9.-]+/g, "") || 0);
+    return acc + (curr.amountRaw || 0);
   }, 0);
 
   return (
@@ -418,16 +422,20 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
       {/* Main Content Area */}
       <div className="space-y-6">
         {/* Financial Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-gray-400">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-gray-400 transition-all hover:shadow-md">
             <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Total del contrato</div>
             <div className="text-2xl font-bold text-gray-900 mt-1">${contractTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
+          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-500 transition-all hover:shadow-md">
+            <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Total de pagos del contrato</div>
+            <div className="text-2xl font-bold text-green-600 mt-1">${totalPaid.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500 transition-all hover:shadow-md">
             <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Saldo del contrato</div>
             <div className="text-2xl font-bold text-gray-900 mt-1">${balance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-red-500">
+          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-red-500 transition-all hover:shadow-md">
             <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Deuda Vencida</div>
             <div className="text-2xl font-bold text-red-600 mt-1 flex items-center">
               ${overdueTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
