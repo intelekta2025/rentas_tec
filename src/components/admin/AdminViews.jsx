@@ -186,7 +186,7 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
   );
 };
 
-export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setContractModalOpen, portalUsers = [], portalUsersLoading = false, contracts = [], contractsLoading = false, onFinalizeContract, onEditContract, onEditClient, onGenerateCXC, onUpdateReceivable, onAddPayment, onAddManualReceivable, receivables = [], receivablesLoading = false }) => {
+export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setContractModalOpen, portalUsers = [], portalUsersLoading = false, contracts = [], contractsLoading = false, onFinalizeContract, onEditContract, onEditClient, onGenerateCXC, onUpdateReceivable, onDeleteReceivable, onAddPayment, onAddManualReceivable, receivables = [], receivablesLoading = false }) => {
   const [isGenerateModalOpen, setGenerateModalOpen] = useState(false);
   const [contractToGenerate, setContractToGenerate] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -197,6 +197,8 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
   const [receivableToEdit, setReceivableToEdit] = useState(null);
   const [isRegisterPaymentModalOpen, setRegisterPaymentModalOpen] = useState(false);
   const [receivableToPay, setReceivableToPay] = useState(null);
+  const [isDeleteReceivableModalOpen, setDeleteReceivableModalOpen] = useState(false);
+  const [receivableToDelete, setReceivableToDelete] = useState(null);
   const [movementStatusFilter, setMovementStatusFilter] = useState('Todos');
   const [serviceTypeFilter, setServiceTypeFilter] = useState('Todos');
   const [isFinalizeConfirmationModalOpen, setFinalizeConfirmationModalOpen] = useState(false);
@@ -963,6 +965,17 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                         >
                           <Edit size={16} />
                         </button>
+                        <button
+                          className="text-red-400 hover:text-red-600"
+                          title="Eliminar Registro"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setReceivableToDelete(item);
+                            setDeleteReceivableModalOpen(true);
+                          }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -1107,6 +1120,60 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
             </div>
           </form>
         </Modal>
+
+        {/* Modal de Confirmación de Eliminación de Receivable */}
+        {isDeleteReceivableModalOpen && (
+          <Modal
+            isOpen={isDeleteReceivableModalOpen}
+            onClose={() => setDeleteReceivableModalOpen(false)}
+            title="Confirmar Eliminación"
+          >
+            <div className="space-y-4">
+              <div className="flex items-center text-red-600 mb-2">
+                <AlertTriangle size={24} className="mr-2" />
+                <h3 className="text-lg font-bold">¿Estás seguro?</h3>
+              </div>
+              <p className="text-gray-600">
+                Vas a eliminar el registro: <strong>{receivableToDelete?.concept}</strong> del mes <strong>{receivableToDelete?.periodMonth}/{receivableToDelete?.periodYear}</strong>.
+              </p>
+              <p className="text-sm text-red-500 font-medium">
+                Esta acción no se puede deshacer y puede afectar los balances del contrato.
+              </p>
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setDeleteReceivableModalOpen(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                  disabled={isGenerating}
+                  onClick={async () => {
+                    setIsGenerating(true);
+                    try {
+                      const result = await onDeleteReceivable(receivableToDelete.id);
+                      if (result.success) {
+                        setDeleteReceivableModalOpen(false);
+                        setReceivableToDelete(null);
+                      } else {
+                        alert('Error al eliminar: ' + result.error?.message);
+                      }
+                    } catch (err) {
+                      alert('Error inesperado: ' + err.message);
+                    } finally {
+                      setIsGenerating(false);
+                    }
+                  }}
+                >
+                  {isGenerating ? <Loader size={18} className="animate-spin" /> : 'Eliminar Permanentemente'}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
 
         {/* Modal para registrar pago */}
         <Modal

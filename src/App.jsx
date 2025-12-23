@@ -66,7 +66,7 @@ const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, onBackToClients
   const { contracts, loading: contractsLoading, addContract, finalizeContract, refreshContracts } = useContracts(client?.id);
 
   // Cargar receivables (Estado de Cuenta) reales
-  const { invoices: receivables, loading: receivablesLoading, refreshInvoices, editInvoice, addInvoice, addPayment } = useInvoices({ clientId: client?.id });
+  const { invoices: receivables, loading: receivablesLoading, refreshInvoices, editInvoice, addInvoice, addPayment, removeInvoice } = useInvoices({ clientId: client?.id });
 
   // Recargar contratos cuando cambie contractsRefreshKey
   useEffect(() => {
@@ -148,6 +148,14 @@ const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, onBackToClients
       }}
       onAddManualReceivable={async (data) => {
         const result = await addInvoice(data);
+        if (result.success) {
+          await refreshInvoices();
+          await refreshContracts(); // Refresh contracts to update KPI cards
+        }
+        return result;
+      }}
+      onDeleteReceivable={async (id) => {
+        const result = await removeInvoice(id);
         if (result.success) {
           await refreshInvoices();
           await refreshContracts(); // Refresh contracts to update KPI cards
