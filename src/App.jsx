@@ -61,12 +61,12 @@ const ContractFormWrapper = ({ client, user, onClose, onContractCreated, contrac
 };
 
 // Componente wrapper para ClientDetailView que carga los usuarios del portal y contratos
-const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModalOpen, generateContractPreview, setTerminationModalOpen, contractsRefreshKey, onPrepareEdit, onEditClient, onGenerateCXC }) => {
+const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModalOpen, generateContractPreview, setTerminationModalOpen, contractsRefreshKey, onPrepareEdit, onEditClient, onGenerateCXC, onAddManualReceivable }) => {
   const { portalUsers, loading: portalUsersLoading } = useClientPortalUsers(client?.id);
   const { contracts, loading: contractsLoading, addContract, finalizeContract, refreshContracts } = useContracts(client?.id);
 
   // Cargar receivables (Estado de Cuenta) reales
-  const { invoices: receivables, loading: receivablesLoading, refreshInvoices, editInvoice, addPayment } = useInvoices({ clientId: client?.id });
+  const { invoices: receivables, loading: receivablesLoading, refreshInvoices, editInvoice, addInvoice, addPayment } = useInvoices({ clientId: client?.id });
 
   // Recargar contratos cuando cambie contractsRefreshKey
   useEffect(() => {
@@ -139,6 +139,13 @@ const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, setContractModa
       }}
       onAddPayment={async (receivableId, paymentData) => {
         const result = await addPayment(receivableId, paymentData);
+        if (result.success) {
+          await refreshInvoices();
+        }
+        return result;
+      }}
+      onAddManualReceivable={async (data) => {
+        const result = await addInvoice(data);
         if (result.success) {
           await refreshInvoices();
         }

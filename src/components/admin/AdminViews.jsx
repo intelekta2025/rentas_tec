@@ -186,7 +186,7 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
   );
 };
 
-export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, portalUsers = [], portalUsersLoading = false, contracts = [], contractsLoading = false, onFinalizeContract, onEditContract, onEditClient, onGenerateCXC, onUpdateReceivable, onAddPayment, receivables = [], receivablesLoading = false }) => {
+export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, portalUsers = [], portalUsersLoading = false, contracts = [], contractsLoading = false, onFinalizeContract, onEditContract, onEditClient, onGenerateCXC, onUpdateReceivable, onAddPayment, onAddManualReceivable, receivables = [], receivablesLoading = false }) => {
   const [isGenerateModalOpen, setGenerateModalOpen] = useState(false);
   const [contractToGenerate, setContractToGenerate] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -199,8 +199,17 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
   const [receivableToPay, setReceivableToPay] = useState(null);
   const [movementStatusFilter, setMovementStatusFilter] = useState('Todos');
   const [isFinalizeConfirmationModalOpen, setFinalizeConfirmationModalOpen] = useState(false);
+  const [isAddManualReceivableModalOpen, setAddManualReceivableModalOpen] = useState(false);
   const [contractToTerminate, setContractToTerminate] = useState(null);
   const [receivablesToCancel, setReceivablesToCancel] = useState([]);
+  const [manualReceivableForm, setManualReceivableForm] = useState({
+    type: 'Rent',
+    periodMonth: new Date().getMonth() + 1,
+    periodYear: new Date().getFullYear(),
+    dueDate: new Date().toISOString().split('T')[0],
+    amount: '',
+    concept: ''
+  });
 
   // Seleccionar automáticamente el primer contrato activo si no hay ninguno seleccionado
   useEffect(() => {
@@ -306,6 +315,47 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
     const fileName = `Estado_de_Cuenta_${client.name.replace(/\s+/g, '_')}_${date}.xlsx`;
 
     XLSX.writeFile(workbook, fileName);
+  };
+
+  const handleAddManualReceivable = async (e) => {
+    e.preventDefault();
+    if (!selectedContractId) {
+      alert("Por favor seleccione un contrato primero");
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const data = {
+        ...manualReceivableForm,
+        unitId: client.unitId,
+        clientId: client.id,
+        contractId: selectedContractId,
+        status: 'Pending',
+        // Si no hay concepto, generamos uno por defecto
+        concept: manualReceivableForm.concept || `${manualReceivableForm.type === 'Rent' ? 'Renta' : 'Servicio'} Manual - ${manualReceivableForm.periodMonth}/${manualReceivableForm.periodYear}`
+      };
+
+      const result = await onAddManualReceivable(data);
+      if (result.success) {
+        setAddManualReceivableModalOpen(false);
+        setManualReceivableForm({
+          type: 'Rent',
+          periodMonth: new Date().getMonth() + 1,
+          periodYear: new Date().getFullYear(),
+          dueDate: new Date().toISOString().split('T')[0],
+          amount: '',
+          concept: ''
+        });
+      } else {
+        alert("Error al crear el registro: " + (result.error?.message || "Error desconocido"));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error inesperado al crear el registro");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const calculateBalance = (items) => items.reduce((acc, curr) => {
@@ -704,6 +754,13 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
                 </button>
               ))}
             </div>
+
+            <button
+              onClick={() => setAddManualReceivableModalOpen(true)}
+              className="ml-4 px-4 py-1.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-sm font-medium flex items-center shadow-sm transition-all active:scale-95"
+            >
+              <Plus size={16} className="mr-2" /> Agregar Registro
+            </button>
           </div>
 
           <div className="max-h-96 overflow-y-auto">
@@ -1104,6 +1161,113 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
                     Registrando...
                   </>
                 ) : 'Registrar Pago'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+
+        {/* Modal para agregar registro manual a la CXC */}
+        <Modal
+          isOpen={isAddManualReceivableModalOpen}
+          onClose={() => !isGenerating && setAddManualReceivableModalOpen(false)}
+          title="Agregar Registro Manual (Estado de Cuenta)"
+        >
+          <form onSubmit={handleAddManualReceivable} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Cargo</label>
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  value={manualReceivableForm.type}
+                  onChange={(e) => setManualReceivableForm({ ...manualReceivableForm, type: e.target.value })}
+                  required
+                >
+                  <option value="Rent">Renta</option>
+                  <option value="Service">Servicio / Luz</option>
+                  <option value="Other">Otro</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Monto</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm font-bold"
+                  placeholder="0.00"
+                  value={manualReceivableForm.amount}
+                  onChange={(e) => setManualReceivableForm({ ...manualReceivableForm, amount: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Vencimiento</label>
+              <input
+                type="date"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                value={manualReceivableForm.dueDate}
+                onChange={(e) => setManualReceivableForm({ ...manualReceivableForm, dueDate: e.target.value })}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mes del Periodo</label>
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  value={manualReceivableForm.periodMonth}
+                  onChange={(e) => setManualReceivableForm({ ...manualReceivableForm, periodMonth: parseInt(e.target.value) })}
+                  required
+                >
+                  {["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"].map((m, i) => (
+                    <option key={m} value={i + 1}>{m}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Año del Periodo</label>
+                <input
+                  type="number"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  value={manualReceivableForm.periodYear}
+                  onChange={(e) => setManualReceivableForm({ ...manualReceivableForm, periodYear: parseInt(e.target.value) })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Concepto (Opcional)</label>
+              <input
+                type="text"
+                placeholder="Ej: Renta Enero 2025, Cargo Extra, etc."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                value={manualReceivableForm.concept}
+                onChange={(e) => setManualReceivableForm({ ...manualReceivableForm, concept: e.target.value })}
+              />
+            </div>
+
+            <div className="pt-4 flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setAddManualReceivableModalOpen(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={isGenerating}
+                className="px-4 py-2 bg-blue-700 text-white rounded-md text-sm font-bold hover:bg-blue-800 disabled:opacity-50 shadow-sm flex items-center"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader size={16} className="animate-spin mr-2" />
+                    Guardando...
+                  </>
+                ) : 'Crear Registro'}
               </button>
             </div>
           </form>
