@@ -219,6 +219,29 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
     }
   }, [contracts, selectedContractId]);
 
+  // Auto-calcular concepto para registro manual
+  useEffect(() => {
+    if (isAddManualReceivableModalOpen) {
+      const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+      const monthName = monthNames[manualReceivableForm.periodMonth - 1];
+      const typeLabel = manualReceivableForm.type === 'Rent' ? 'Renta' :
+        manualReceivableForm.type === 'Service' ? 'Luz/Servicios' : 'Cargo';
+
+      const newConcept = `${typeLabel} ${monthName} ${manualReceivableForm.periodYear}`;
+
+      setManualReceivableForm(prev => {
+        // Solo actualizar si el concepto actual está vacío o si es un concepto generado automáticamente previo
+        // Para simplificar y seguir la instrucción del usuario ("Calculame automaticamente"), lo actualizaremos siempre
+        // a menos que el usuario lo haya editado manualmente (podríamos añadir un flag 'isConceptEdited', 
+        // pero el usuario pidió automatización directa).
+        return {
+          ...prev,
+          concept: newConcept
+        };
+      });
+    }
+  }, [manualReceivableForm.type, manualReceivableForm.periodMonth, manualReceivableForm.periodYear, isAddManualReceivableModalOpen]);
+
   const selectedContract = contracts.find(c => c.id === selectedContractId);
 
 
@@ -298,6 +321,7 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
       return {
         'Tipo': (item.type === 'Rent' || item.type === 'Renta') ? 'Renta' : 'Luz/Servicios',
         'Mes': periodStr,
+        'Concepto': item.concept || '-',
         'Vencimiento': item.dueDate || '-',
         'Monto': parseFloat(String(item.amount || 0).replace(/[^0-9.-]+/g, "")),
         'Pagado': parseFloat(String(item.amount_paid || 0).replace(/[^0-9.-]+/g, "")),
@@ -331,9 +355,7 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
         unitId: client.unitId,
         clientId: client.id,
         contractId: selectedContractId,
-        status: 'Pending',
-        // Si no hay concepto, generamos uno por defecto
-        concept: manualReceivableForm.concept || `${manualReceivableForm.type === 'Rent' ? 'Renta' : 'Servicio'} Manual - ${manualReceivableForm.periodMonth}/${manualReceivableForm.periodYear}`
+        status: 'Pending'
       };
 
       const result = await onAddManualReceivable(data);
@@ -787,6 +809,12 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
                   </th>
                   <th
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => requestSort('concept')}
+                  >
+                    <div className="flex items-center">Concepto {getSortIcon('concept')}</div>
+                  </th>
+                  <th
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
                     onClick={() => requestSort('daysOverdue')}
                   >
                     <div className="flex items-center">Atraso {getSortIcon('daysOverdue')}</div>
@@ -820,7 +848,7 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {receivablesLoading ? (
-                  <tr><td colSpan="5" className="px-6 py-8 text-center"><Loader size={24} className="animate-spin mx-auto text-blue-600" /></td></tr>
+                  <tr><td colSpan="10" className="px-6 py-8 text-center"><Loader size={24} className="animate-spin mx-auto text-blue-600" /></td></tr>
                 ) : filteredReceivables.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50 group">
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -851,6 +879,9 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
                           return `${d} ${months[date.getMonth()]} ${y.substring(2)}`;
                         } catch (_) { return item.dueDate; }
                       })()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 italic font-medium">
+                      {item.concept || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       {item.status === 'Overdue' && item.daysOverdue > 0 ? (
@@ -902,7 +933,7 @@ export const ClientDetailView = ({ client, setActiveTab, setContractModalOpen, p
                 ))}
                 {!receivablesLoading && sortedReceivables.length === 0 && (
                   <tr>
-                    <td colSpan="9" className="px-6 py-20 text-center text-sm text-gray-500">
+                    <td colSpan="10" className="px-6 py-20 text-center text-sm text-gray-500">
                       <FileText size={40} className="mx-auto text-gray-200 mb-3" />
                       No hay movimientos registrados para este contrato.
                     </td>
