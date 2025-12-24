@@ -419,7 +419,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
   }, 0);
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-4 animate-fade-in">
       {/* Breadcrumb */}
       <div className="flex items-center space-x-2 text-sm text-gray-500 mb-4">
         <button onClick={onBackToClients || (() => setActiveTab('clients'))} className="hover:text-blue-600 hover:underline">Clientes</button>
@@ -430,32 +430,32 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
       {/* Top Profile Card */}
       <div className="bg-white shadow rounded-lg overflow-hidden flex flex-col md:flex-row">
         {/* Left Side: Client Info */}
-        <div className="p-6 flex-1 flex flex-col md:flex-row justify-between items-start md:items-center border-b md:border-b-0 md:border-r border-gray-100">
+        <div className="p-4 flex-1 flex flex-col md:flex-row justify-between items-start md:items-center border-b md:border-b-0 md:border-r border-gray-100">
           <div className="flex items-center mb-4 md:mb-0">
-            <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-xl mr-5">
+            <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-lg mr-4">
               {client.name.substring(0, 2).toUpperCase()}
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">{client.name}</h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-bold text-gray-900">{client.name}</h2>
+                <StatusBadge status={client.status} />
+              </div>
               <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-600 mt-2">
                 <span className="flex items-center" title="Correo de contacto">
-                  <Mail size={14} className="mr-1.5 text-blue-600" /> {client.email}
+                  <Mail size={12} className="mr-1 text-blue-600" /> {client.email}
                 </span>
                 <span className="flex items-center" title="Contacto principal">
-                  <User size={14} className="mr-1.5 text-blue-600" /> {client.contact}
+                  <User size={12} className="mr-1 text-blue-600" /> {client.contact}
                 </span>
                 <span className="flex items-center" title="Teléfono">
-                  <Phone size={14} className="mr-1.5 text-blue-600" /> {client.contactPhone || client.contact_phone || '-'}
+                  <Phone size={12} className="mr-1 text-blue-600" /> {client.contactPhone || client.contact_phone || '-'}
                 </span>
                 <span className="flex items-center" title="Usuario Market Tec">
-                  <Users size={14} className="mr-1.5 text-blue-600" /> {client.user_market_tec || client.User_market_tec || '-'}
+                  <Users size={12} className="mr-1 text-blue-600" /> {client.user_market_tec || client.User_market_tec || '-'}
                 </span>
                 <span className="flex items-center">
-                  <FileText size={14} className="mr-1.5 text-gray-400" /> <span className="text-gray-400">ID: {client.id}</span>
+                  <FileText size={12} className="mr-1 text-gray-400" /> <span className="text-gray-400">ID: {client.id}</span>
                 </span>
-              </div>
-              <div className="mt-3 flex space-x-2">
-                <StatusBadge status={client.status} />
               </div>
             </div>
           </div>
@@ -471,7 +471,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
         </div>
 
         {/* Right Side: Portal Users Management */}
-        <div className="w-full md:w-80 bg-gray-50 p-6">
+        <div className="w-full md:w-64 bg-gray-50 p-4">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide">Usuarios del Portal</h3>
             <button className="text-blue-600 hover:text-blue-800 text-xs font-medium flex items-center">
@@ -501,33 +501,28 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
               ))}
             </div>
           )}
-          <div className="mt-4 pt-3 border-t border-gray-200">
-            <button className="w-full text-center text-[10px] text-blue-600 hover:underline flex justify-center items-center">
-              <Key size={10} className="mr-1" /> Restablecer contraseñas
-            </button>
-          </div>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Financial Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-gray-400 transition-all hover:shadow-md">
+          <div className="bg-white p-3 rounded-lg shadow border-l-4 border-gray-400 transition-all hover:shadow-md">
             <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Total del contrato</div>
-            <div className="text-2xl font-bold text-gray-900 mt-1">${contractTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
+            <div className="text-xl font-bold text-gray-900 mt-1">${contractTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-500 transition-all hover:shadow-md">
+          <div className="bg-white p-3 rounded-lg shadow border-l-4 border-green-500 transition-all hover:shadow-md">
             <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Total de pagos del contrato</div>
-            <div className="text-2xl font-bold text-green-600 mt-1">${totalPaid.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
+            <div className="text-xl font-bold text-green-600 mt-1">${totalPaid.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500 transition-all hover:shadow-md">
+          <div className="bg-white p-3 rounded-lg shadow border-l-4 border-blue-500 transition-all hover:shadow-md">
             <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Saldo del contrato</div>
-            <div className="text-2xl font-bold text-gray-900 mt-1">${balance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
+            <div className="text-xl font-bold text-gray-900 mt-1">${balance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-red-500 transition-all hover:shadow-md">
+          <div className="bg-white p-3 rounded-lg shadow border-l-4 border-red-500 transition-all hover:shadow-md">
             <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Deuda Vencida</div>
-            <div className="text-2xl font-bold text-red-600 mt-1 flex items-center">
+            <div className="text-xl font-bold text-red-600 mt-1 flex items-center">
               ${overdueTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
               {overdueTotal > 0 && <AlertTriangle size={16} className="ml-2" />}
             </div>
@@ -560,15 +555,15 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Período</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Meses</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Renta de Servicios</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Renta Mensual</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CXC Renta</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CXC Servicios</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Terminación</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                    <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Período</th>
+                    <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Meses</th>
+                    <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Renta de Servicios</th>
+                    <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Renta Mensual</th>
+                    <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CXC Renta</th>
+                    <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CXC Servicios</th>
+                    <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Terminación</th>
+                    <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                    <th className="px-6 py-2.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -631,7 +626,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                         onClick={() => setSelectedContractId(contract.id)}
                         className={`transition-colors cursor-pointer border-l-4 ${isSelected ? 'bg-blue-50 border-blue-500' : 'hover:bg-gray-50 border-transparent'}`}
                       >
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-3 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900">
                             {startDateFormatted} - {endDateFormatted}
                           </div>
@@ -639,12 +634,12 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                         <td className="px-6 py-4 whitespace-nowrap text-center md:text-left font-bold text-blue-700">
                           {contract.num_months || '-'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-3 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900">
                             {serviceRentFormatted}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-3 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900">
                             {monthlyRentFormatted}
                           </div>
@@ -659,7 +654,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                             {serviceCount}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-3 whitespace-nowrap">
                           <div className="text-sm text-gray-500">
                             {(() => {
                               let terminationDateFormatted = '-'
@@ -682,7 +677,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                             })()}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-3 whitespace-nowrap">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${isActive
                             ? 'bg-green-100 text-green-800'
                             : 'bg-gray-100 text-gray-800'
@@ -823,82 +818,67 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
             </button>
           </div>
 
-          <div className="max-h-96 overflow-y-auto">
+          <div className="max-h-80 overflow-y-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-white sticky top-0 shadow-sm z-10">
                 <tr>
                   <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors w-20"
+                    className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors w-20"
                     onClick={() => requestSort('type')}
                   >
                     <div className="flex items-center">Tipo {getSortIcon('type')}</div>
                   </th>
                   <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
-                    onClick={() => requestSort('period')}
-                  >
-                    <div className="flex items-center">Mes {getSortIcon('period')}</div>
-                  </th>
-                  <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
-                    onClick={() => requestSort('dueDate')}
-                  >
-                    <div className="flex items-center">Vencimiento {getSortIcon('dueDate')}</div>
-                  </th>
-                  <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                    className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
                     onClick={() => requestSort('concept')}
                   >
                     <div className="flex items-center">Concepto {getSortIcon('concept')}</div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">
                     Ref MT
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">
                     Fecha Pago
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    ID Carga
-                  </th>
                   <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                    className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
                     onClick={() => requestSort('daysOverdue')}
                   >
                     <div className="flex items-center">Atraso {getSortIcon('daysOverdue')}</div>
                   </th>
                   <th
-                    className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                    className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
                     onClick={() => requestSort('amount')}
                   >
                     <div className="flex items-center justify-end">Monto {getSortIcon('amount')}</div>
                   </th>
                   <th
-                    className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                    className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
                     onClick={() => requestSort('paidAmount')}
                   >
                     <div className="flex items-center justify-end text-green-700">Pagado {getSortIcon('paidAmount')}</div>
                   </th>
                   <th
-                    className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                    className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
                     onClick={() => requestSort('balanceDue')}
                   >
                     <div className="flex items-center justify-end text-blue-700">Saldo {getSortIcon('balanceDue')}</div>
                   </th>
                   <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                    className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
                     onClick={() => requestSort('status')}
                   >
                     <div className="flex items-center">Estado {getSortIcon('status')}</div>
                   </th>
-                  <th className="relative px-6 py-3"><span className="sr-only">Acciones</span></th>
+                  <th className="px-3 py-2.5 relative"><span className="sr-only">Acciones</span></th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {receivablesLoading ? (
-                  <tr><td colSpan="13" className="px-6 py-8 text-center"><Loader size={24} className="animate-spin mx-auto text-blue-600" /></td></tr>
+                  <tr><td colSpan="10" className="px-6 py-8 text-center"><Loader size={24} className="animate-spin mx-auto text-blue-600" /></td></tr>
                 ) : filteredReceivables.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50 group">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 py-2.5 whitespace-nowrap">
                       {item.type === 'Rent' || item.type === 'Renta' ? (
                         <div className="flex items-center text-blue-600" title="Renta">
                           <Home size={18} />
@@ -909,31 +889,13 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {(() => {
-                        if (!item.periodMonth) return '-';
-                        const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-                        return `${months[item.periodMonth - 1]} ${String(item.periodYear).substring(2)}`;
-                      })()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {(() => {
-                        if (!item.dueDate) return '-';
-                        try {
-                          const [y, m, d] = item.dueDate.split('-');
-                          const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-                          const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-                          return `${d} ${months[date.getMonth()]} ${y.substring(2)}`;
-                        } catch (_) { return item.dueDate; }
-                      })()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 italic font-medium">
+                    <td className="px-3 py-2.5 whitespace-nowrap text-sm text-gray-900 italic font-medium">
                       {item.concept || '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    <td className="px-3 py-2.5 whitespace-nowrap text-sm text-gray-600">
                       {item.paymentReferences || '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-3 py-2.5 whitespace-nowrap text-sm text-gray-500">
                       {item.paymentDates ? item.paymentDates.split(', ').map(d => {
                         try {
                           const [y, m, d_] = d.split('-');
@@ -942,10 +904,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                         } catch (_) { return d; }
                       }).join(', ') : '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400 font-mono">
-                      {item.marketTecUploadIds ? item.marketTecUploadIds.split(', ').map(id => `#${id}`).join(', ') : '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <td className="px-3 py-4 whitespace-nowrap text-sm">
                       {item.status === 'Overdue' && item.daysOverdue > 0 ? (
                         <span className="text-red-600 font-bold flex items-center">
                           <AlertTriangle size={14} className="mr-1" />
@@ -955,20 +914,29 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                         <span className="text-gray-400">-</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">
+                    <td className="px-3 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">
                       {item.amount}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600 text-right">
+                    <td className="px-3 py-4 whitespace-nowrap text-sm font-bold text-green-600 text-right">
                       {`$${parseFloat(item.amount_paid || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-700 text-right">
+                    <td className="px-3 py-4 whitespace-nowrap text-sm font-bold text-blue-700 text-right">
                       {`$${(item.balanceDueRaw || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={item.status} /></td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="hidden group-hover:flex justify-end space-x-2">
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <StatusBadge status={item.status} />
+                        {item.marketTecUploadIds && (
+                          <span className="text-[10px] text-gray-400 font-mono">
+                            {item.marketTecUploadIds.split(', ').map(id => `#${id}`).join(', ')}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-right text-sm font-medium relative">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute right-2 top-1/2 -translate-y-1/2 flex space-x-1 bg-white shadow-sm rounded px-1">
                         <button
-                          className="text-blue-600 hover:text-blue-900"
+                          className="text-blue-600 hover:text-blue-900 p-1"
                           title="Registrar Pago"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -976,10 +944,10 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                             setRegisterPaymentModalOpen(true);
                           }}
                         >
-                          <DollarSign size={16} />
+                          <DollarSign size={14} />
                         </button>
                         <button
-                          className="text-gray-400 hover:text-gray-600"
+                          className="text-gray-400 hover:text-gray-600 p-1"
                           title="Editar Monto"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -987,10 +955,10 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                             setEditReceivableModalOpen(true);
                           }}
                         >
-                          <Edit size={16} />
+                          <Edit size={14} />
                         </button>
                         <button
-                          className="text-red-400 hover:text-red-600"
+                          className="text-red-400 hover:text-red-600 p-1"
                           title="Eliminar Registro"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -998,7 +966,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                             setDeleteReceivableModalOpen(true);
                           }}
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </td>
@@ -1006,7 +974,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                 ))}
                 {!receivablesLoading && sortedReceivables.length === 0 && (
                   <tr>
-                    <td colSpan="13" className="px-6 py-20 text-center text-sm text-gray-500">
+                    <td colSpan="10" className="px-6 py-20 text-center text-sm text-gray-500">
                       <FileText size={40} className="mx-auto text-gray-200 mb-3" />
                       No hay movimientos registrados para este contrato.
                     </td>
