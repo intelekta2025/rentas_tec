@@ -1942,7 +1942,6 @@ export const MarketTecView = ({ user, unitName }) => {
               <span className="text-slate-400 text-sm">Upload ID: #{selectedUploadId}</span>
             </div>
             <h2 className="text-2xl font-bold text-slate-800">Revisión de Carga</h2>
-            <p className="text-slate-500 text-sm">Datos cargados en tabla `payment_staging`. Listos para procesamiento.</p>
           </div>
 
           <div className="flex gap-3">
@@ -1977,13 +1976,13 @@ export const MarketTecView = ({ user, unitName }) => {
             <div className="flex justify-between items-start">
               <div>
                 <p className={`${unmatchedCount > 0 ? 'text-orange-800' : 'text-green-800'} text-xs font-medium uppercase`}>
-                  {unmatchedCount > 0 ? 'Usuarios No Encontrados' : 'Validación Completa'}
+                  {unmatchedCount > 0 ? 'Clientes no encontrados' : 'Validación Completa'}
                 </p>
                 <p className={`${unmatchedCount > 0 ? 'text-orange-900' : 'text-green-900'} text-2xl font-bold mt-1`}>{unmatchedCount}</p>
               </div>
               {unmatchedCount > 0 ? <AlertTriangle size={20} className="text-orange-500" /> : <CheckCircle size={20} className="text-green-500" />}
             </div>
-            <p className="text-xs text-slate-500 mt-1">Registros sin "Usuario MT" asignado</p>
+            <p className="text-xs text-slate-500 mt-1">Registros sin Market Tec Receiver asociado</p>
           </div>
         </div>
 
@@ -2003,10 +2002,11 @@ export const MarketTecView = ({ user, unitName }) => {
                 <thead className="bg-slate-100 text-slate-600 border-b border-slate-200">
                   <tr>
                     <th className="px-4 py-3 font-semibold">Orden / Ref</th>
-                    <th className="px-4 py-3 font-semibold">Receptor</th>
-                    <th className="px-4 py-3 font-semibold text-center">Usuario MT</th>
+                    <th className="px-4 py-3 font-semibold">Cliente</th>
+                    <th className="px-4 py-3 font-semibold text-center">Market Tec Receiver</th>
                     <th className="px-4 py-3 font-semibold">Fecha Autorización</th>
                     <th className="px-4 py-3 font-semibold text-right">Monto</th>
+                    <th className="px-4 py-3 font-semibold text-center">CxC Pendientes</th>
                     <th className="px-4 py-3 font-semibold text-center">Status Procesamiento</th>
                   </tr>
                 </thead>
@@ -2039,6 +2039,9 @@ export const MarketTecView = ({ user, unitName }) => {
                       </td>
                       <td className={`px-4 py-3 text-right ${row.raw_total_value === 0 ? 'text-red-600 font-bold' : 'text-slate-700'}`}>
                         ${(row.raw_total_value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-4 py-3 text-center text-slate-600">
+                        {row.pending_receivables_count || 0}
                       </td>
                       <td className="px-4 py-3 text-center">
                         {row.processing_status === 'SIN CLIENTE' ? (
