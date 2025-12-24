@@ -111,10 +111,20 @@ const mapReceivableFromDB = (dbReceivable) => {
     amountRaw: parseFloat(dbReceivable.amount || 0),
     paidAmountRaw: parseFloat(dbReceivable.amount_paid || 0),
     balanceDueRaw: parseFloat(dbReceivable.balance || 0),
-    // Extraer referencias de pago (puede haber múltiples pagos)
+    // Extraer referencias de pago, fechas de pago e IDs de carga
     paymentReferences: dbReceivable.payment_applications
       ?.map(app => app.payments?.Market_tec_Referencia)
-      .filter(ref => ref) // Filtrar valores nulos/undefined
+      .filter(ref => ref)
+      .join(', ') || '',
+    // Usar payment_date de payment_applications (sincronizado automáticamente desde payments)
+    paymentDates: dbReceivable.payment_applications
+      ?.map(app => app.payment_date)
+      .filter(date => date)
+      .join(', ') || '',
+    // Usar upload_id de payments
+    marketTecUploadIds: dbReceivable.payment_applications
+      ?.map(app => app.payments?.upload_id)
+      .filter(id => id)
       .join(', ') || ''
   }
 }
@@ -187,7 +197,12 @@ export const getInvoices = async (filters = {}) => {
         clients(business_name),
         payment_applications(
           payment_id,
-          payments(Market_tec_Referencia)
+          payment_date,
+          payments(
+            Market_tec_Referencia,
+            payment_date,
+            upload_id
+          )
         )
       `)
       .order('due_date', { ascending: false })

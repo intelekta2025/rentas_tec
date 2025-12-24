@@ -336,8 +336,11 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
       return {
         'Tipo': (item.type === 'Rent' || item.type === 'Renta') ? 'Renta' : 'Luz/Servicios',
         'Mes': periodStr,
-        'Concepto': item.concept || '-',
         'Vencimiento': item.dueDate || '-',
+        'Concepto': item.concept || '-',
+        'Ref Market Tec': item.paymentReferences || '-',
+        'Fecha Pago': item.paymentDates || '-',
+        'ID Carga': item.marketTecUploadIds || '-',
         'Monto': parseFloat(String(item.amount || 0).replace(/[^0-9.-]+/g, "")),
         'Pagado': parseFloat(String(item.amount_paid || 0).replace(/[^0-9.-]+/g, "")),
         'Saldo': item.balanceDueRaw || 0,
@@ -849,7 +852,13 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                     <div className="flex items-center">Concepto {getSortIcon('concept')}</div>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Market_tec_Referencia
+                    Ref MT
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Fecha Pago
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    ID Carga
                   </th>
                   <th
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
@@ -886,7 +895,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {receivablesLoading ? (
-                  <tr><td colSpan="11" className="px-6 py-8 text-center"><Loader size={24} className="animate-spin mx-auto text-blue-600" /></td></tr>
+                  <tr><td colSpan="13" className="px-6 py-8 text-center"><Loader size={24} className="animate-spin mx-auto text-blue-600" /></td></tr>
                 ) : filteredReceivables.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50 group">
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -923,6 +932,18 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {item.paymentReferences || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {item.paymentDates ? item.paymentDates.split(', ').map(d => {
+                        try {
+                          const [y, m, d_] = d.split('-');
+                          const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+                          return `${d_} ${months[parseInt(m) - 1]}`;
+                        } catch (_) { return d; }
+                      }).join(', ') : '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400 font-mono">
+                      {item.marketTecUploadIds ? item.marketTecUploadIds.split(', ').map(id => `#${id}`).join(', ') : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       {item.status === 'Overdue' && item.daysOverdue > 0 ? (
@@ -985,7 +1006,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                 ))}
                 {!receivablesLoading && sortedReceivables.length === 0 && (
                   <tr>
-                    <td colSpan="10" className="px-6 py-20 text-center text-sm text-gray-500">
+                    <td colSpan="13" className="px-6 py-20 text-center text-sm text-gray-500">
                       <FileText size={40} className="mx-auto text-gray-200 mb-3" />
                       No hay movimientos registrados para este contrato.
                     </td>
