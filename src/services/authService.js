@@ -61,8 +61,9 @@ const getStaffProfile = async (userId) => {
         }
       }
 
+      const profile = { ...data, unitName, unitId: data.unit_id };
       return {
-        data: { ...data, unitName, unitId: data.unit_id },
+        data: profile,
         error: null
       }
     }
@@ -546,38 +547,59 @@ export const onAuthStateChange = (callback) => {
   return supabase.auth.onAuthStateChange(async (event, session) => {
     if (session?.user) {
       // Solo obtener perfil completo en SIGNED_IN inicial, no en cada refresh de token
-      if (event === 'SIGNED_IN') {
-        // Login inicial - obtener perfil completo
+      if (event === 'SIGNED_IN' || !session.user.role) {
+        // Login inicial o sesión sin perfil - obtener perfil completo
         try {
           const { data: profile } = await getUserProfile(session.user.id)
           if (profile) {
             callback(event, { ...session, user: { ...session.user, ...profile } })
           } else {
-            // Fallback a cache si falla
-            const cachedRole = localStorage.getItem(`user_role_${session.user.id}`)
-            if (cachedRole) {
-              callback(event, { ...session, user: { ...session.user, role: cachedRole } })
+            // Fallback a cache completo si falla
+            const cachedProfileStr = localStorage.getItem(`user_profile_${session.user.id}`);
+            if (cachedProfileStr) {
+              try {
+                const cachedProfile = JSON.parse(cachedProfileStr);
+                callback(event, { ...session, user: { ...session.user, ...cachedProfile, from_cache: true } })
+              } catch (e) {
+                // Fallback a solo rol si falla el JSON
+                const cachedRole = localStorage.getItem(`user_role_${session.user.id}`)
+                callback(event, { ...session, user: { ...session.user, role: cachedRole } })
+              }
             } else {
-              callback(event, session)
+              const cachedRole = localStorage.getItem(`user_role_${session.user.id}`)
+              callback(event, { ...session, user: { ...session.user, role: cachedRole } })
             }
           }
         } catch (e) {
           console.warn('Error obteniendo perfil en SIGNED_IN:', e)
-          const cachedRole = localStorage.getItem(`user_role_${session.user.id}`)
-          if (cachedRole) {
-            callback(event, { ...session, user: { ...session.user, role: cachedRole } })
+          const cachedProfileStr = localStorage.getItem(`user_profile_${session.user.id}`);
+          if (cachedProfileStr) {
+            try {
+              const cachedProfile = JSON.parse(cachedProfileStr);
+              callback(event, { ...session, user: { ...session.user, ...cachedProfile, from_cache: true } })
+            } catch (e2) {
+              const cachedRole = localStorage.getItem(`user_role_${session.user.id}`)
+              callback(event, { ...session, user: { ...session.user, role: cachedRole } })
+            }
           } else {
-            callback(event, session)
+            const cachedRole = localStorage.getItem(`user_role_${session.user.id}`)
+            callback(event, { ...session, user: { ...session.user, role: cachedRole } })
           }
         }
       } else {
-        // TOKEN_REFRESHED u otros eventos - usar cache de rol, NO consultar BD
-        const cachedRole = localStorage.getItem(`user_role_${session.user.id}`)
-        if (cachedRole) {
-          callback(event, { ...session, user: { ...session.user, role: cachedRole } })
+        // TOKEN_REFRESHED u otros eventos - usar cache de perfil completo, NO consultar BD
+        const cachedProfileStr = localStorage.getItem(`user_profile_${session.user.id}`);
+        if (cachedProfileStr) {
+          try {
+            const cachedProfile = JSON.parse(cachedProfileStr);
+            callback(event, { ...session, user: { ...session.user, ...cachedProfile, from_cache: true } })
+          } catch (e) {
+            const cachedRole = localStorage.getItem(`user_role_${session.user.id}`)
+            callback(event, { ...session, user: { ...session.user, role: cachedRole } })
+          }
         } else {
-          // Si no hay cache (caso raro), callback con session básica
-          callback(event, session)
+          const cachedRole = localStorage.getItem(`user_role_${session.user.id}`)
+          callback(event, { ...session, user: { ...session.user, role: cachedRole || session.user.role } })
         }
       }
     } else {

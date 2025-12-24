@@ -8,7 +8,7 @@ import {
   Building, DollarSign, FileText, Calendar, Download, School,
   Plus, Send, ChevronRight, FileCheck, Ban, Edit, Zap, Trash2,
   Key, UploadCloud, Loader, Play, Filter, Shield, Eye, User, Phone, Lightbulb,
-  ChevronUp, ChevronDown, Upload, AlertCircle, X, Loader2, Search, Bot, ArrowRight,
+  ChevronUp, ChevronDown, Upload, AlertCircle, X, Loader2, Bot, ArrowRight,
   LayoutGrid, List, RefreshCw, ChevronLeft, Edit2, Save, UserCheck, UserX
 } from 'lucide-react';
 import { StatusBadge, OverdueBadge, KPICard, RevenueChart, Modal } from '../ui/Shared';
@@ -1726,12 +1726,15 @@ export const MarketTecView = ({ user, unitName }) => {
   // Cargar historial al inicio
   useEffect(() => {
     loadUploads();
-  }, [user.unitId]);
+  }, [user.unitId, user.unit_id]);
 
   const loadUploads = async () => {
+    const currentUnitId = user.unitId || user.unit_id;
+    if (!currentUnitId) return;
+
     try {
       setLoading(true);
-      const data = await marketTecService.getUploads(user.unitId);
+      const data = await marketTecService.getUploads(currentUnitId);
       setUploads(data || []);
     } catch (error) {
       console.error('Error loading uploads:', error);
@@ -1741,6 +1744,13 @@ export const MarketTecView = ({ user, unitName }) => {
   };
 
   const handleFileProcess = async (file) => {
+    const currentUnitId = user.unitId || user.unit_id;
+
+    if (!currentUnitId) {
+      alert("Error: No se ha detectado una Unidad de Negocio asociada a tu cuenta. Por favor, cierra sesión e intenta de nuevo.");
+      return;
+    }
+
     try {
       setUploadLoading(true);
       // 1. Parsear CSV
@@ -1751,14 +1761,14 @@ export const MarketTecView = ({ user, unitName }) => {
         return;
       }
 
-      // Filtrar registros: Solo "ready for handling" (case insensitive)
+      // Filtrar registros: Solo "Ready for handling" o "Listo para preparación" (case insensitive)
       const rows = allRows.filter(row => {
-        const status = row['Status raw value (temporary)'];
-        return status && status.toLowerCase().trim() === 'ready for handling';
+        const status = (row['Status raw value (temporary)'] || '').toLowerCase().trim();
+        return status === 'ready for handling' || status === 'listo para preparación';
       });
 
       if (rows.length === 0) {
-        alert('El archivo no contiene registros con estado "ready for handling".');
+        alert('El archivo no contiene registros con estado "Ready for handling" o "Listo para preparación".');
         return;
       }
 
@@ -1771,7 +1781,7 @@ export const MarketTecView = ({ user, unitName }) => {
 
       // 3. Crear registro maestro
       const uploadRecord = await marketTecService.createUploadRecord({
-        unitId: user.unitId,
+        unitId: currentUnitId,
         filename: file.name,
         uploadedBy: user.id, // ID del usuario de supbase auth
         totalRecords,
@@ -1779,7 +1789,7 @@ export const MarketTecView = ({ user, unitName }) => {
       });
 
       // 4. Insertar detalle en staging
-      const { skippedCount } = await marketTecService.insertStagingData(uploadRecord.id, user.unitId, rows);
+      const { skippedCount } = await marketTecService.insertStagingData(uploadRecord.id, currentUnitId, rows);
 
       if (skippedCount > 0) {
         alert(`Se procesaron correctamente los registros, pero se omitieron ${skippedCount} registros que ya existían en la tabla de Pagos (duplicados).`);
@@ -1910,7 +1920,8 @@ export const MarketTecView = ({ user, unitName }) => {
     const handleTriggerReconciliation = async () => {
       setIsReconciling(true);
       try {
-        const { success, error, data } = await marketTecService.triggerReconciliation(selectedUploadId);
+        const rowIds = stagingData.map(r => r.id);
+        const { success, error, data } = await marketTecService.triggerReconciliation(selectedUploadId, rowIds);
 
         if (success) {
           alert('¡Conciliación IA iniciada correctamente!');
@@ -2075,7 +2086,7 @@ export const MarketTecView = ({ user, unitName }) => {
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-          Market Tec - {unitName || `Unidad ${user.unitId}`}
+          Market Tec - {unitName || `Unidad ${user.unitId || user.unit_id || '???'}`}
         </h2>
         {currentView === 'list' && (
           <button

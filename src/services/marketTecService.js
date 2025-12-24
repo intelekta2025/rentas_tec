@@ -192,9 +192,13 @@ export const marketTecService = {
     },
 
     // 6. Disparar conciliación en n8n
-    triggerReconciliation: async (uploadId) => {
+    triggerReconciliation: async (uploadId, rowIds = []) => {
         try {
-            const webhookUrl = `https://n8n-t.intelekta.ai/webhook-test/8a737d17-e9cf-4eaa-aae7-8dba9fc61864?upload_id=${uploadId}`;
+            let webhookUrl = `https://n8n-t.intelekta.ai/webhook-test/8a737d17-e9cf-4eaa-aae7-8dba9fc61864?upload_id=${uploadId}`;
+
+            if (rowIds && rowIds.length > 0) {
+                webhookUrl += `&record_ids=${rowIds.join(',')}`;
+            }
 
             // Enviar ID de carga vía GET para que n8n procese
             const response = await fetch(webhookUrl, {
