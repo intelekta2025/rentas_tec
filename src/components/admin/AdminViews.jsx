@@ -2001,8 +2001,8 @@ export const MarketTecView = ({ user, unitName }) => {
               <table className="w-full text-sm text-left">
                 <thead className="bg-slate-100 text-slate-600 border-b border-slate-200">
                   <tr>
-                    <th className="px-4 py-3 font-semibold">Orden / Ref</th>
                     <th className="px-4 py-3 font-semibold">Cliente</th>
+                    <th className="px-4 py-3 font-semibold">Orden / Ref</th>
                     <th className="px-4 py-3 font-semibold text-center">Market Tec Receiver</th>
                     <th className="px-4 py-3 font-semibold">Fecha Autorización</th>
                     <th className="px-4 py-3 font-semibold text-right">Monto</th>
@@ -2013,10 +2013,12 @@ export const MarketTecView = ({ user, unitName }) => {
                 <tbody className="divide-y divide-slate-100">
                   {stagingData.map((row) => (
                     <tr key={row.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 text-slate-600">
+                        {row.client_business_name || <span className="text-slate-400 italic">{row.raw_receiver_name}</span>}
+                      </td>
                       <td className="px-4 py-3 text-slate-700">
                         {row.raw_order || <span className="text-red-300 italic">Vacío</span>}
                       </td>
-                      <td className="px-4 py-3 text-slate-600">{row.raw_receiver_name}</td>
                       <td className="px-4 py-3 text-center">
                         {row.client_user_market_tec ? (
                           <div className="flex justify-center group relative cursor-help">
