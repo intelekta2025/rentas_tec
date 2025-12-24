@@ -79,18 +79,39 @@ export const marketTecService = {
             return { data: [], skippedCount };
         }
 
-        // 3. Mapeo para inserción
-        const formattedRows = newRows.map(row => ({
-            upload_id: uploadId,
-            unit_id: unitId,
-            raw_total_value: parseFloat(row['Total Value'] || row['Monto'] || row['raw_total_value'] || 0),
-            raw_authorized_date: row['Authorized Date'] || row['Fecha'] || row['raw_authorized_date'] || null,
-            raw_order: row['Order'] || row['Orden'] || row['raw_order'] || '',
-            raw_receiver_name: row['Receiver Name'] || row['Receptor'] || row['raw_receiver_name'] || '',
-            raw_sku_name: row['SKU Name'] || row['SKU'] || row['raw_sku_name'] || '',
-            raw_status: row['Status raw value (temporary)'] || row['Status'] || row['Estatus'] || row['raw_status'] || '',
-            processing_status: 'PENDING'
-        }));
+        // 3. Obtener clientes para validación de "Usuario MT"
+        const receiverNames = [...new Set(newRows.map(row => row['Receiver Name'] || row['Receptor'] || row['raw_order']).filter(Boolean))];
+        let clientMap = {};
+        if (receiverNames.length > 0) {
+            const { data: clients, error: clientError } = await supabase
+                .from('clients')
+                .select('"User_market_tec"')
+                .in('"User_market_tec"', receiverNames);
+
+            if (!clientError && clients) {
+                clients.forEach(c => {
+                    clientMap[c.User_market_tec] = true;
+                });
+            }
+        }
+
+        // 4. Mapeo para inserción
+        const formattedRows = newRows.map(row => {
+            const receiverName = row['Receiver Name'] || row['Receptor'] || row['raw_receiver_name'] || '';
+            const hasClient = clientMap[receiverName];
+
+            return {
+                upload_id: uploadId,
+                unit_id: unitId,
+                raw_total_value: parseFloat(row['Total Value'] || row['Monto'] || row['raw_total_value'] || 0),
+                raw_authorized_date: row['Authorized Date'] || row['Fecha'] || row['raw_authorized_date'] || null,
+                raw_order: row['Order'] || row['Orden'] || row['raw_order'] || '',
+                raw_receiver_name: receiverName,
+                raw_sku_name: row['SKU Name'] || row['SKU'] || row['raw_sku_name'] || '',
+                raw_status: row['Status raw value (temporary)'] || row['Status'] || row['Estatus'] || row['raw_status'] || '',
+                processing_status: hasClient ? 'PENDIENTE' : 'SIN CLIENTE'
+            };
+        });
 
         const { data, error } = await supabase
             .from('payment_staging')
