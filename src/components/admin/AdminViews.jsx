@@ -1972,8 +1972,6 @@ export const MarketTecView = ({ user, unitName }) => {
                 <th className="px-6 py-4 font-semibold">Archivo</th>
                 <th className="px-6 py-4 font-semibold text-center">Registros</th>
                 <th className="px-6 py-4 font-semibold text-right">Total</th>
-                <th className="px-6 py-4 font-semibold text-center">Procesados</th>
-                <th className="px-6 py-4 font-semibold text-center">Pendientes</th>
                 <th className="px-6 py-4 font-semibold text-center">Fecha</th>
                 <th className="px-6 py-4 font-semibold text-center">Estado</th>
                 <th className="px-6 py-4 text-right">Acción</th>
@@ -1986,20 +1984,6 @@ export const MarketTecView = ({ user, unitName }) => {
                   <td className="px-6 py-4 font-medium text-slate-800">{row.filename}</td>
                   <td className="px-6 py-4 text-center">{row.total_records}</td>
                   <td className="px-6 py-4 text-right font-mono">${(row.total_amount || 0).toLocaleString()}</td>
-                  <td className="px-6 py-4 text-center">
-                    <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full font-bold border border-emerald-100">
-                      {row.processed_records || 0}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    {(row.pending_records || 0) > 0 ? (
-                      <span className="text-xs bg-amber-50 text-amber-700 px-2 py-1 rounded-full font-bold border border-amber-100">
-                        {row.pending_records}
-                      </span>
-                    ) : (
-                      <span className="text-slate-400 font-medium text-xs">0</span>
-                    )}
-                  </td>
                   <td className="px-6 py-4 text-center text-slate-500">
                     {new Date(row.upload_date).toLocaleDateString()}
                   </td>

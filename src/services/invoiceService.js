@@ -511,21 +511,13 @@ export const registerPayment = async (paymentData) => {
 
     if (appError) throw appError;
 
-    // 6. Actualizar el saldo y estado del movimiento
-    const { error: updateError } = await supabase
-      .from('receivables')
-      .update({
-        amount_paid: newPaidAmount,
-        status: newStatus
-      })
-      .eq('id', targetReceivableId);
+    // 6. La actualización del saldo y estado del movimiento es manejada por un trigger de la BD
+    // NO actualizar manualmente aquí para evitar duplicidad
 
-    if (updateError) throw updateError;
-
-    return { data: payment, error: null };
+    return { success: true, data: payment, error: null };
   } catch (error) {
     console.error('Error al registrar pago:', error);
-    return { data: null, error };
+    return { success: false, data: null, error };
   }
 };
 
@@ -555,8 +547,8 @@ export const cancelReceivables = async (ids) => {
 /**
  * Revierte el pago de un receivable:
  * 1. Identifica los IDs de pago en payment_applications.
- * 2. Elimina los registros en la tabla 'payments' (esto debería eliminar en cascada payment_applications).
- * 3. Restablece el monto pagado a 0 y estado a 'Pending' en receivables.
+ * 2. Elimina los registros en la tabla 'payments' (CASCADE eliminará payment_applications automáticamente).
+ * 3. El trigger de la BD actualizará automáticamente receivables.amount_paid y status.
  * @param {number} receivableId - ID del receivable
  * @returns {Promise<{success: boolean, error: object}>}
  */
@@ -573,7 +565,9 @@ export const revertPayment = async (receivableId) => {
     if (applications && applications.length > 0) {
       const paymentIds = applications.map(app => app.payment_id);
 
-      // 2. Eliminar desde la tabla payments (Cascade debería borrar applications)
+      // 2. Eliminar desde la tabla payments
+      // El CASCADE eliminará payment_applications
+      // El trigger de la BD actualizará receivables automáticamente
       const { error: deleteError } = await supabase
         .from('payments')
         .delete()
@@ -581,17 +575,6 @@ export const revertPayment = async (receivableId) => {
 
       if (deleteError) throw deleteError;
     }
-
-    // 3. Actualizar receivable
-    const { error: updateError } = await supabase
-      .from('receivables')
-      .update({
-        amount_paid: 0,
-        status: 'Pending'
-      })
-      .eq('id', receivableId);
-
-    if (updateError) throw updateError;
 
     return { success: true, error: null };
   } catch (error) {
