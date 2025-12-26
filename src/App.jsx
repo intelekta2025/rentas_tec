@@ -23,7 +23,7 @@ import { useClients } from './hooks/useClients';
 import { useInvoices, useOverdueInvoices, useUpcomingReminders } from './hooks/useInvoices';
 import { useBusinessUnit } from './hooks/useBusinessUnit';
 import { useClientPortalUsers } from './hooks/useClientPortalUsers';
-import { generateBulkInvoices, cancelReceivables } from './services/invoiceService';
+import { generateBulkInvoices, cancelReceivables, revertPayment } from './services/invoiceService';
 import { useContracts } from './hooks/useContracts';
 
 // Componente wrapper para el formulario de contrato que usa el mismo hook que ClientDetailView
@@ -156,6 +156,14 @@ const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, onBackToClients
       }}
       onDeleteReceivable={async (id) => {
         const result = await removeInvoice(id);
+        if (result.success) {
+          await refreshInvoices();
+          await refreshContracts(); // Refresh contracts to update KPI cards
+        }
+        return result;
+      }}
+      onRevertPayment={async (id) => {
+        const result = await revertPayment(id);
         if (result.success) {
           await refreshInvoices();
           await refreshContracts(); // Refresh contracts to update KPI cards

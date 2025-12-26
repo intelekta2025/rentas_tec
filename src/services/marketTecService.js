@@ -134,9 +134,46 @@ export const marketTecService = {
             query = query.eq('unit_id', unitId);
         }
 
-        const { data, error } = await query;
+        const { data: uploads, error } = await query;
         if (error) throw error;
-        return data;
+
+        if (!uploads || uploads.length === 0) return [];
+
+        // Obtener estadísticas de procesados/pendientes desde staging
+        const uploadIds = uploads.map(u => u.id);
+        const { data: stagingStats, error: statsError } = await supabase
+            .from('payment_staging')
+            .select('upload_id, processing_status')
+            .in('upload_id', uploadIds);
+
+        if (statsError) {
+            console.error('Error fetching staging stats:', statsError);
+            // Retornar uploads sin stats si falla esto, para no romper la UI
+            return uploads.map(u => ({ ...u, processed_records: 0, pending_records: 0 }));
+        }
+
+        // Agrupar estadísticas por upload_id
+        const statsMap = {};
+        stagingStats.forEach(item => {
+            if (!statsMap[item.upload_id]) {
+                statsMap[item.upload_id] = { processed: 0, pending: 0 };
+            }
+            if (item.processing_status === 'PENDIENTE') {
+                statsMap[item.upload_id].pending++;
+            } else {
+                statsMap[item.upload_id].processed++;
+            }
+        });
+
+        // Combinar datos
+        return uploads.map(u => {
+            const stats = statsMap[u.id] || { processed: 0, pending: 0 };
+            return {
+                ...u,
+                processed_records: stats.processed,
+                pending_records: stats.pending
+            };
+        });
     },
 
     // 5. Obtener datos de staging para revisión

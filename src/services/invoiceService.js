@@ -551,3 +551,51 @@ export const cancelReceivables = async (ids) => {
     return { success: false, error };
   }
 };
+
+/**
+ * Revierte el pago de un receivable:
+ * 1. Identifica los IDs de pago en payment_applications.
+ * 2. Elimina los registros en la tabla 'payments' (esto debería eliminar en cascada payment_applications).
+ * 3. Restablece el monto pagado a 0 y estado a 'Pending' en receivables.
+ * @param {number} receivableId - ID del receivable
+ * @returns {Promise<{success: boolean, error: object}>}
+ */
+export const revertPayment = async (receivableId) => {
+  try {
+    // 1. Obtener IDs de pago asociados
+    const { data: applications, error: fetchError } = await supabase
+      .from('payment_applications')
+      .select('payment_id')
+      .eq('receivable_id', receivableId);
+
+    if (fetchError) throw fetchError;
+
+    if (applications && applications.length > 0) {
+      const paymentIds = applications.map(app => app.payment_id);
+
+      // 2. Eliminar desde la tabla payments (Cascade debería borrar applications)
+      const { error: deleteError } = await supabase
+        .from('payments')
+        .delete()
+        .in('id', paymentIds);
+
+      if (deleteError) throw deleteError;
+    }
+
+    // 3. Actualizar receivable
+    const { error: updateError } = await supabase
+      .from('receivables')
+      .update({
+        amount_paid: 0,
+        status: 'Pending'
+      })
+      .eq('id', receivableId);
+
+    if (updateError) throw updateError;
+
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('Error al revertir pago:', error);
+    return { success: false, error };
+  }
+};

@@ -9,7 +9,7 @@ import {
   Plus, Send, ChevronRight, FileCheck, Ban, Edit, Zap, Trash2,
   Key, UploadCloud, Loader, Play, Filter, Shield, Eye, User, Phone, Lightbulb,
   ChevronUp, ChevronDown, Upload, AlertCircle, X, Loader2, Bot, ArrowRight,
-  LayoutGrid, List, RefreshCw, ChevronLeft, Edit2, Save, UserCheck, UserX
+  LayoutGrid, List, RefreshCw, ChevronLeft, Edit2, Save, UserCheck, UserX, RotateCcw
 } from 'lucide-react';
 import { StatusBadge, OverdueBadge, KPICard, RevenueChart, Modal } from '../ui/Shared';
 import { UNITS, mockStaff } from '../../data/constants';
@@ -189,7 +189,7 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
   );
 };
 
-export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setContractModalOpen, portalUsers = [], portalUsersLoading = false, contracts = [], contractsLoading = false, onFinalizeContract, onEditContract, onEditClient, onGenerateCXC, onUpdateReceivable, onDeleteReceivable, onAddPayment, onAddManualReceivable, receivables = [], receivablesLoading = false }) => {
+export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setContractModalOpen, portalUsers = [], portalUsersLoading = false, contracts = [], contractsLoading = false, onFinalizeContract, onEditContract, onEditClient, onGenerateCXC, onUpdateReceivable, onDeleteReceivable, onAddPayment, onAddManualReceivable, onRevertPayment, receivables = [], receivablesLoading = false }) => {
   const [isGenerateModalOpen, setGenerateModalOpen] = useState(false);
   const [contractToGenerate, setContractToGenerate] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -208,6 +208,8 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
   const [isAddManualReceivableModalOpen, setAddManualReceivableModalOpen] = useState(false);
   const [contractToTerminate, setContractToTerminate] = useState(null);
   const [receivablesToCancel, setReceivablesToCancel] = useState([]);
+  const [isRevertPaymentModalOpen, setRevertPaymentModalOpen] = useState(false);
+  const [receivableToRevert, setReceivableToRevert] = useState(null);
   const [manualReceivableForm, setManualReceivableForm] = useState({
     type: 'Rent',
     periodMonth: new Date().getMonth() + 1,
@@ -946,6 +948,19 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                         >
                           <DollarSign size={14} />
                         </button>
+                        {(item.amount_paid > 0 || item.status === 'Paid' || item.status === 'Pagado') && (
+                          <button
+                            className="text-orange-600 hover:text-orange-900 p-1"
+                            title="Revertir Pago"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setReceivableToRevert(item);
+                              setRevertPaymentModalOpen(true);
+                            }}
+                          >
+                            <RotateCcw size={14} />
+                          </button>
+                        )}
                         <button
                           className="text-gray-400 hover:text-gray-600 p-1"
                           title="Editar Monto"
@@ -1644,6 +1659,94 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
             )}
           </div>
         </Modal>
+
+        {/* Modal para revertir pago */}
+        <Modal
+          isOpen={isRevertPaymentModalOpen}
+          onClose={() => !isGenerating && setRevertPaymentModalOpen(false)}
+          title="Revertir Pago"
+        >
+          <div className="space-y-4">
+            <div className="bg-orange-50 border-l-4 border-orange-400 p-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <AlertTriangle className="h-5 w-5 text-orange-400" aria-hidden="true" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-orange-700 font-medium">
+                    ¿Estás seguro de que deseas revertir el pago de este movimiento?
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {receivableToRevert && (
+              <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-xs text-gray-500 font-bold uppercase">Concepto</span>
+                    <p className="text-sm font-medium text-gray-900">{receivableToRevert.concept}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-gray-500 font-bold uppercase">Fecha de Pago</span>
+                    <p className="text-sm font-medium text-gray-900">{receivableToRevert.paymentDates || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-gray-500 font-bold uppercase">Monto Pagado</span>
+                    <p className="text-sm font-bold text-green-600">${parseFloat(receivableToRevert.amount_paid || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-gray-500 font-bold uppercase">Referencia</span>
+                    <p className="text-sm font-medium text-gray-900">{receivableToRevert.paymentReferences || '-'}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <p className="text-sm text-gray-600">
+              Esta acción restablecerá el estado a <span className="font-bold text-blue-600">Pendiente</span> y el monto pagado a <span className="font-bold text-red-600">$0.00</span>.
+            </p>
+
+            <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setRevertPaymentModalOpen(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isGenerating}
+                onClick={async () => {
+                  setIsGenerating(true);
+                  try {
+                    const result = await onRevertPayment(receivableToRevert.id);
+                    if (result.success) {
+                      setRevertPaymentModalOpen(false);
+                      setReceivableToRevert(null);
+                    } else {
+                      alert('Error al revertir pago: ' + (result.error?.message || 'Error desconocido'));
+                    }
+                  } catch (err) {
+                    console.error('Error reverting payment:', err);
+                    alert('Error inesperado: ' + err.message);
+                  } finally {
+                    setIsGenerating(false);
+                  }
+                }}
+                className="px-4 py-2 bg-orange-600 text-white rounded-md text-sm font-bold hover:bg-orange-700 disabled:opacity-50 shadow-sm flex items-center"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader size={16} className="animate-spin mr-2" />
+                    Procesando...
+                  </>
+                ) : 'Confirmar Reversión'}
+              </button>
+            </div>
+          </div>
+        </Modal>
       </div>
     </div>
   );
@@ -1869,6 +1972,8 @@ export const MarketTecView = ({ user, unitName }) => {
                 <th className="px-6 py-4 font-semibold">Archivo</th>
                 <th className="px-6 py-4 font-semibold text-center">Registros</th>
                 <th className="px-6 py-4 font-semibold text-right">Total</th>
+                <th className="px-6 py-4 font-semibold text-center">Procesados</th>
+                <th className="px-6 py-4 font-semibold text-center">Pendientes</th>
                 <th className="px-6 py-4 font-semibold text-center">Fecha</th>
                 <th className="px-6 py-4 font-semibold text-center">Estado</th>
                 <th className="px-6 py-4 text-right">Acción</th>
@@ -1881,6 +1986,20 @@ export const MarketTecView = ({ user, unitName }) => {
                   <td className="px-6 py-4 font-medium text-slate-800">{row.filename}</td>
                   <td className="px-6 py-4 text-center">{row.total_records}</td>
                   <td className="px-6 py-4 text-right font-mono">${(row.total_amount || 0).toLocaleString()}</td>
+                  <td className="px-6 py-4 text-center">
+                    <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full font-bold border border-emerald-100">
+                      {row.processed_records || 0}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    {(row.pending_records || 0) > 0 ? (
+                      <span className="text-xs bg-amber-50 text-amber-700 px-2 py-1 rounded-full font-bold border border-amber-100">
+                        {row.pending_records}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 font-medium text-xs">0</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-center text-slate-500">
                     {new Date(row.upload_date).toLocaleDateString()}
                   </td>
