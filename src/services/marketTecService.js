@@ -194,10 +194,38 @@ export const marketTecService = {
     // 6. Disparar conciliación en n8n
     triggerReconciliation: async (uploadId, rowIds = []) => {
         try {
+            // Si no se proporcionan rowIds específicos, consultar solo registros PENDIENTES
+            let recordIds = rowIds;
+
+            if (!rowIds || rowIds.length === 0) {
+                // Consultar registros con status PENDIENTE
+                const { data: pendingRecords, error: queryError } = await supabase
+                    .from('payment_staging')
+                    .select('id')
+                    .eq('upload_id', uploadId)
+                    .eq('processing_status', 'PENDIENTE');
+
+                if (queryError) {
+                    console.error('Error querying pending records:', queryError);
+                    throw queryError;
+                }
+
+                // Si no hay registros pendientes, retornar
+                if (!pendingRecords || pendingRecords.length === 0) {
+                    return {
+                        success: false,
+                        error: 'No hay registros pendientes para procesar. Todos los registros ya han sido procesados.'
+                    };
+                }
+
+                // Extraer IDs de registros pendientes
+                recordIds = pendingRecords.map(r => r.id);
+            }
+
             let webhookUrl = `https://n8n-t.intelekta.ai/webhook-test/8a737d17-e9cf-4eaa-aae7-8dba9fc61864?upload_id=${uploadId}`;
 
-            if (rowIds && rowIds.length > 0) {
-                webhookUrl += `&record_ids=${rowIds.join(',')}`;
+            if (recordIds && recordIds.length > 0) {
+                webhookUrl += `&record_ids=${recordIds.join(',')}`;
             }
 
             // Enviar ID de carga vía GET para que n8n procese
@@ -211,7 +239,7 @@ export const marketTecService = {
             }
 
             const result = await response.json();
-            return { success: true, data: result };
+            return { success: true, data: result, recordCount: recordIds.length };
         } catch (error) {
             console.error('Error triggering reconciliation:', error);
             // Retornamos success false para manejarlo en la UI

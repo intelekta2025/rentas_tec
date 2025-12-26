@@ -1909,14 +1909,16 @@ export const MarketTecView = ({ user, unitName }) => {
     const handleTriggerReconciliation = async () => {
       setIsReconciling(true);
       try {
-        const rowIds = stagingData.map(r => r.id);
-        const { success, error, data } = await marketTecService.triggerReconciliation(selectedUploadId, rowIds);
+        // No enviamos IDs específicos para que el servicio filtre automáticamente los PENDIENTES
+        const { success, error, data, recordCount } = await marketTecService.triggerReconciliation(selectedUploadId);
 
         if (success) {
-          alert('¡Conciliación IA iniciada correctamente!');
+          alert(`¡Conciliación IA iniciada correctamente! Se procesarán ${recordCount} registros pendientes.`);
           console.log('n8n response:', data);
+          // Recargar datos para ver cambios de estado si los hay
+          await loadStagingForReview(selectedUploadId);
         } else {
-          alert(`Error al iniciar conciliación: ${error}`);
+          alert(`Mensaje: ${error}`);
         }
       } catch (err) {
         alert('Error inesperado al contactar n8n.');
