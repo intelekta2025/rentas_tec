@@ -82,7 +82,7 @@ export const getClients = async (unitId = null) => {
   try {
     let query = supabase
       .from('clients')
-      .select('*, receivables(amount, balance, status, due_date)')
+      .select('*, receivables(amount, balance, status, due_date, contract_id), contracts(id, status)')
       .order('business_name', { ascending: true }) // Usar business_name en lugar de name
 
     // Filtrar por unitId si se proporciona
@@ -98,8 +98,14 @@ export const getClients = async (unitId = null) => {
 
     // Mapear los datos al formato del frontend y calcular totales
     const mappedData = (data || []).map(client => {
-      // Calcular totales desde receivables
-      const receivables = client.receivables || []
+      // Obtener IDs de contratos activos
+      const activeContractIds = (client.contracts || [])
+        .filter(contract => contract.status === 'Activo')
+        .map(contract => contract.id)
+
+      // Filtrar receivables solo de contratos activos
+      const receivables = (client.receivables || [])
+        .filter(r => r.contract_id && activeContractIds.includes(r.contract_id))
 
       const totalContract = receivables.reduce((sum, r) => {
         const amount = typeof r.amount === 'string' ? parseFloat(r.amount.replace(/[^0-9.-]+/g, '')) : r.amount
