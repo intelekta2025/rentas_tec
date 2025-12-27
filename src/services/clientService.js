@@ -148,107 +148,148 @@ export const getClients = async (unitId = null) => {
 
     return { data: mappedData, error: null }
   } catch (error) {
-    console.error('Error al obtener clientes:', error)
-    return { data: null, error }
+    console.error('Error fetching clients:', error)
+    return { data: [], error }
   }
 }
 
 /**
- * Obtiene un cliente por su ID
- * @param {number} id - ID del cliente
- * @returns {Promise<{data: object, error: object}>}
+ * Obtiene estadísticas de cobranza: clientes con deuda vencida
+ * @param {number|null} unitId 
  */
-export const getClientById = async (id) => {
+export const getCollectionStats = async (unitId = null) => {
   try {
-    const { data, error } = await supabase
+    // 1. Obtener clientes activos con sus contratos y receivables
+    let query = supabase
       .from('clients')
-      .select('*')
-      .eq('id', id)
-      .single()
+      .select(`
+        id, 
+        business_name, 
+        contact_email, 
+        contact_phone, 
+        status,
+        contracts(id, status),
+        receivables(id, contract_id, concept, due_date, amount, balance, status)
+      `)
+      .eq('status', 'Activo')
+      .order('business_name');
 
-    if (error) throw error
+    if (unitId) {
+      query = query.eq('unit_id', unitId);
+    }
 
-    // Mapear los datos al formato del frontend
-    const mappedData = mapClientFromDB(data)
+    const { data: clients, error } = await query;
+    if (error) throw error;
 
-    return { data: mappedData, error: null }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const clientsWithOverdue = clients.map(client => {
+      // Filtrar contratos activos
+      const activeContractIds = (client.contracts || [])
+        .filter(c => c.status === 'Activo')
+        .map(c => c.id);
+
+      if (activeContractIds.length === 0) return null;
+
+      // Filtrar receivables vencidos de contratos activos
+      // Regla: status != 'Paid' AND due_date < today
+      const overdueInvoices = (client.receivables || []).filter(inv => {
+        // Solo considerar invoices de contratos activos (o sin contrato si fuera el caso, pero el req dice contratos activos)
+        // Asumimos que si tiene contract_id debe ser uno activo. Si no tiene contract_id, ¿qué hacemos? 
+        // El prompt dice "considera solo clientes activos y contratos activos".
+        if (!inv.contract_id || !activeContractIds.includes(inv.contract_id)) {
+          return false;
+        }
+
+        // Checar estatus pagado
+        if (inv.status === 'Paid' || inv.status === 'Pagado') return false;
+
+        // Checar fecha vencimiento
+        if (!inv.due_date) return false;
+        const dueDate = new Date(inv.due_date);
+        // Ajuste zona horaria simple para evitar falsos positivos por horas
+        const dueDateSimple = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+
+        return dueDateSimple < today;
+      }).map(inv => {
+        // Calcular días vencidos
+        const dueDate = new Date(inv.due_date);
+        const diffTime = Math.abs(today - dueDate);
+        const daysOverdue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        const balance = typeof inv.balance === 'string' ? parseFloat(inv.balance.replace(/[^0-9.-]+/g, '')) : (inv.balance || 0);
+
+        return {
+          id: `inv_${inv.id}`, // Prefijo para evitar colisiones en frontend key
+          originalId: inv.id,
+          concept: inv.concept,
+          date: inv.due_date, // Usamos due_date como referencia principal o deberíamos usar issue_date? El mock usa 'date' visualmente.
+          daysOverdue: daysOverdue,
+          amount: balance, // El monto es el balance pendiente
+          status: daysOverdue > 30 ? 'Vencido Critico' : 'Vencido'
+        };
+      });
+
+      if (overdueInvoices.length === 0) return null;
+
+      return {
+        id: `c_${client.id}`,
+        originalId: client.id,
+        clientName: client.business_name,
+        contactEmail: client.contact_email,
+        contactPhone: client.contact_phone,
+        lastContact: 'N/A', // No tenemos este dato en BD aún
+        invoices: overdueInvoices
+      };
+    }).filter(c => c !== null);
+
+    return { data: clientsWithOverdue, error: null };
+
   } catch (error) {
-    console.error('Error al obtener cliente:', error)
-    return { data: null, error }
+    console.error('Error in getCollectionStats:', error);
+    return { data: [], error };
   }
-}
+};
 
-/**
- * Crea un nuevo cliente
- * @param {object} clientData - Datos del cliente (puede venir en formato frontend o BD)
- * @returns {Promise<{data: object, error: object}>}
- */
 export const createClient = async (clientData) => {
   try {
-    // Mapear los datos al formato de la BD
-    const mappedData = mapClientToDB(clientData)
-
-    // IMPORTANTE: Eliminamos id si existe para que la BD use su secuencia automática
-    delete mappedData.id
+    // Mapear datos al formato de BD
+    const dbData = mapClientToDB(clientData)
 
     const { data, error } = await supabase
       .from('clients')
-      .insert([mappedData])
+      .insert([dbData])
       .select()
-      .single()
 
     if (error) throw error
 
-    // Mapear la respuesta al formato del frontend
-    const mappedResponse = mapClientFromDB(data)
-
-    return { data: mappedResponse, error: null }
+    return { data: mapClientFromDB(data[0]), error: null }
   } catch (error) {
-    console.error('Error al crear cliente:', error)
+    console.error('Error creating client:', error)
     return { data: null, error }
   }
 }
 
-/**
- * Actualiza un cliente existente
- * @param {number} id - ID del cliente
- * @param {object} clientData - Datos a actualizar (puede venir en formato frontend o BD)
- * @returns {Promise<{data: object, error: object}>}
- */
 export const updateClient = async (id, clientData) => {
   try {
-    // Mapear los datos al formato de la BD
-    const mappedData = mapClientToDB(clientData)
+    const dbData = mapClientToDB(clientData)
 
-    // IMPORTANTE: Para la actualización, no enviamos id ni unit_id
-    delete mappedData.id
-    delete mappedData.unit_id
-
-    // 2. Ejecutar UPDATE
     const { data, error } = await supabase
       .from('clients')
-      .update(mappedData)
+      .update(dbData)
       .eq('id', id)
       .select()
-      .single()
 
     if (error) throw error
 
-    // Mapear la respuesta al formato del frontend
-    const mappedResponse = mapClientFromDB(data)
-
-    return { data: mappedResponse, error: null }
+    return { data: mapClientFromDB(data[0]), error: null }
   } catch (error) {
-    console.error('Error al actualizar cliente:', error)
+    console.error('Error updating client:', error)
     return { data: null, error }
   }
 }
 
-/**
- * Elimina un cliente
- * @param {number} id - ID del cliente
- * @returns {Promise<{error: object}>}
- */
 export const deleteClient = async (id) => {
   try {
     const { error } = await supabase
@@ -260,8 +301,7 @@ export const deleteClient = async (id) => {
 
     return { error: null }
   } catch (error) {
-    console.error('Error al eliminar cliente:', error)
+    console.error('Error deleting client:', error)
     return { error }
   }
 }
-

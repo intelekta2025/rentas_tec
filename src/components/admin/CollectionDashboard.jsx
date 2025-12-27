@@ -14,59 +14,34 @@ import {
     MessageCircle
 } from 'lucide-react';
 
-// --- Mock Data ---
-const initialData = [
-    {
-        id: 'c1',
-        clientName: 'AUMENTA DESARROLLO DE SOFTWARE S.A. DE C.V.',
-        contactEmail: 'finanzas@aumenta.com',
-        contactPhone: '444 123 4567',
-        lastContact: 'Hace 5 días',
-        invoices: [
-            { id: 'inv1', concept: 'Renta Diciembre 2025', date: '2025-12-10', daysOverdue: 16, amount: 25707.83, status: 'Vencido' },
-            { id: 'inv2', concept: 'Renta Noviembre 2025', date: '2025-11-10', daysOverdue: 46, amount: 25707.83, status: 'Vencido Critico' },
-        ]
-    },
-    {
-        id: 'c2',
-        clientName: 'ASTROCONFORT S.A. DE C.V.',
-        contactEmail: 'pagos@astroconfort.mx',
-        contactPhone: '444 987 6543',
-        lastContact: 'Nunca',
-        invoices: [
-            { id: 'inv3', concept: 'Mantenimiento Diciembre', date: '2025-12-05', daysOverdue: 21, amount: 2128.50, status: 'Vencido' },
-            { id: 'inv4', concept: 'Mantenimiento Noviembre', date: '2025-11-05', daysOverdue: 51, amount: 2128.50, status: 'Vencido Critico' },
-        ]
-    },
-    {
-        id: 'c3',
-        clientName: 'CARLOS F. AGUILERA',
-        contactEmail: 'carlos.aguilera@gmail.com',
-        contactPhone: '444 555 1234',
-        lastContact: 'Ayer',
-        invoices: [
-            { id: 'inv5', concept: 'Renta Local A-12', date: '2025-12-01', daysOverdue: 25, amount: 4134.20, status: 'Vencido' },
-        ]
-    },
-    {
-        id: 'c4',
-        clientName: 'LOGISTICA INTEGRAL DEL BAJIO',
-        contactEmail: 'admin@logistica.com',
-        contactPhone: '444 888 9999',
-        lastContact: 'Hace 10 días',
-        invoices: [
-            { id: 'inv6', concept: 'Bodega B-04', date: '2025-12-15', daysOverdue: 11, amount: 15600.00, status: 'Vencido' },
-            { id: 'inv7', concept: 'Bodega B-05', date: '2025-12-15', daysOverdue: 11, amount: 15600.00, status: 'Vencido' },
-            { id: 'inv8', concept: 'Servicios Agua', date: '2025-11-30', daysOverdue: 26, amount: 450.00, status: 'Vencido' },
-        ]
-    }
-];
+import { getCollectionStats } from '../../services/clientService';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function CollectionDashboard() {
-    const [clients, setClients] = useState(initialData);
-    const [expandedRows, setExpandedRows] = useState(new Set(['c1'])); // First one expanded by default
+    const { user } = useAuth();
+    const [clients, setClients] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [expandedRows, setExpandedRows] = useState(new Set());
     const [selectedClients, setSelectedClients] = useState(new Set());
     const [showModal, setShowModal] = useState(false);
+
+    React.useEffect(() => {
+        const fetchData = async () => {
+            if (!user) return;
+            setLoading(true);
+            const { data, error } = await getCollectionStats(user.unitId);
+            if (!error && data) {
+                setClients(data);
+                // Expand first row if data exists
+                if (data.length > 0) {
+                    setExpandedRows(new Set([data[0].id]));
+                }
+            }
+            setLoading(false);
+        };
+
+        fetchData();
+    }, [user]);
 
     // --- Helpers ---
     const toggleRow = (id) => {
@@ -267,7 +242,11 @@ export default function CollectionDashboard() {
                                                                                     <span className="flex items-center justify-center gap-1 text-red-600 text-xs">
                                                                                         <AlertCircle className="w-3 h-3" /> Crítico
                                                                                     </span>
-                                                                                ) : 'Pendiente'}
+                                                                                ) : (
+                                                                                    <span className="flex items-center justify-center gap-1 text-orange-600 text-xs font-medium">
+                                                                                        Vencido
+                                                                                    </span>
+                                                                                )}
                                                                             </td>
                                                                             <td className="py-3 text-right font-medium">${inv.amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
                                                                         </tr>
