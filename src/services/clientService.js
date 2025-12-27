@@ -167,6 +167,7 @@ export const getCollectionStats = async (unitId = null) => {
         business_name, 
         contact_email, 
         contact_phone, 
+        User_market_tec,
         status,
         contracts(id, status),
         receivables(id, contract_id, concept, due_date, amount, balance, status)
@@ -239,6 +240,7 @@ export const getCollectionStats = async (unitId = null) => {
         clientName: client.business_name,
         contactEmail: client.contact_email,
         contactPhone: client.contact_phone,
+        marketTecReceiver: client.User_market_tec,
         lastContact: 'N/A', // No tenemos este dato en BD aún
         invoices: overdueInvoices
       };

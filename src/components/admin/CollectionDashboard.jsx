@@ -190,6 +190,11 @@ export default function CollectionDashboard() {
                                                             <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
                                                                 {client.contactPhone}
                                                             </div>
+                                                            {client.marketTecReceiver && (
+                                                                <div className="text-xs text-slate-400 mt-0.5">
+                                                                    Market Tec: {client.marketTecReceiver}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </td>
@@ -253,6 +258,16 @@ export default function CollectionDashboard() {
                                                                     ))}
                                                                 </tbody>
                                                             </table>
+                                                            <div className="mt-3 flex justify-end gap-3">
+                                                                <a
+                                                                    href={`${window.location.protocol}//${window.location.host}${window.location.pathname}?clientId=${client.originalId}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="text-xs text-indigo-600 hover:underline font-medium flex items-center gap-1"
+                                                                >
+                                                                    Ir al estado de cuenta <ArrowUpRight className="w-3 h-3" />
+                                                                </a>
+                                                            </div>
                                                         </div>
                                                     </td>
                                                 </tr>

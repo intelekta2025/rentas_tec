@@ -248,6 +248,22 @@ export default function App() {
 
   // Pagos del cliente (solo si es cliente)
   // TODO: Restaurar cuando se implemente usePayments
+
+  // Deep linking logic
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const clientId = params.get('clientId');
+    if (clientId && filteredClients.length > 0 && user) {
+      const client = filteredClients.find(c => c.id === parseInt(clientId));
+      if (client) {
+        setSelectedClient(client);
+        setActiveTab('clientDetail');
+        // Optional: clear params or keep them? Keeping them allows refresh to stay on page, 
+        // but might interfere with navigation if not handled. 
+        // For simple "open in new window", keeping it is fine.
+      }
+    }
+  }, [filteredClients, user]);
   const clientPayments = [];
   const paymentsLoading = false;
 
