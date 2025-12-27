@@ -328,5 +328,19 @@ export const marketTecService = {
             .update({ status })
             .eq('id', uploadId);
         if (error) throw error;
+    },
+
+    // 9. Eliminar carga y sus registros asociados
+    deleteUpload: async (uploadId) => {
+        // Eliminar el registro maestro de la carga
+        // Los registros de payment_staging se eliminarán automáticamente por triggers de la BD
+        const { error: uploadError } = await supabase
+            .from('market_tec_uploads')
+            .delete()
+            .eq('id', uploadId);
+
+        if (uploadError) throw uploadError;
+
+        return true;
     }
 };

@@ -1817,6 +1817,7 @@ export const MarketTecView = ({ user, unitName }) => {
   const [stagingData, setStagingData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploadLoading, setUploadLoading] = useState(false);
+  const [uploadToDelete, setUploadToDelete] = useState(null);
 
   // Cargar historial al inicio
   useEffect(() => {
@@ -1928,6 +1929,25 @@ export const MarketTecView = ({ user, unitName }) => {
     setCurrentView(view);
   };
 
+  const handleDeleteUpload = async () => {
+    if (!uploadToDelete) return;
+
+    try {
+      setLoading(true);
+      await marketTecService.deleteUpload(uploadToDelete.id);
+
+      // Recargar lista y cerrar modal
+      await loadUploads();
+      setUploadToDelete(null);
+
+    } catch (error) {
+      console.error('Error deleting upload:', error);
+      alert('Error al eliminar la carga: ' + (error.message || error));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // --- COMPONENTES AUXILIARES ---
 
   const StatusBadge = ({ status }) => {
@@ -1992,12 +2012,29 @@ export const MarketTecView = ({ user, unitName }) => {
                   </td>
                   <td className="px-6 py-4 text-center"><StatusBadge status={row.status} /></td>
                   <td className="px-6 py-4 text-right">
-                    <button
-                      onClick={() => handleViewDetail(row.id, 'review')}
-                      className="text-blue-600 hover:text-blue-800 font-medium text-sm"
-                    >
-                      Ver Detalle
-                    </button>
+                    <div className="flex justify-end items-center gap-2">
+                      <div className="relative group/tooltip">
+                        <button
+                          onClick={() => handleViewDetail(row.id, 'review')}
+                          className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-md transition-colors"
+                          title="Ver Detalle"
+                        >
+                          <Eye size={18} />
+                        </button>
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover/tooltip:block px-2 py-1 bg-slate-800 text-white text-xs rounded whitespace-nowrap z-10">Ver Detalle</span>
+                      </div>
+
+                      <div className="relative group/tooltip">
+                        <button
+                          onClick={() => setUploadToDelete(row)}
+                          className="p-1.5 hover:bg-red-50 text-red-500 rounded-md transition-colors"
+                          title="Eliminar"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover/tooltip:block px-2 py-1 bg-slate-800 text-white text-xs rounded whitespace-nowrap z-10">Eliminar</span>
+                      </div>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -2313,6 +2350,43 @@ export const MarketTecView = ({ user, unitName }) => {
         onFileProcess={handleFileProcess}
         isLoading={uploadLoading}
       />
+
+      {/* Modal de Confirmación de Eliminación */}
+      <Modal
+        isOpen={!!uploadToDelete}
+        onClose={() => !loading && setUploadToDelete(null)}
+        title="Eliminar Registro de Importación"
+      >
+        <div className="space-y-4">
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+            <AlertTriangle className="text-red-500 shrink-0 mt-0.5" size={20} />
+            <div className="space-y-1">
+              <p className="font-medium text-red-800">¿Estás seguro de que deseas eliminar este registro?</p>
+              <p className="text-red-700 text-sm">
+                Esta acción eliminará permanentemente la carga <strong>{uploadToDelete?.filename}</strong> y todos los registros de pago asociados a ella. Esta acción no se puede deshacer.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              onClick={() => setUploadToDelete(null)}
+              className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
+              disabled={loading}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleDeleteUpload}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center gap-2"
+              disabled={loading}
+            >
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+              {loading ? 'Eliminando...' : 'Eliminar Definitivamente'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
