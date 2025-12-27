@@ -9,7 +9,7 @@ import {
   Plus, Send, ChevronRight, FileCheck, Ban, Edit, Zap, Trash2,
   Key, UploadCloud, Loader, Play, Filter, Shield, Eye, User, Phone, Lightbulb,
   ChevronUp, ChevronDown, Upload, AlertCircle, X, Loader2, Bot, ArrowRight,
-  LayoutGrid, List, RefreshCw, ChevronLeft, Edit2, Save, UserCheck, UserX, RotateCcw
+  LayoutGrid, List, RefreshCw, ChevronLeft, Edit2, Save, UserCheck, UserX, RotateCcw, MessageCircle
 } from 'lucide-react';
 import { StatusBadge, OverdueBadge, KPICard, RevenueChart, Modal } from '../ui/Shared';
 import { UNITS, mockStaff } from '../../data/constants';
@@ -2011,6 +2011,7 @@ export const MarketTecView = ({ user, unitName }) => {
   // 2. NUEVA VISTA: REVISIÓN PRE-N8N (Staging Data Real)
   const ReviewStagingView = () => {
     const [isReconciling, setIsReconciling] = useState(false);
+    const [showErrorModal, setShowErrorModal] = useState(false);
 
     const handleTriggerReconciliation = async () => {
       setIsReconciling(true);
@@ -2019,7 +2020,7 @@ export const MarketTecView = ({ user, unitName }) => {
         const { success, error, data, recordCount } = await marketTecService.triggerReconciliation(selectedUploadId);
 
         if (!success) {
-          alert(`Mensaje: ${error}`);
+          setShowErrorModal(true);
           setIsReconciling(false);
           return;
         }
@@ -2068,7 +2069,7 @@ export const MarketTecView = ({ user, unitName }) => {
         setTimeout(checkStatus, pollInterval);
 
       } catch (err) {
-        alert('Error inesperado al contactar n8n.');
+        setShowErrorModal(true);
         console.error(err);
         setIsReconciling(false);
       }
@@ -2215,6 +2216,63 @@ export const MarketTecView = ({ user, unitName }) => {
             </div>
           )}
         </div>
+        <Modal
+          isOpen={showErrorModal}
+          onClose={() => setShowErrorModal(false)}
+          title="Algo salió mal con el asistente"
+        >
+          <div className="space-y-4">
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+              <AlertTriangle className="text-red-500 shrink-0 mt-0.5" size={20} />
+              <p className="text-red-700 text-sm">
+                No pudimos conectar con el agente. Por favor, inténtalo de nuevo o contacta a soporte si el problema persiste.
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <h4 className="font-medium text-slate-700">Contacto de soporte:</h4>
+
+              <a
+                href="mailto:contact@intelekta.ai?subject=Soporte%20Market%20Tec%20-%20Error%20Asistente%20IA&body=Hola%2C%20necesito%20ayuda%20con%20un%20error%20al%20ejecutar%20el%20asistente%20de%20IA."
+                className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors group"
+              >
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                  <Mail className="text-blue-600" size={20} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-900">Correo Electrónico</p>
+                  <p className="text-sm text-slate-500">contact@intelekta.ai</p>
+                </div>
+                <ArrowRight className="ml-auto text-slate-400 group-hover:text-slate-600" size={16} />
+              </a>
+
+              <a
+                href="https://wa.me/524442908017"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors group"
+              >
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center group-hover:bg-green-200 transition-colors">
+                  <MessageCircle className="text-green-600" size={20} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-900">WhatsApp</p>
+                  <p className="text-sm text-slate-500">+52 444 290 8017</p>
+                </div>
+                <ArrowRight className="ml-auto text-slate-400 group-hover:text-slate-600" size={16} />
+              </a>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => setShowErrorModal(false)}
+                className="bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors text-sm font-medium"
+              >
+                Entendido
+              </button>
+            </div>
+          </div>
+        </Modal>
       </div>
     );
   };
