@@ -31,7 +31,7 @@ export const DashboardView = ({ adminStats, user, unitName, setActiveTab }) => {
           icon={AlertTriangle}
           color="#EF4444"
           subtext={`${adminStats.overdueCount || 0} cuentas requieren atención`}
-          onClick={() => setActiveTab('overdue')}
+          onClick={() => setActiveTab('collection')}
         />
         <KPICard
           title="Proyección Ingresos"
