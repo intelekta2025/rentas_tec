@@ -270,7 +270,10 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
       // Filter by Service Type
       if (serviceTypeFilter === 'Todos') return true;
       if (serviceTypeFilter === 'Rent') return item.type === 'Rent' || item.type === 'Renta';
-      if (serviceTypeFilter === 'Service') return item.type === 'Service' || item.type === 'Luz/Servicios' || item.type === 'Servicio';
+      if (serviceTypeFilter === 'Service') {
+        // Cualquier tipo que NO sea Rent/Renta se considera Service
+        return item.type !== 'Rent' && item.type !== 'Renta';
+      }
 
       return true;
     });
