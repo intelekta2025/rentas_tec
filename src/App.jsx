@@ -548,7 +548,6 @@ export default function App() {
                 <div className="pt-4 pb-2 px-6 text-xs uppercase text-blue-400 font-semibold tracking-wider">Operaciones</div>
                 <SidebarItem icon={Users} label="Clientes" active={activeTab === 'clients' || activeTab === 'clientDetail'} onClick={() => setActiveTab('clients')} />
                 <SidebarItem icon={FileSpreadsheet} label="Market Tec" active={activeTab === 'marketTec'} onClick={() => setActiveTab('marketTec')} />
-                <SidebarItem icon={AlertTriangle} label="Cuentas Vencidas" active={activeTab === 'overdue'} onClick={() => setActiveTab('overdue')} />
                 <SidebarItem icon={Mail} label="Recordatorios" active={activeTab === 'reminders'} onClick={() => setActiveTab('reminders')} />
                 <SidebarItem icon={DollarSign} label="Cobranza" active={activeTab === 'collection'} onClick={() => setActiveTab('collection')} />
 
@@ -661,16 +660,7 @@ export default function App() {
                   }}
                 />
               )}
-              {activeTab === 'overdue' && (
-                <OverdueView
-                  filteredCXC={overdueInvoicesList.length > 0 ? overdueInvoicesList : filteredCXC.filter(i => i.status === 'Overdue')}
-                  selectedOverdue={selectedOverdue}
-                  toggleOverdueSelection={toggleOverdueSelection}
-                  user={user}
-                  loading={overdueLoading || invoicesLoading}
-                  unitName={businessUnitName || user.unitName}
-                />
-              )}
+
               {activeTab === 'marketTec' && (
                 <MarketTecView
                   user={user}
