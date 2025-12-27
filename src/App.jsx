@@ -249,18 +249,27 @@ export default function App() {
   // Pagos del cliente (solo si es cliente)
   // TODO: Restaurar cuando se implemente usePayments
 
-  // Deep linking logic
+  // Deep linking logic - only process once on mount
+  const deepLinkProcessed = useRef(false);
+
   useEffect(() => {
+    // Only process deep link once
+    if (deepLinkProcessed.current) return;
+
     const params = new URLSearchParams(window.location.search);
     const clientId = params.get('clientId');
+
     if (clientId && filteredClients.length > 0 && user) {
       const client = filteredClients.find(c => c.id === parseInt(clientId));
       if (client) {
         setSelectedClient(client);
         setActiveTab('clientDetail');
-        // Optional: clear params or keep them? Keeping them allows refresh to stay on page, 
-        // but might interfere with navigation if not handled. 
-        // For simple "open in new window", keeping it is fine.
+
+        // Clear the URL parameter to prevent unwanted redirects
+        window.history.replaceState({}, '', window.location.pathname);
+
+        // Mark as processed
+        deepLinkProcessed.current = true;
       }
     }
   }, [filteredClients, user]);
@@ -679,7 +688,15 @@ export default function App() {
                 />
               )}
               {activeTab === 'collection' && (
-                <CollectionDashboard />
+                <CollectionDashboard
+                  onClientClick={(clientId) => {
+                    const client = filteredClients.find(c => c.id === clientId);
+                    if (client) {
+                      setSelectedClient(client);
+                      setActiveTab('clientDetail');
+                    }
+                  }}
+                />
               )}
               {activeTab === 'settings' && (
                 <SettingsView

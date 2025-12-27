@@ -17,7 +17,7 @@ import {
 import { getCollectionStats } from '../../services/clientService';
 import { useAuth } from '../../hooks/useAuth';
 
-export default function CollectionDashboard() {
+export default function CollectionDashboard({ onClientClick }) {
     const { user } = useAuth();
     const [clients, setClients] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -259,14 +259,12 @@ export default function CollectionDashboard() {
                                                                 </tbody>
                                                             </table>
                                                             <div className="mt-3 flex justify-end gap-3">
-                                                                <a
-                                                                    href={`${window.location.protocol}//${window.location.host}${window.location.pathname}?clientId=${client.originalId}`}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="text-xs text-indigo-600 hover:underline font-medium flex items-center gap-1"
+                                                                <button
+                                                                    onClick={() => onClientClick && onClientClick(client.originalId)}
+                                                                    className="text-xs text-indigo-600 hover:underline font-medium flex items-center gap-1 cursor-pointer bg-transparent border-none p-0"
                                                                 >
                                                                     Ir al estado de cuenta <ArrowUpRight className="w-3 h-3" />
-                                                                </a>
+                                                                </button>
                                                             </div>
                                                         </div>
                                                     </td>

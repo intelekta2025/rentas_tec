@@ -2019,7 +2019,7 @@ export const MarketTecView = ({ user, unitName }) => {
         const { success, error, data, recordCount } = await marketTecService.triggerReconciliation(selectedUploadId);
 
         if (success) {
-          alert(`¡Conciliación IA iniciada correctamente! Se procesarán ${recordCount} registros pendientes.`);
+          alert(`Conciliación correcta. Se procesaron ${recordCount} registros.`);
           console.log('n8n response:', data);
           // Recargar datos para ver cambios de estado si los hay
           await loadStagingForReview(selectedUploadId);
@@ -2049,13 +2049,21 @@ export const MarketTecView = ({ user, unitName }) => {
               <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wide">Staging</span>
               <span className="text-slate-400 text-sm">Upload ID: #{selectedUploadId}</span>
             </div>
-            <h2 className="text-2xl font-bold text-slate-800">Revisión de Carga</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-bold text-slate-800">Revisión de Carga</h2>
+              {isReconciling && (
+                <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-xs font-bold animate-pulse flex items-center gap-2 border border-purple-200">
+                  <Loader2 size={12} className="animate-spin" /> Procesando con IA...
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="flex gap-3">
             <button
               onClick={() => setCurrentView('list')}
-              className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium border border-slate-200"
+              disabled={isReconciling}
+              className={`px-4 py-2 text-slate-600 rounded-lg font-medium border border-slate-200 ${isReconciling ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'hover:bg-slate-100'}`}
             >
               <ChevronLeft size={18} className="inline mr-1" /> Volver
             </button>
@@ -2065,7 +2073,7 @@ export const MarketTecView = ({ user, unitName }) => {
               className={`bg-slate-900 hover:bg-slate-800 text-white px-6 py-2 rounded-lg shadow-lg shadow-slate-200 flex items-center gap-2 font-medium transition-all transform hover:scale-105 ${isReconciling ? 'opacity-70 cursor-wait' : ''}`}
             >
               {isReconciling ? <Loader2 size={18} className="animate-spin" /> : <Bot size={18} className="text-purple-300" />}
-              {isReconciling ? 'Iniciando...' : 'Ejecutar Conciliación IA'}
+              {isReconciling ? 'Ejecutando...' : 'Ejecutar Conciliación IA'}
             </button>
           </div>
         </div>
