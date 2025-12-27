@@ -2209,9 +2209,73 @@ export const MarketTecView = ({ user, unitName }) => {
 };
 
 export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelection, user, unitName }) => {
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
   const overdueItems = filteredCXC.filter(i => i.status === 'Overdue');
   const totalOverdue = overdueItems.reduce((acc, curr) => acc + (curr.balanceDueRaw || 0), 0);
   const uniqueClientsCount = new Set(overdueItems.map(i => i.clientId)).size;
+
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedOverdueItems = React.useMemo(() => {
+    let sortableItems = [...overdueItems];
+    if (sortConfig.key !== null) {
+      sortableItems.sort((a, b) => {
+        let aValue = a[sortConfig.key];
+        let bValue = b[sortConfig.key];
+
+        // Manejo especial para dueDate
+        if (sortConfig.key === 'dueDate') {
+          aValue = new Date(aValue);
+          bValue = new Date(bValue);
+        }
+
+        if (aValue < bValue) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [overdueItems, sortConfig]);
+
+  const getSortIcon = (key) => {
+    if (sortConfig.key !== key) {
+      return <ChevronUp size={14} className="opacity-30" />;
+    }
+    return sortConfig.direction === 'asc'
+      ? <ChevronUp size={14} className="text-blue-600" />
+      : <ChevronDown size={14} className="text-blue-600" />;
+  };
+
+  const handleExportExcel = () => {
+    // Preparar datos para Excel
+    const excelData = overdueItems.map(item => ({
+      'Cliente': item.client || 'N/A',
+      'Concepto': item.concept || 'N/A',
+      'Fecha Límite': item.dueDate || 'N/A',
+      'Días Retraso': item.daysOverdue || 0,
+      'Saldo': item.balanceDueRaw || 0
+    }));
+
+    // Crear workbook y worksheet
+    const ws = XLSX.utils.json_to_sheet(excelData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Cuentas Vencidas');
+
+    // Descargar archivo
+    const fileName = `cuentas_vencidas_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -2226,7 +2290,9 @@ export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelecti
           <p className="text-sm text-gray-500">Unidad: {unitName || `Unidad ${user.unitId} ` || 'Sin unidad'}</p>
         </div>
         <div className="flex space-x-3">
-          <button className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg flex items-center shadow-sm text-sm font-medium">
+          <button
+            onClick={handleExportExcel}
+            className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg flex items-center shadow-sm text-sm font-medium">
             <Download size={16} className="mr-2" />
             Descargar Excel
           </button>
@@ -2303,9 +2369,33 @@ export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelecti
                     }}
                   />
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Concepto</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Límite</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <button
+                    onClick={() => handleSort('client')}
+                    className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
+                  >
+                    <span>Cliente</span>
+                    {getSortIcon('client')}
+                  </button>
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <button
+                    onClick={() => handleSort('concept')}
+                    className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
+                  >
+                    <span>Concepto</span>
+                    {getSortIcon('concept')}
+                  </button>
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <button
+                    onClick={() => handleSort('dueDate')}
+                    className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
+                  >
+                    <span>Fecha Límite</span>
+                    {getSortIcon('dueDate')}
+                  </button>
+                </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Días Retraso</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo</th>
                 <th scope="col" className="relative px-6 py-3">
@@ -2314,8 +2404,8 @@ export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelecti
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {overdueItems.length > 0 ? (
-                overdueItems.map((item) => (
+              {sortedOverdueItems.length > 0 ? (
+                sortedOverdueItems.map((item) => (
                   <tr key={item.id} className={`hover:bg-red-50 transition-colors ${selectedOverdue.includes(item.id) ? 'bg-blue-50' : ''}`}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <input
