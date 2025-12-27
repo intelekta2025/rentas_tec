@@ -259,7 +259,7 @@ export const marketTecService = {
                 recordIds = pendingRecords.map(r => r.id);
             }
 
-            let webhookUrl = `https://n8n-t.intelekta.ai/webhook-test/8a737d17-e9cf-4eaa-aae7-8dba9fc61864?upload_id=${uploadId}`;
+            let webhookUrl = `https://n8n-t.intelekta.ai/webhook-test/c0a61e42-37a7-40a9-ac8f-24899ee74dc4?upload_id=${uploadId}`;
 
             if (recordIds && recordIds.length > 0) {
                 webhookUrl += `&record_ids=${recordIds.join(',')}`;
@@ -284,7 +284,44 @@ export const marketTecService = {
         }
     },
 
-    // 7. Actualizar estado de la carga
+    // 7. Verificar estado de procesamiento
+    checkProcessingStatus: async (uploadId) => {
+        try {
+            const { data, error } = await supabase
+                .from('payment_staging')
+                .select('processing_status')
+                .eq('upload_id', uploadId);
+
+            if (error) throw error;
+
+            if (!data || data.length === 0) {
+                return { isComplete: true, pendingCount: 0, totalCount: 0 };
+            }
+
+            const totalCount = data.length;
+            const pendingCount = data.filter(r => r.processing_status === 'PENDIENTE').length;
+            const processingCount = data.filter(r => r.processing_status === 'PROCESANDO').length;
+            const processedCount = data.filter(r => r.processing_status === 'PROCESADO').length;
+            const errorCount = data.filter(r => r.processing_status === 'ERROR').length;
+
+            // Se considera completo cuando no hay registros PENDIENTES ni PROCESANDO
+            const isComplete = (pendingCount + processingCount) === 0;
+
+            return {
+                isComplete,
+                totalCount,
+                pendingCount,
+                processingCount,
+                processedCount,
+                errorCount
+            };
+        } catch (error) {
+            console.error('Error checking processing status:', error);
+            return { isComplete: true, error: error.message };
+        }
+    },
+
+    // 8. Actualizar estado de la carga
     updateUploadStatus: async (uploadId, status) => {
         const { error } = await supabase
             .from('market_tec_uploads')

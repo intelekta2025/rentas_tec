@@ -2018,18 +2018,58 @@ export const MarketTecView = ({ user, unitName }) => {
         // No enviamos IDs específicos para que el servicio filtre automáticamente los PENDIENTES
         const { success, error, data, recordCount } = await marketTecService.triggerReconciliation(selectedUploadId);
 
-        if (success) {
-          alert(`Conciliación correcta. Se procesaron ${recordCount} registros.`);
-          console.log('n8n response:', data);
-          // Recargar datos para ver cambios de estado si los hay
-          await loadStagingForReview(selectedUploadId);
-        } else {
+        if (!success) {
           alert(`Mensaje: ${error}`);
+          setIsReconciling(false);
+          return;
         }
+
+        console.log('n8n response:', data);
+        console.log(`Procesamiento iniciado para ${recordCount} registros. Verificando estado...`);
+
+        // Implementar polling para verificar el estado de procesamiento
+        const pollInterval = 3000; // 3 segundos
+        const maxPollingTime = 300000; // 5 minutos máximo
+        const startTime = Date.now();
+
+        const checkStatus = async () => {
+          try {
+            const status = await marketTecService.checkProcessingStatus(selectedUploadId);
+
+            console.log('Estado de procesamiento:', status);
+
+            if (status.isComplete) {
+              // Procesamiento completado
+              setIsReconciling(false);
+
+              // Mostrar mensaje de éxito
+              alert(`Conciliación correcta. Se procesaron ${status.processedCount} registros.${status.errorCount > 0 ? ` ${status.errorCount} registros con error.` : ''}`);
+
+              return; // Detener polling
+            }
+
+            // Verificar timeout
+            if (Date.now() - startTime > maxPollingTime) {
+              setIsReconciling(false);
+              alert('El procesamiento está tomando más tiempo del esperado. Por favor, verifica el estado manualmente.');
+              return;
+            }
+
+            // Continuar polling
+            setTimeout(checkStatus, pollInterval);
+          } catch (err) {
+            console.error('Error checking status:', err);
+            setIsReconciling(false);
+            alert('Error al verificar el estado del procesamiento.');
+          }
+        };
+
+        // Iniciar polling
+        setTimeout(checkStatus, pollInterval);
+
       } catch (err) {
         alert('Error inesperado al contactar n8n.');
         console.error(err);
-      } finally {
         setIsReconciling(false);
       }
     };
