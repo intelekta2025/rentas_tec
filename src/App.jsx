@@ -16,6 +16,7 @@ import {
   MarketTecView, OverdueView, RemindersView, SettingsView,
   ContractForm, ClientForm
 } from './components/admin/AdminViews';
+import CollectionDashboard from './components/admin/CollectionDashboard';
 
 // Importar hooks de Supabase
 import { useAuth } from './hooks/useAuth';
@@ -524,6 +525,7 @@ export default function App() {
                 <SidebarItem icon={FileSpreadsheet} label="Market Tec" active={activeTab === 'marketTec'} onClick={() => setActiveTab('marketTec')} />
                 <SidebarItem icon={AlertTriangle} label="Cuentas Vencidas" active={activeTab === 'overdue'} onClick={() => setActiveTab('overdue')} />
                 <SidebarItem icon={Mail} label="Recordatorios" active={activeTab === 'reminders'} onClick={() => setActiveTab('reminders')} />
+                <SidebarItem icon={DollarSign} label="Cobranza" active={activeTab === 'collection'} onClick={() => setActiveTab('collection')} />
 
                 <div className="pt-4 pb-2 px-6 text-xs uppercase text-blue-400 font-semibold tracking-wider">Administración</div>
                 <SidebarItem icon={Settings} label="Configuración" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
@@ -659,6 +661,9 @@ export default function App() {
                   loading={remindersLoading}
                   unitName={businessUnitName || user.unitName}
                 />
+              )}
+              {activeTab === 'collection' && (
+                <CollectionDashboard />
               )}
               {activeTab === 'settings' && (
                 <SettingsView
