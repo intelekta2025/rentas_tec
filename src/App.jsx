@@ -437,15 +437,33 @@ export default function App() {
         acc.nextMonthIncome += fullAmount;
       }
 
-      // 2. Comportamiento Mensual (Gráfica): Solo para el año actual
+      // 2. Comportamiento Mensual (Gráfica): Para 2025 y 2026
       if (!isCancelled) {
         // Usar principalmente el periodo, si no el dueDate
         const mYear = pYear || dYear;
         const mMonth = pMonth || dMonth;
 
-        if (mYear === currentYear && mMonth >= 1 && mMonth <= 12) {
-          acc.monthlyStats[mMonth - 1].collected += paid;
-          acc.monthlyStats[mMonth - 1].pending += balance;
+        // Incluir 2025 y 2026
+        if ((mYear === currentYear || mYear === currentYear + 1) && mMonth >= 1 && mMonth <= 12) {
+          const yearKey = mYear;
+          if (!acc.monthlyStatsByYear[yearKey]) {
+            acc.monthlyStatsByYear[yearKey] = [
+              { month: 'Ene', collected: 0, pending: 0, year: yearKey },
+              { month: 'Feb', collected: 0, pending: 0, year: yearKey },
+              { month: 'Mar', collected: 0, pending: 0, year: yearKey },
+              { month: 'Abr', collected: 0, pending: 0, year: yearKey },
+              { month: 'May', collected: 0, pending: 0, year: yearKey },
+              { month: 'Jun', collected: 0, pending: 0, year: yearKey },
+              { month: 'Jul', collected: 0, pending: 0, year: yearKey },
+              { month: 'Ago', collected: 0, pending: 0, year: yearKey },
+              { month: 'Sep', collected: 0, pending: 0, year: yearKey },
+              { month: 'Oct', collected: 0, pending: 0, year: yearKey },
+              { month: 'Nov', collected: 0, pending: 0, year: yearKey },
+              { month: 'Dic', collected: 0, pending: 0, year: yearKey },
+            ];
+          }
+          acc.monthlyStatsByYear[yearKey][mMonth - 1].collected += paid;
+          acc.monthlyStatsByYear[yearKey][mMonth - 1].pending += balance;
         }
       }
 
@@ -455,25 +473,19 @@ export default function App() {
       overdueAmount: 0,
       overdueCount: 0,
       nextMonthIncome: 0,
-      monthlyStats: [
-        { month: 'Ene', collected: 0, pending: 0 },
-        { month: 'Feb', collected: 0, pending: 0 },
-        { month: 'Mar', collected: 0, pending: 0 },
-        { month: 'Abr', collected: 0, pending: 0 },
-        { month: 'May', collected: 0, pending: 0 },
-        { month: 'Jun', collected: 0, pending: 0 },
-        { month: 'Jul', collected: 0, pending: 0 },
-        { month: 'Ago', collected: 0, pending: 0 },
-        { month: 'Sep', collected: 0, pending: 0 },
-        { month: 'Oct', collected: 0, pending: 0 },
-        { month: 'Nov', collected: 0, pending: 0 },
-        { month: 'Dic', collected: 0, pending: 0 },
-      ]
+      monthlyStatsByYear: {}
     });
+
+    // Flatten monthly stats into array with year property
+    const monthlyStats = Object.values(stats.monthlyStatsByYear).flat();
 
     return {
       totalClients: filteredClients.filter(c => (c.status || '').toLowerCase() === 'activo').length,
-      ...stats
+      totalCXC: stats.totalCXC,
+      overdueAmount: stats.overdueAmount,
+      overdueCount: stats.overdueCount,
+      nextMonthIncome: stats.nextMonthIncome,
+      monthlyStats
     };
   }, [user, filteredClients, filteredCXC]);
 

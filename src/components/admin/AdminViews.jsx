@@ -18,6 +18,29 @@ import { marketTecService } from '../../services/marketTecService';
 
 export const DashboardView = ({ adminStats, user, unitName, setActiveTab }) => {
   const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+
+  // Extraer años disponibles de los datos mensuales
+  const availableYears = React.useMemo(() => {
+    const years = new Set();
+    (adminStats.monthlyStats || []).forEach(stat => {
+      if (stat.year) years.add(stat.year);
+    });
+    // Si no hay años en los datos, usar el año actual y el próximo
+    if (years.size === 0) {
+      years.add(currentYear);
+      years.add(currentYear + 1);
+    }
+    return Array.from(years).sort((a, b) => b - a); // Orden descendente
+  }, [adminStats.monthlyStats, currentYear]);
+
+  // Filtrar datos por año seleccionado
+  const filteredMonthlyStats = React.useMemo(() => {
+    const stats = adminStats.monthlyStats || [];
+    // Si los datos tienen propiedad year, filtrar
+    const filtered = stats.filter(s => !s.year || s.year === selectedYear);
+    return filtered.length > 0 ? filtered : stats;
+  }, [adminStats.monthlyStats, selectedYear]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -44,7 +67,12 @@ export const DashboardView = ({ adminStats, user, unitName, setActiveTab }) => {
 
       {/* Revenue Chart */}
       <div className="overflow-x-auto">
-        <RevenueChart data={adminStats.monthlyStats || []} year={currentYear} />
+        <RevenueChart
+          data={filteredMonthlyStats}
+          year={selectedYear}
+          availableYears={availableYears}
+          onYearChange={setSelectedYear}
+        />
       </div>
     </div>
   );

@@ -143,7 +143,7 @@ export const Modal = ({ isOpen, onClose, title, children, size = "md" }) => {
   );
 };
 
-export const RevenueChart = ({ data, year = new Date().getFullYear(), title = "Comportamiento de Cobranza" }) => {
+export const RevenueChart = ({ data, year = new Date().getFullYear(), title = "Comportamiento de Cobranza", availableYears = [], onYearChange }) => {
   const allValues = data.flatMap(d => [d.collected, d.pending]);
   const rawMax = Math.max(...allValues, 100);
   const rawMin = Math.min(...allValues, 0);
@@ -191,7 +191,26 @@ export const RevenueChart = ({ data, year = new Date().getFullYear(), title = "C
           <h3 className="text-lg font-bold text-gray-800">{title} {year}</h3>
           <p className="text-xs text-gray-500">Comparativo Mensual: Cobrado vs. Pendiente</p>
         </div>
-        <div className="flex space-x-4">
+        <div className="flex items-center space-x-4">
+          {/* Year Selector */}
+          {availableYears.length > 1 && onYearChange && (
+            <div className="relative">
+              <select
+                value={year}
+                onChange={(e) => onYearChange(parseInt(e.target.value))}
+                className="appearance-none bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block px-3 py-1.5 pr-8 font-medium"
+              >
+                {availableYears.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+          )}
           <div className="flex items-center">
             <div className="w-3 h-3 bg-green-500 rounded-sm mr-2"></div>
             <span className="text-xs text-gray-600">Cobrado</span>
@@ -203,16 +222,16 @@ export const RevenueChart = ({ data, year = new Date().getFullYear(), title = "C
         </div>
       </div>
 
-      <div className="relative h-72 flex">
+      <div className="relative h-48 flex">
         {/* Y-Axis Labels */}
-        <div className="hidden sm:flex flex-col justify-between h-64 pr-4 pb-2 text-[10px] text-gray-400 font-medium text-right w-16 select-none">
+        <div className="hidden sm:flex flex-col justify-between h-44 pr-4 pb-2 text-[10px] text-gray-400 font-medium text-right w-14 select-none">
           {steps.map((s, i) => (
             <span key={i}>${Math.abs(s) >= 1000 ? `${(s / 1000).toFixed(1)}k` : s.toFixed(0)}</span>
           ))}
         </div>
 
         {/* Chart Container */}
-        <div className="flex-1 relative h-64 pb-2 border-b border-gray-100 overflow-x-auto">
+        <div className="flex-1 relative h-44 pb-2 border-b border-gray-100">
           {/* Grid Lines */}
           <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-2">
             {steps.map((_, i) => (
