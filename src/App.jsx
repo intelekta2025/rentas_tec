@@ -373,14 +373,44 @@ export default function App() {
       // Ignorar cancelados para balances
       const isCancelled = ['cancelled', 'cancelado'].includes((curr.status || '').toLowerCase());
 
-      const balance = curr.balanceDueRaw || 0;
-      const fullAmount = curr.amountRaw || 0;
-      const paid = curr.paidAmountRaw || 0;
+      const balance = curr.balance || curr.balanceDueRaw || curr.balance_due || 0;
+      const fullAmount = curr.amountRaw || curr.amount || 0;
+      const paid = curr.paidAmountRaw || curr.amount_paid || 0;
+
+      // Debug: log all receivables to see what we're working with
+      if (!isCancelled) {
+        // console.log('Processing receivable:', {
+        //   id: curr.id,
+        //   status: curr.status,
+        //   dueDate: curr.dueDate,
+        //   balance,
+        //   balanceDueRaw: curr.balanceDueRaw,
+        //   balanceField: curr.balance,
+        //   balance_due: curr.balance_due
+        // });
+      }
 
       if (!isCancelled) {
         acc.totalCXC += balance;
 
-        if (curr.status === 'Overdue' || (curr.status || '').toLowerCase() === 'vencido') {
+        // Para montos vencidos: sumar receivables con status Overdue
+        const statusLower = (curr.status || '').toLowerCase();
+        const isOverdueStatus = statusLower === 'overdue' || statusLower === 'vencido';
+
+        // Temporary debug logging for overdue items
+        // if (balance > 0) {
+        //   console.log('Checking receivable:', {
+        //     id: curr.id,
+        //     status: curr.status,
+        //     statusLower,
+        //     isOverdueStatus,
+        //     balance,
+        //     willAdd: isOverdueStatus && balance > 0
+        //   });
+        // }
+
+        if (isOverdueStatus && balance > 0) {
+          // console.log('✓ ADDING to overdueAmount:', balance);
           acc.overdueAmount += balance;
           acc.overdueCount++;
         }
