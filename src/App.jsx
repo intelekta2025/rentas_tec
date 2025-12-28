@@ -17,6 +17,8 @@ import {
   ContractForm, ClientForm
 } from './components/admin/AdminViews';
 import CollectionDashboard from './components/admin/CollectionDashboard';
+import PendingReceivablesDashboard from './components/admin/PendingReceivablesDashboard';
+import NextMonthReceivablesDashboard from './components/admin/NextMonthReceivablesDashboard';
 import EmailTemplateConfig from './components/admin/EmailTemplateConfig';
 
 // Importar hooks de Supabase
@@ -718,6 +720,30 @@ export default function App() {
                       setActiveTab('clientDetail');
                     }
                   }}
+                />
+              )}
+              {activeTab === 'pendingReceivables' && (
+                <PendingReceivablesDashboard
+                  onClientClick={(clientId) => {
+                    const client = filteredClients.find(c => c.id === clientId);
+                    if (client) {
+                      setSelectedClient(client);
+                      setActiveTab('clientDetail');
+                    }
+                  }}
+                  onBack={() => setActiveTab('dashboard')}
+                />
+              )}
+              {activeTab === 'nextMonthReceivables' && (
+                <NextMonthReceivablesDashboard
+                  onClientClick={(clientId) => {
+                    const client = filteredClients.find(c => c.id === clientId);
+                    if (client) {
+                      setSelectedClient(client);
+                      setActiveTab('clientDetail');
+                    }
+                  }}
+                  onBack={() => setActiveTab('dashboard')}
                 />
               )}
               {activeTab === 'templates' && (

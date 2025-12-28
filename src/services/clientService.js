@@ -259,6 +259,211 @@ export const getCollectionStats = async (unitId = null) => {
   }
 };
 
+/**
+ * Obtiene estadísticas de receivables pendientes (Por Cobrar)
+ * Similar a getCollectionStats pero incluye TODOS los receivables no pagados
+ * @param {number|null} unitId 
+ */
+export const getPendingReceivablesStats = async (unitId = null) => {
+  try {
+    let query = supabase
+      .from('clients')
+      .select(`
+        id, 
+        business_name, 
+        contact_name,
+        contact_email, 
+        contact_phone, 
+        User_market_tec,
+        status,
+        contracts(id, status),
+        receivables(id, contract_id, concept, due_date, amount, balance, status, type)
+      `)
+      .eq('status', 'Activo')
+      .order('business_name');
+
+    if (unitId) {
+      query = query.eq('unit_id', unitId);
+    }
+
+    const { data: clients, error } = await query;
+    if (error) throw error;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const clientsWithPending = clients.map(client => {
+      const activeContractIds = (client.contracts || [])
+        .filter(c => c.status === 'Activo')
+        .map(c => c.id);
+
+      if (activeContractIds.length === 0) return null;
+
+      const pendingInvoices = (client.receivables || []).filter(inv => {
+        if (!inv.contract_id || !activeContractIds.includes(inv.contract_id)) {
+          return false;
+        }
+        const statusLower = (inv.status || '').toLowerCase();
+        if (statusLower === 'paid' || statusLower === 'pagado' || statusLower === 'cancelled' || statusLower === 'cancelado') return false;
+        const balance = typeof inv.balance === 'string' ? parseFloat(inv.balance.replace(/[^0-9.-]+/g, '')) : (inv.balance || 0);
+        return balance > 0;
+      }).map(inv => {
+        const dueDate = inv.due_date ? new Date(inv.due_date) : null;
+        let daysOverdue = 0;
+        let isOverdue = false;
+
+        if (dueDate) {
+          const dueDateSimple = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+          const diffTime = today - dueDateSimple;
+          daysOverdue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          isOverdue = daysOverdue > 0;
+        }
+
+        const balance = typeof inv.balance === 'string' ? parseFloat(inv.balance.replace(/[^0-9.-]+/g, '')) : (inv.balance || 0);
+
+        return {
+          id: `inv_${inv.id}`,
+          originalId: inv.id,
+          concept: inv.concept,
+          date: inv.due_date,
+          dueDate: inv.due_date,
+          daysOverdue: isOverdue ? daysOverdue : 0,
+          isOverdue: isOverdue,
+          amount: balance,
+          status: isOverdue ? (daysOverdue > 60 ? 'Crítico' : daysOverdue > 30 ? 'Vencido 31-60' : 'Vencido 1-30') : 'Al día',
+          type: inv.type || null
+        };
+      });
+
+      if (pendingInvoices.length === 0) return null;
+
+      return {
+        id: `c_${client.id}`,
+        originalId: client.id,
+        clientName: client.business_name,
+        contact: client.contact_name,
+        email: client.contact_email,
+        contactEmail: client.contact_email,
+        contactPhone: client.contact_phone,
+        marketTecReceiver: client.User_market_tec,
+        invoices: pendingInvoices
+      };
+    }).filter(c => c !== null);
+
+    return { data: clientsWithPending, error: null };
+
+  } catch (error) {
+    console.error('Error in getPendingReceivablesStats:', error);
+    return { data: [], error };
+  }
+};
+
+/**
+ * Obtiene receivables del próximo mes (Proyección de Ingresos)
+ * @param {number|null} unitId 
+ */
+export const getNextMonthReceivables = async (unitId = null) => {
+  try {
+    let query = supabase
+      .from('clients')
+      .select(`
+        id, 
+        business_name, 
+        contact_name,
+        contact_email, 
+        contact_phone, 
+        User_market_tec,
+        status,
+        contracts(id, status),
+        receivables(id, contract_id, concept, due_date, amount, balance, status, type, period_month, period_year)
+      `)
+      .eq('status', 'Activo')
+      .order('business_name');
+
+    if (unitId) {
+      query = query.eq('unit_id', unitId);
+    }
+
+    const { data: clients, error } = await query;
+    if (error) throw error;
+
+    const now = new Date();
+    let nextMonth = now.getMonth() + 2; // +1 for 0-indexed, +1 for next month
+    let nextYear = now.getFullYear();
+    if (nextMonth > 12) {
+      nextMonth = 1;
+      nextYear++;
+    }
+
+    const clientsWithNextMonth = clients.map(client => {
+      const activeContractIds = (client.contracts || [])
+        .filter(c => c.status === 'Activo')
+        .map(c => c.id);
+
+      if (activeContractIds.length === 0) return null;
+
+      // Filter receivables for next month
+      const nextMonthInvoices = (client.receivables || []).filter(inv => {
+        if (!inv.contract_id || !activeContractIds.includes(inv.contract_id)) {
+          return false;
+        }
+
+        // Check if cancelled or paid
+        const statusLower = (inv.status || '').toLowerCase();
+        if (statusLower === 'paid' || statusLower === 'pagado' || statusLower === 'cancelled' || statusLower === 'cancelado') return false;
+
+        // Check due date for next month
+        if (inv.due_date) {
+          const dueDate = new Date(inv.due_date);
+          const dueMonth = dueDate.getMonth() + 1;
+          const dueYear = dueDate.getFullYear();
+          if (dueMonth === nextMonth && dueYear === nextYear) return true;
+        }
+
+        // Check period for next month
+        if (inv.period_month && inv.period_year) {
+          if (inv.period_month === nextMonth && inv.period_year === nextYear) return true;
+        }
+
+        return false;
+      }).map(inv => {
+        const balance = typeof inv.balance === 'string' ? parseFloat(inv.balance.replace(/[^0-9.-]+/g, '')) : (inv.balance || 0);
+        const amount = typeof inv.amount === 'string' ? parseFloat(inv.amount.replace(/[^0-9.-]+/g, '')) : (inv.amount || 0);
+
+        return {
+          id: `inv_${inv.id}`,
+          originalId: inv.id,
+          concept: inv.concept,
+          dueDate: inv.due_date,
+          amount: amount,
+          balance: balance,
+          status: inv.status,
+          type: inv.type || null
+        };
+      });
+
+      if (nextMonthInvoices.length === 0) return null;
+
+      return {
+        id: `c_${client.id}`,
+        originalId: client.id,
+        clientName: client.business_name,
+        contact: client.contact_name,
+        email: client.contact_email,
+        contactEmail: client.contact_email,
+        contactPhone: client.contact_phone,
+        marketTecReceiver: client.User_market_tec,
+        invoices: nextMonthInvoices
+      };
+    }).filter(c => c !== null);
+
+    return { data: clientsWithNextMonth, error: null, nextMonth, nextYear };
+
+  } catch (error) {
+    console.error('Error in getNextMonthReceivables:', error);
+    return { data: [], error };
+  }
+};
 export const createClient = async (clientData) => {
   try {
     // Mapear datos al formato de BD

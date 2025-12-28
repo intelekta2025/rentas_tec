@@ -24,13 +24,13 @@ export const DashboardView = ({ adminStats, user, unitName, setActiveTab }) => {
       <h2 className="text-2xl font-bold text-gray-800">Panel General - {unitName || (user?.unitId ? `Unidad ${user.unitId}` : 'Sin unidad')}</h2>
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <KPICard title="Total Clientes" value={adminStats.totalClients} icon={Users} color="#003DA5" subtext="En esta unidad" />
-        <KPICard title="Por Cobrar" value={`$${adminStats.totalCXC.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} `} icon={CreditCard} color="#F59E0B" subtext="Facturación pendiente" />
+        <KPICard title="Por Cobrar" value={`$${adminStats.totalCXC.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} `} icon={CreditCard} color="#F59E0B" onClick={() => setActiveTab('pendingReceivables')} />
         <KPICard
           title="Monto Vencido"
           value={`$${(adminStats.overdueAmount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} `}
           icon={AlertTriangle}
           color="#EF4444"
-          subtext={`${adminStats.overdueCount || 0} cuentas requieren atención`}
+
           onClick={() => setActiveTab('collection')}
         />
         <KPICard
@@ -38,7 +38,7 @@ export const DashboardView = ({ adminStats, user, unitName, setActiveTab }) => {
           value={`$${(adminStats.nextMonthIncome || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} `}
           icon={Calendar}
           color="#10B981"
-          subtext="Cobros del próximo mes"
+          onClick={() => setActiveTab('nextMonthReceivables')}
         />
       </div>
 
