@@ -165,12 +165,13 @@ export const getCollectionStats = async (unitId = null) => {
       .select(`
         id, 
         business_name, 
+        contact_name,
         contact_email, 
         contact_phone, 
         User_market_tec,
         status,
         contracts(id, status),
-        receivables(id, contract_id, concept, due_date, amount, balance, status)
+        receivables(id, contract_id, concept, due_date, amount, balance, status, type)
       `)
       .eq('status', 'Activo')
       .order('business_name');
@@ -226,9 +227,11 @@ export const getCollectionStats = async (unitId = null) => {
           originalId: inv.id,
           concept: inv.concept,
           date: inv.due_date, // Usamos due_date como referencia principal o deberíamos usar issue_date? El mock usa 'date' visualmente.
+          dueDate: inv.due_date, // Campo adicional para el webhook
           daysOverdue: daysOverdue,
           amount: balance, // El monto es el balance pendiente
-          status: daysOverdue > 30 ? 'Vencido Critico' : 'Vencido'
+          status: daysOverdue > 30 ? 'Vencido Critico' : 'Vencido',
+          type: inv.type || null
         };
       });
 
@@ -238,6 +241,8 @@ export const getCollectionStats = async (unitId = null) => {
         id: `c_${client.id}`,
         originalId: client.id,
         clientName: client.business_name,
+        contact: client.contact_name,
+        email: client.contact_email,
         contactEmail: client.contact_email,
         contactPhone: client.contact_phone,
         marketTecReceiver: client.User_market_tec,

@@ -15,8 +15,9 @@ import {
 } from 'lucide-react';
 
 import { getCollectionStats } from '../../services/clientService';
+import { getTemplates } from '../../services/templateService';
 import { useAuth } from '../../hooks/useAuth';
-import EmailTemplateConfig from './EmailTemplateConfig';
+
 
 export default function CollectionDashboard({ onClientClick }) {
     const { user } = useAuth();
@@ -25,7 +26,11 @@ export default function CollectionDashboard({ onClientClick }) {
     const [expandedRows, setExpandedRows] = useState(new Set());
     const [selectedClients, setSelectedClients] = useState(new Set());
     const [showModal, setShowModal] = useState(false);
-    const [showTemplateConfig, setShowTemplateConfig] = useState(false);
+
+    // Template State
+    const [templates, setTemplates] = useState([]);
+    const [selectedTemplate, setSelectedTemplate] = useState('default'); // 'default' or template id
+    const [loadingTemplates, setLoadingTemplates] = useState(false);
 
     React.useEffect(() => {
         const fetchData = async () => {
@@ -44,6 +49,22 @@ export default function CollectionDashboard({ onClientClick }) {
 
         fetchData();
     }, [user]);
+
+    // Fetch Templates
+    React.useEffect(() => {
+        const fetchTemplates = async () => {
+            if (!user?.unitId) return;
+            setLoadingTemplates(true);
+            const { data } = await getTemplates(user.unitId);
+            if (data) {
+                setTemplates(data);
+                // Set default if exists
+                if (data.length > 0) setSelectedTemplate(data[0].id);
+            }
+            setLoadingTemplates(false);
+        };
+        fetchTemplates();
+    }, [user?.unitId]);
 
     // --- Helpers ---
     const toggleRow = (id) => {
@@ -92,10 +113,7 @@ export default function CollectionDashboard({ onClientClick }) {
 
 
 
-    // If showing template config, render that instead
-    if (showTemplateConfig) {
-        return <EmailTemplateConfig onBack={() => setShowTemplateConfig(false)} />;
-    }
+
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
@@ -121,14 +139,33 @@ export default function CollectionDashboard({ onClientClick }) {
                                 <p className="text-sm text-slate-500 font-medium mb-1">Clientes con Adeudos</p>
                                 <h2 className="text-3xl font-bold text-slate-900">{clients.length}</h2>
                             </div>
-                            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-center items-start">
-                                <button
-                                    onClick={() => setShowTemplateConfig(true)}
-                                    className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
-                                >
-                                    <Mail className="w-4 h-4" />
-                                    Configurar Plantillas
-                                </button>
+
+                            {/* Template Selector */}
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-center">
+                                <label className="text-sm text-slate-500 font-medium mb-2 flex items-center gap-2">
+                                    <Mail size={16} /> Plantilla de Email
+                                </label>
+                                <div className="relative">
+                                    <select
+                                        value={selectedTemplate}
+                                        onChange={(e) => setSelectedTemplate(e.target.value)}
+                                        className="w-full appearance-none bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 pr-8"
+                                        disabled={loadingTemplates}
+                                    >
+                                        <option value="default" disabled>Seleccionar plantilla...</option>
+                                        {templates.map(t => (
+                                            <option key={t.id} value={t.id}>
+                                                {t.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                                        <ChevronDown size={16} />
+                                    </div>
+                                </div>
+                                <p className="text-xs text-slate-400 mt-2">
+                                    Se usará esta plantilla al enviar correos masivos.
+                                </p>
                             </div>
                         </div>
 
@@ -344,8 +381,103 @@ export default function CollectionDashboard({ onClientClick }) {
                                             Cancelar
                                         </button>
                                         <button
-                                            onClick={() => {
-                                                alert("Correos enviados al backend");
+                                            onClick={async () => {
+                                                try {
+                                                    // Get the selected template details
+                                                    const templateData = templates.find(t => t.id === selectedTemplate);
+                                                    if (!templateData) {
+                                                        alert("Por favor selecciona una plantilla válida.");
+                                                        return;
+                                                    }
+
+                                                    // Helper function to replace variables in template
+                                                    const processTemplate = (template, clientData, isBody = false) => {
+                                                        if (!template) return '';
+                                                        let processed = template;
+
+                                                        // Client variables
+                                                        processed = processed.replace(/\{\{client\.contact_name\}\}/g, clientData.contact || '');
+                                                        processed = processed.replace(/\{\{client\.business_name\}\}/g, clientData.clientName || '');
+                                                        processed = processed.replace(/\{\{client\.contact_email\}\}/g, clientData.email || '');
+
+                                                        // Receivables summary (aggregate)
+                                                        const totalBalance = clientData.invoices.reduce((sum, inv) => sum + inv.amount, 0);
+                                                        const concepts = clientData.invoices.map(inv => inv.concept).join(', ');
+                                                        const dueDates = clientData.invoices.map(inv => inv.dueDate).join(', ');
+                                                        const types = [...new Set(clientData.invoices.map(inv => inv.type || 'N/A'))].join(', ');
+
+                                                        processed = processed.replace(/\{\{receivables\.concept\}\}/g, concepts);
+                                                        processed = processed.replace(/\{\{receivables\.due_date\}\}/g, dueDates);
+                                                        processed = processed.replace(/\{\{receivables\.balance\}\}/g, `$${totalBalance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`);
+                                                        processed = processed.replace(/\{\{receivables\.type\}\}/g, types);
+
+                                                        // Business unit
+                                                        processed = processed.replace(/\{\{business_units\.name\}\}/g, user?.unitName || '');
+
+                                                        // Convert to HTML if it's the body
+                                                        if (isBody) {
+                                                            // Convert newlines to <br> tags
+                                                            processed = processed.replace(/\n/g, '<br>');
+                                                            // Wrap in basic HTML structure
+                                                            processed = `<div style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333;">${processed}</div>`;
+                                                        }
+
+                                                        return processed;
+                                                    };
+
+                                                    // Prepare data for webhook with processed templates
+                                                    const selectedClientData = clients
+                                                        .filter(c => selectedClients.has(c.id))
+                                                        .map(c => {
+                                                            const processedSubject = processTemplate(templateData.subject_template, c, false);
+                                                            const processedBody = processTemplate(templateData.body_template, c, true);
+
+                                                            return {
+                                                                clientId: c.id,
+                                                                clientName: c.clientName,
+                                                                email: c.email,
+                                                                contact: c.contact,
+                                                                subject: processedSubject,
+                                                                body: processedBody,
+                                                                receivables: c.invoices.map(inv => ({
+                                                                    concept: inv.concept,
+                                                                    dueDate: inv.dueDate,
+                                                                    amount: inv.amount,
+                                                                    daysOverdue: inv.daysOverdue,
+                                                                    type: inv.type
+                                                                }))
+                                                            };
+                                                        });
+
+                                                    const webhookPayload = {
+                                                        templateId: selectedTemplate,
+                                                        templateName: templateData.name,
+                                                        unitId: user?.unitId,
+                                                        unitName: user?.unitName,
+                                                        clients: selectedClientData,
+                                                        totalClients: selectedClients.size,
+                                                        timestamp: new Date().toISOString()
+                                                    };
+
+                                                    // Call n8n webhook
+                                                    const response = await fetch('https://n8n-t.intelekta.ai/webhook-test/c5be4efd-e1b3-40ca-b75e-ca681d345850', {
+                                                        method: 'POST',
+                                                        headers: {
+                                                            'Content-Type': 'application/json'
+                                                        },
+                                                        body: JSON.stringify(webhookPayload)
+                                                    });
+
+                                                    if (response.ok) {
+                                                        alert("Correos enviados exitosamente");
+                                                    } else {
+                                                        alert("Error al enviar correos. Intente de nuevo.");
+                                                    }
+                                                } catch (error) {
+                                                    console.error('Error calling webhook:', error);
+                                                    alert("Error al enviar correos. Intente de nuevo.");
+                                                }
+
                                                 setShowModal(false);
                                                 setSelectedClients(new Set());
                                             }}
@@ -361,6 +493,6 @@ export default function CollectionDashboard({ onClientClick }) {
                     </>
                 )}
             </main>
-        </div>
+        </div >
     );
 }

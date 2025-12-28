@@ -17,6 +17,7 @@ import {
   ContractForm, ClientForm
 } from './components/admin/AdminViews';
 import CollectionDashboard from './components/admin/CollectionDashboard';
+import EmailTemplateConfig from './components/admin/EmailTemplateConfig';
 
 // Importar hooks de Supabase
 import { useAuth } from './hooks/useAuth';
@@ -583,6 +584,7 @@ export default function App() {
 
                 <div className="pt-4 pb-2 px-6 text-xs uppercase text-blue-400 font-semibold tracking-wider">Administración</div>
                 <SidebarItem icon={Settings} label="Configuración" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
+                <SidebarItem icon={FileText} label="Plantillas" active={activeTab === 'templates'} onClick={() => setActiveTab('templates')} />
               </>
             ) : (
               <>
@@ -717,6 +719,11 @@ export default function App() {
                     }
                   }}
                 />
+              )}
+              {activeTab === 'templates' && (
+                <div className="flex-1 overflow-auto p-8">
+                  <EmailTemplateConfig onBack={() => setActiveTab('collection')} />
+                </div>
               )}
               {activeTab === 'settings' && (
                 <SettingsView

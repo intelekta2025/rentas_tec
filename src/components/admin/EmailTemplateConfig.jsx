@@ -1,57 +1,131 @@
-import React, { useState } from 'react';
-import { Mail, Save, Eye, ArrowLeft, Send, CheckCircle, AlertCircle, Variable, FileText } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Mail, Save, Eye, ArrowLeft, Send, CheckCircle, AlertCircle, Variable, FileText, Code } from 'lucide-react';
+import { getTemplates, createTemplate, updateTemplate } from '../../services/templateService';
+import { useAuth } from '../../hooks/useAuth';
 
 const EmailTemplateConfig = ({ onBack }) => {
+    const { user } = useAuth();
     const [activeStep, setActiveStep] = useState('list'); // list, edit, preview
-    const [selectedTemplate, setSelectedTemplate] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [templates, setTemplates] = useState([]);
+    const [editForm, setEditForm] = useState(null);
+    const [activeField, setActiveField] = useState('body'); // 'subject' or 'body'
 
-    // Datos simulados basados en tu esquema SQL
+    // Variables disponibles para usar en plantillas
     const dbVariables = [
-        { category: 'Cliente', vars: ['{{client.contact_name}}', '{{client.business_name}}', '{{client.rfc}}'] },
-        { category: 'Pago', vars: ['{{payment.amount}}', '{{payment.date}}', '{{payment.reference}}'] },
-        { category: 'Aplicación', vars: ['{{application.amount_applied}}', '{{receivable.concept}}', '{{receivable.balance}}'] },
-        { category: 'Unidad de Negocio', vars: ['{{unit.name}}', '{{unit.address}}'] }
+        { category: 'Cliente', vars: ['{{client.contact_name}}', '{{client.business_name}}', '{{client.contact_email}}'] },
+        { category: 'Cuenta por Cobrar', vars: ['{{receivables.concept}}', '{{receivables.due_date}}', '{{receivables.balance}}', '{{receivables.type}}'] },
+        { category: 'Unidad de Negocio', vars: ['{{business_units.name}}'] }
     ];
 
-    const [templates, setTemplates] = useState([
-        {
-            id: 1,
-            name: 'Confirmación de Pago Aplicado',
-            type: 'payment_notification',
-            subject: 'Pago recibido: {{payment.reference}} - {{client.business_name}}',
-            body: 'Hola {{client.contact_name}},\n\nHemos recibido tu pago por la cantidad de ${{application.amount_applied}} el día {{payment.date}}.\n\nEste pago ha sido aplicado a la factura {{receivable.concept}}.\n\nNuevo saldo de la factura: ${{receivable.balance}}.\n\nGracias,\n{{unit.name}}',
-            lastUpdated: '2023-10-25'
-        },
-        {
-            id: 2,
-            name: 'Recordatorio de Saldo Pendiente',
-            type: 'overdue_reminder',
-            subject: 'Recordatorio: Factura Pendiente - {{receivable.concept}}',
-            body: 'Estimado {{client.contact_name}},\n\nLe recordamos que tiene un saldo pendiente de ${{receivable.balance}} con {{unit.name}}.\n\nPor favor realizar el pago a la brevedad.\n\nSaludos cordiales.',
-            lastUpdated: '2023-10-20'
+    // Cargar plantillas
+    useEffect(() => {
+        if (user?.unitId) {
+            loadTemplates();
         }
-    ]);
+    }, [user?.unitId]);
 
-    const [editForm, setEditForm] = useState(null);
+    const loadTemplates = async () => {
+        setLoading(true);
+        const { data, error } = await getTemplates(user.unitId);
+        if (data) {
+            // Mapear campos de DB a estructura local si es necesario, o usar los de DB
+            // DB: name, code, subject_template, body_template
+            // Local: name, type(code), subject, body
+            const formatted = data.map(t => ({
+                id: t.id,
+                name: t.name,
+                type: t.code,
+                subject: t.subject_template,
+                body: t.body_template,
+                lastUpdated: new Date(t.updated_at).toLocaleDateString(),
+                ...t
+            }));
+            setTemplates(formatted);
+        }
+        setLoading(false);
+    };
+
+    const handleCreate = () => {
+        setEditForm({
+            id: null,
+            name: '',
+            type: '', // code
+            subject: '',
+            body: '',
+        });
+        setActiveStep('edit');
+    };
 
     const handleEdit = (template) => {
         setEditForm({ ...template });
         setActiveStep('edit');
     };
 
-    const handleSave = () => {
-        setTemplates(templates.map(t => t.id === editForm.id ? editForm : t));
-        setActiveStep('list');
+    const handleSave = async () => {
+        if (!editForm.name || !editForm.subject) {
+            alert('Por favor completa los campos requeridos (Nombre, Asunto)');
+            return;
+        }
+
+        const generatedCode = editForm.type || editForm.name.toLowerCase().replace(/\s+/g, '_').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+        setLoading(true);
+        const payload = {
+            unit_id: user.unitId,
+            name: editForm.name,
+            code: generatedCode,
+            subject_template: editForm.subject,
+            body_template: editForm.body,
+            updated_at: new Date().toISOString()
+        };
+
+        let result;
+        if (editForm.id) {
+            result = await updateTemplate(editForm.id, payload);
+        } else {
+            result = await createTemplate(payload);
+        }
+
+        if (result.error) {
+            alert('Error al guardar: ' + result.error.message);
+        } else {
+            await loadTemplates();
+            setActiveStep('list');
+        }
+        setLoading(false);
     };
 
     const insertVariable = (variable) => {
-        const textarea = document.getElementById('body-editor');
-        if (textarea) {
-            const start = textarea.selectionStart;
-            const end = textarea.selectionEnd;
-            const text = editForm.body;
-            const newText = text.substring(0, start) + variable + text.substring(end);
-            setEditForm({ ...editForm, body: newText });
+        if (activeField === 'body') {
+            const textarea = document.getElementById('body-editor');
+            if (textarea) {
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const text = editForm.body;
+                const newText = text.substring(0, start) + variable + text.substring(end);
+                setEditForm({ ...editForm, body: newText });
+
+                // Restore focus and cursor in next cycle (simplified)
+                setTimeout(() => {
+                    textarea.focus();
+                    textarea.setSelectionRange(start + variable.length, start + variable.length);
+                }, 0);
+            }
+        } else if (activeField === 'subject') {
+            const input = document.getElementById('subject-editor');
+            if (input) {
+                const start = input.selectionStart;
+                const end = input.selectionEnd;
+                const text = editForm.subject;
+                const newText = text.substring(0, start) + variable + text.substring(end);
+                setEditForm({ ...editForm, subject: newText });
+
+                setTimeout(() => {
+                    input.focus();
+                    input.setSelectionRange(start + variable.length, start + variable.length);
+                }, 0);
+            }
         }
     };
 
@@ -60,15 +134,13 @@ const EmailTemplateConfig = ({ onBack }) => {
         <div className="space-y-6 animate-fade-in">
             <div className="flex justify-between items-center">
                 <div className="flex items-center gap-4">
-                    <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition">
-                        <ArrowLeft size={20} />
-                    </button>
+
                     <div>
                         <h2 className="text-2xl font-bold text-slate-800">Plantillas de Notificación</h2>
                         <p className="text-slate-500">Administra los correos automáticos que envía el sistema.</p>
                     </div>
                 </div>
-                <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition flex items-center gap-2 shadow-sm">
+                <button onClick={handleCreate} className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition flex items-center gap-2 shadow-sm">
                     <FileText size={18} /> Nueva Plantilla
                 </button>
             </div>
@@ -104,7 +176,9 @@ const EmailTemplateConfig = ({ onBack }) => {
                         <ArrowLeft size={20} />
                     </button>
                     <div>
-                        <h2 className="text-xl font-bold text-slate-800">Editar Plantilla</h2>
+                        <h2 className="text-xl font-bold text-slate-800">
+                            {editForm.id ? 'Editar Plantilla' : 'Nueva Plantilla'}
+                        </h2>
                         <p className="text-sm text-slate-500">{editForm.name}</p>
                     </div>
                 </div>
@@ -119,26 +193,41 @@ const EmailTemplateConfig = ({ onBack }) => {
             </div>
 
             <div className="flex flex-col lg:flex-row gap-6 h-full">
+
                 {/* Main Editor */}
                 <div className="flex-1 space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Asunto del Correo</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Nombre de la Plantilla</label>
                         <input
                             type="text"
-                            value={editForm.subject}
-                            onChange={(e) => setEditForm({ ...editForm, subject: e.target.value })}
+                            placeholder="Ej. Recordatorio de Pago"
+                            value={editForm.name}
+                            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                             className="w-full border border-slate-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Asunto del Correo</label>
+                        <input
+                            id="subject-editor"
+                            type="text"
+                            value={editForm.subject}
+                            onFocus={() => setActiveField('subject')}
+                            onChange={(e) => setEditForm({ ...editForm, subject: e.target.value })}
+                            className={`w-full border rounded-lg p-3 transition ${activeField === 'subject' ? 'ring-2 ring-indigo-500 border-indigo-500' : 'border-slate-300'}`}
                         />
                     </div>
 
                     <div className="flex-1 flex flex-col">
                         <label className="block text-sm font-medium text-slate-700 mb-1">Cuerpo del Mensaje (HTML/Texto)</label>
-                        <div className="relative flex-1">
+                        <div className={`relative flex-1 rounded-lg border transition ${activeField === 'body' ? 'ring-2 ring-indigo-500 border-indigo-500' : 'border-slate-300'}`}>
                             <textarea
                                 id="body-editor"
                                 value={editForm.body}
+                                onFocus={() => setActiveField('body')}
                                 onChange={(e) => setEditForm({ ...editForm, body: e.target.value })}
-                                className="w-full h-96 border border-slate-300 rounded-lg p-4 font-mono text-sm leading-relaxed focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition resize-none"
+                                className="w-full h-96 rounded-lg p-4 font-mono text-sm leading-relaxed focus:outline-none bg-transparent resize-none"
                             />
                             <div className="absolute bottom-4 right-4 text-xs text-slate-400 bg-white/80 px-2 py-1 rounded">
                                 Soporta Markdown básico
