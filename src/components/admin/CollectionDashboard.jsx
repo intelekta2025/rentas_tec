@@ -16,6 +16,7 @@ import {
 
 import { getCollectionStats } from '../../services/clientService';
 import { useAuth } from '../../hooks/useAuth';
+import EmailTemplateConfig from './EmailTemplateConfig';
 
 export default function CollectionDashboard({ onClientClick }) {
     const { user } = useAuth();
@@ -24,6 +25,7 @@ export default function CollectionDashboard({ onClientClick }) {
     const [expandedRows, setExpandedRows] = useState(new Set());
     const [selectedClients, setSelectedClients] = useState(new Set());
     const [showModal, setShowModal] = useState(false);
+    const [showTemplateConfig, setShowTemplateConfig] = useState(false);
 
     React.useEffect(() => {
         const fetchData = async () => {
@@ -89,6 +91,12 @@ export default function CollectionDashboard({ onClientClick }) {
     };
 
 
+
+    // If showing template config, render that instead
+    if (showTemplateConfig) {
+        return <EmailTemplateConfig onBack={() => setShowTemplateConfig(false)} />;
+    }
+
     return (
         <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
 
@@ -114,7 +122,10 @@ export default function CollectionDashboard({ onClientClick }) {
                                 <h2 className="text-3xl font-bold text-slate-900">{clients.length}</h2>
                             </div>
                             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-center items-start">
-                                <button className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors">
+                                <button
+                                    onClick={() => setShowTemplateConfig(true)}
+                                    className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
+                                >
                                     <Mail className="w-4 h-4" />
                                     Configurar Plantillas
                                 </button>
@@ -134,13 +145,22 @@ export default function CollectionDashboard({ onClientClick }) {
                             {selectedClients.size > 0 && (
                                 <div className="flex items-center gap-4 bg-indigo-50 border border-indigo-100 px-4 py-2 rounded-lg animate-in fade-in slide-in-from-bottom-2">
                                     <span className="text-sm font-medium text-indigo-900">{selectedClients.size} clientes seleccionados</span>
-                                    <button
-                                        onClick={() => setShowModal(true)}
-                                        className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-md shadow-sm flex items-center gap-2 transition-all"
-                                    >
-                                        <Send className="w-3 h-3" />
-                                        Enviar Recordatorios
-                                    </button>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setShowModal(true)}
+                                            className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-md shadow-sm flex items-center gap-2 transition-all"
+                                        >
+                                            <Mail className="w-3 h-3" />
+                                            Enviar Email
+                                        </button>
+                                        <button
+                                            onClick={() => setShowModal(true)}
+                                            className="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md shadow-sm flex items-center gap-2 transition-all"
+                                        >
+                                            <MessageCircle className="w-3 h-3" />
+                                            Enviar WhatsApp
+                                        </button>
+                                    </div>
                                 </div>
                             )}
                         </div>
