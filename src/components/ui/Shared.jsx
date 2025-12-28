@@ -143,12 +143,14 @@ export const Modal = ({ isOpen, onClose, title, children, size = "md" }) => {
   );
 };
 
-export const RevenueChart = ({ data, year = new Date().getFullYear(), title = "Comportamiento de Cobranza", availableYears = [], onYearChange }) => {
+export const RevenueChart = ({ data, year = new Date().getFullYear(), title = "Comportamiento de Cobranza", availableYears = [], onYearChange, onClientClick }) => {
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerData, setDrawerData] = useState({ type: '', month: '', items: [], total: 0 });
+
   const allValues = data.flatMap(d => [d.collected, d.pending]);
   const rawMax = Math.max(...allValues, 100);
   const rawMin = Math.min(...allValues, 0);
 
-  // Función para obtener límites "redondos"
   const getRoundedLimit = (val) => {
     const absVal = Math.abs(val);
     if (absVal === 0) return 0;
@@ -162,10 +164,8 @@ export const RevenueChart = ({ data, year = new Date().getFullYear(), title = "C
 
   const maxVal = getRoundedLimit(rawMax);
   let minVal = getRoundedLimit(rawMin);
-  // Asegurar que si hay valores negativos, el eje 0 no esté pegado al fondo absoluto
-  // Forzamos que el rango cubra al menos un 10% de espacio negativo si hay negativos pequeñitos
   if (minVal < 0) {
-    const minHeight = maxVal * 0.05; // 5% del positivo
+    const minHeight = maxVal * 0.05;
     if (Math.abs(minVal) < minHeight) {
       minVal = -getRoundedLimit(minHeight);
     }
@@ -174,133 +174,211 @@ export const RevenueChart = ({ data, year = new Date().getFullYear(), title = "C
   const totalRange = maxVal - minVal;
   const zeroPercentage = ((0 - minVal) / totalRange) * 100;
 
-  // Generar pasos (5 líneas aprox)
   const steps = [];
   const stepCount = 5;
-  const stepValue = totalRange / (stepCount - 1); // 4 intervalos
+  const stepValue = totalRange / (stepCount - 1);
   for (let i = 0; i < stepCount; i++) {
     steps.push(maxVal - (stepValue * i));
   }
-  // Asegurarnos de que el 0 esté perfectamente alineado si está cerca
-  // O simplemente renderizar el eje 0 explícitamente
+
+  const handleBarClick = (d, type) => {
+    const items = type === 'collected' ? (d.collectedItems || []) : (d.pendingItems || []);
+    const total = type === 'collected' ? d.collected : d.pending;
+    setDrawerData({
+      type: type === 'collected' ? 'Cobrado' : 'Pendiente',
+      month: `${d.month} ${year}`,
+      items,
+      total
+    });
+    setDrawerOpen(true);
+  };
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow mt-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h3 className="text-lg font-bold text-gray-800">{title} {year}</h3>
-          <p className="text-xs text-gray-500">Comparativo Mensual: Cobrado vs. Pendiente</p>
-        </div>
-        <div className="flex items-center space-x-4">
-          {/* Year Selector */}
-          {availableYears.length > 1 && onYearChange && (
-            <div className="relative">
-              <select
-                value={year}
-                onChange={(e) => onYearChange(parseInt(e.target.value))}
-                className="appearance-none bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block px-3 py-1.5 pr-8 font-medium"
-              >
-                {availableYears.map(y => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
+    <>
+      <div className="bg-white p-6 rounded-lg shadow mt-6">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h3 className="text-lg font-bold text-gray-800">{title} {year}</h3>
+            <p className="text-xs text-gray-500">Comparativo Mensual: Cobrado vs. Pendiente (click en barra para detalles)</p>
+          </div>
+          <div className="flex items-center space-x-4">
+            {availableYears.length > 1 && onYearChange && (
+              <div className="relative">
+                <select
+                  value={year}
+                  onChange={(e) => onYearChange(parseInt(e.target.value))}
+                  className="appearance-none bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block px-3 py-1.5 pr-8 font-medium"
+                >
+                  {availableYears.map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
               </div>
+            )}
+            <div className="flex items-center">
+              <div className="w-3 h-3 bg-green-500 rounded-sm mr-2"></div>
+              <span className="text-xs text-gray-600">Cobrado</span>
             </div>
-          )}
-          <div className="flex items-center">
-            <div className="w-3 h-3 bg-green-500 rounded-sm mr-2"></div>
-            <span className="text-xs text-gray-600">Cobrado</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-3 h-3 bg-orange-400 rounded-sm mr-2"></div>
-            <span className="text-xs text-gray-600">Pendiente</span>
+            <div className="flex items-center">
+              <div className="w-3 h-3 bg-orange-400 rounded-sm mr-2"></div>
+              <span className="text-xs text-gray-600">Pendiente</span>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="relative h-48 flex">
-        {/* Y-Axis Labels */}
-        <div className="hidden sm:flex flex-col justify-between h-44 pr-4 pb-2 text-[10px] text-gray-400 font-medium text-right w-14 select-none">
-          {steps.map((s, i) => (
-            <span key={i}>${Math.abs(s) >= 1000 ? `${(s / 1000).toFixed(1)}k` : s.toFixed(0)}</span>
-          ))}
-        </div>
-
-        {/* Chart Container */}
-        <div className="flex-1 relative h-44 pb-2 border-b border-gray-100">
-          {/* Grid Lines */}
-          <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-2">
-            {steps.map((_, i) => (
-              <div key={i} className="w-full border-t border-gray-50 h-0"></div>
+        <div className="relative h-48 flex">
+          <div className="hidden sm:flex flex-col justify-between h-44 pr-4 pb-2 text-[10px] text-gray-400 font-medium text-right w-14 select-none">
+            {steps.map((s, i) => (
+              <span key={i}>${Math.abs(s) >= 1000 ? `${(s / 1000).toFixed(1)}k` : s.toFixed(0)}</span>
             ))}
           </div>
 
-          {/* Zero Line - Highlighted */}
-          <div
-            className="absolute w-full border-t border-gray-400 border-dashed pointer-events-none z-0"
-            style={{ bottom: `${zeroPercentage}%`, left: 0 }}
-          ></div>
+          <div className="flex-1 relative h-44 pb-2 border-b border-gray-100">
+            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-2">
+              {steps.map((_, i) => (
+                <div key={i} className="w-full border-t border-gray-50 h-0"></div>
+              ))}
+            </div>
 
-          <div className="flex items-end space-x-2 sm:space-x-4 h-full relative z-10 px-2 pointer-events-none">
-            {data.map((d, i) => {
-              const collectedHeight = (Math.abs(d.collected) / totalRange) * 100;
-              const pendingHeight = (Math.abs(d.pending) / totalRange) * 100;
+            <div
+              className="absolute w-full border-t border-gray-400 border-dashed pointer-events-none z-0"
+              style={{ bottom: `${zeroPercentage}%`, left: 0 }}
+            ></div>
 
-              // Calcular posición 'bottom' basándose en si es positivo o negativo
-              // Si es positivo, bottom = zeroPercentage
-              // Si es negativo, top = (100 - zeroPercentage) -> bottom = zeroPercentage - height
+            <div className="flex items-end space-x-2 sm:space-x-4 h-full relative z-10 px-2">
+              {data.map((d, i) => {
+                const collectedHeight = (Math.abs(d.collected) / totalRange) * 100;
+                const pendingHeight = (Math.abs(d.pending) / totalRange) * 100;
+                const collectedBottom = d.collected >= 0 ? zeroPercentage : zeroPercentage - collectedHeight;
+                const pendingBottom = d.pending >= 0 ? zeroPercentage : zeroPercentage - pendingHeight;
 
-              const collectedBottom = d.collected >= 0 ? zeroPercentage : zeroPercentage - collectedHeight;
-              const pendingBottom = d.pending >= 0 ? zeroPercentage : zeroPercentage - pendingHeight;
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center group relative h-full justify-end min-w-[40px]">
+                    <div className="flex-1 w-full relative h-full">
+                      {/* Collected Bar - Clickable */}
+                      <div
+                        onClick={() => handleBarClick(d, 'collected')}
+                        style={{
+                          height: `${Math.max(collectedHeight, 0.5)}%`,
+                          bottom: `${collectedBottom}%`,
+                          left: '5%',
+                          width: '40%'
+                        }}
+                        className={`absolute bg-green-500 hover:bg-green-600 transition-all cursor-pointer ${d.collected >= 0 ? 'rounded-t-sm' : 'rounded-b-sm'} hover:ring-2 hover:ring-green-300`}
+                        title={`Click para ver detalles - Cobrado: $${d.collected.toLocaleString()}`}
+                      ></div>
 
-              return (
-                <div key={i} className="flex-1 flex flex-col items-center group relative h-full justify-end min-w-[40px] pointer-events-auto">
+                      {/* Pending Bar - Clickable */}
+                      <div
+                        onClick={() => handleBarClick(d, 'pending')}
+                        style={{
+                          height: `${Math.max(pendingHeight, 0.5)}%`,
+                          bottom: `${pendingBottom}%`,
+                          right: '5%',
+                          width: '40%'
+                        }}
+                        className={`absolute bg-orange-400 hover:bg-orange-500 transition-all cursor-pointer ${d.pending >= 0 ? 'rounded-t-sm' : 'rounded-b-sm'} hover:ring-2 hover:ring-orange-300`}
+                        title={`Click para ver detalles - Pendiente: $${d.pending.toLocaleString()}`}
+                      ></div>
+                    </div>
 
-                  {/* Container for bars rendering relative to full height */}
-                  <div className="flex-1 w-full relative h-full">
-                    {/* Collected Bar */}
-                    <div
-                      style={{
-                        height: `${Math.max(collectedHeight, 0.5)}%`, // min 0.5% visual
-                        bottom: `${collectedBottom}%`,
-                        left: '5%',
-                        width: '40%'
-                      }}
-                      className={`absolute bg-green-500 hover:bg-green-600 transition-all cursor-pointer ${d.collected >= 0 ? 'rounded-t-sm' : 'rounded-b-sm'}`}
-                      title={`Cobrado: $${d.collected.toLocaleString()}`}
-                    ></div>
-
-                    {/* Pending Bar */}
-                    <div
-                      style={{
-                        height: `${Math.max(pendingHeight, 0.5)}%`,
-                        bottom: `${pendingBottom}%`,
-                        right: '5%',
-                        width: '40%'
-                      }}
-                      className={`absolute bg-orange-400 hover:bg-orange-500 transition-all cursor-pointer ${d.pending >= 0 ? 'rounded-t-sm' : 'rounded-b-sm'}`}
-                      title={`Pendiente: $${d.pending.toLocaleString()}`}
-                    ></div>
+                    <span className="text-[10px] sm:text-xs text-gray-500 mt-2 font-medium absolute -bottom-6 w-full text-center truncate">{d.month}</span>
                   </div>
-
-                  <span className="text-[10px] sm:text-xs text-gray-500 mt-2 font-medium absolute -bottom-6 w-full text-center truncate">{d.month}</span>
-
-                  {/* Tooltip */}
-                  <div className="absolute bottom-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800 text-white text-[10px] rounded p-2 z-20 w-32 text-center pointer-events-none shadow-lg left-1/2 transform -translate-x-1/2 hidden sm:block">
-                    <div className="font-bold border-b border-gray-600 pb-1 mb-1">{d.month} {year}</div>
-                    <div className="flex justify-between"><span className="text-green-300">Cobrado:</span><span>${d.collected.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span className="text-orange-300">Pendiente:</span><span>${d.pending.toLocaleString()}</span></div>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Slide-in Drawer */}
+      {drawerOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/30 z-40 transition-opacity"
+            onClick={() => setDrawerOpen(false)}
+          ></div>
+
+          {/* Drawer Panel */}
+          <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform transition-transform animate-in slide-in-from-right duration-300">
+            <div className={`p-4 border-b ${drawerData.type === 'Cobrado' ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className={`text-lg font-bold ${drawerData.type === 'Cobrado' ? 'text-green-800' : 'text-orange-800'}`}>
+                    {drawerData.type} - {drawerData.month}
+                  </h3>
+                  <p className={`text-sm ${drawerData.type === 'Cobrado' ? 'text-green-600' : 'text-orange-600'}`}>
+                    Total: ${drawerData.total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setDrawerOpen(false)}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 overflow-y-auto h-[calc(100%-80px)]">
+              {drawerData.items.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No hay registros detallados disponibles</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {drawerData.items.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-gray-50 rounded-lg p-3 border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer"
+                      onClick={() => {
+                        if (onClientClick && item.clientId) {
+                          setDrawerOpen(false);
+                          onClientClick(item.clientId);
+                        }
+                      }}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-900 truncate">{item.clientName}</p>
+                          <p className="text-xs text-gray-500 truncate">{item.concept}</p>
+                          {item.dueDate && (
+                            <p className="text-xs text-gray-400 mt-1">Vence: {item.dueDate}</p>
+                          )}
+                        </div>
+                        <div className="text-right ml-3 flex-shrink-0">
+                          {drawerData.type === 'Cobrado' ? (
+                            <p className="font-bold text-green-600">${item.paid?.toLocaleString('es-MX', { minimumFractionDigits: 2 }) || '0.00'}</p>
+                          ) : (
+                            <p className="font-bold text-orange-600">${item.balance?.toLocaleString('es-MX', { minimumFractionDigits: 2 }) || '0.00'}</p>
+                          )}
+                          <p className="text-xs text-gray-400">{item.status}</p>
+                        </div>
+                      </div>
+                      {onClientClick && item.clientId && (
+                        <div className="mt-2 text-xs text-indigo-600 flex items-center">
+                          <span>Ver estado de cuenta</span>
+                          <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </>
   );
 };

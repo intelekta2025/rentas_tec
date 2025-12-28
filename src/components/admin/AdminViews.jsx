@@ -16,7 +16,7 @@ import { UNITS, mockStaff } from '../../data/constants';
 import * as invoiceService from '../../services/invoiceService';
 import { marketTecService } from '../../services/marketTecService';
 
-export const DashboardView = ({ adminStats, user, unitName, setActiveTab }) => {
+export const DashboardView = ({ adminStats, user, unitName, setActiveTab, onClientClick }) => {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
 
@@ -72,6 +72,7 @@ export const DashboardView = ({ adminStats, user, unitName, setActiveTab }) => {
           year={selectedYear}
           availableYears={availableYears}
           onYearChange={setSelectedYear}
+          onClientClick={onClientClick}
         />
       </div>
     </div>

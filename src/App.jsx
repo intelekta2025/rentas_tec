@@ -448,22 +448,42 @@ export default function App() {
           const yearKey = mYear;
           if (!acc.monthlyStatsByYear[yearKey]) {
             acc.monthlyStatsByYear[yearKey] = [
-              { month: 'Ene', collected: 0, pending: 0, year: yearKey },
-              { month: 'Feb', collected: 0, pending: 0, year: yearKey },
-              { month: 'Mar', collected: 0, pending: 0, year: yearKey },
-              { month: 'Abr', collected: 0, pending: 0, year: yearKey },
-              { month: 'May', collected: 0, pending: 0, year: yearKey },
-              { month: 'Jun', collected: 0, pending: 0, year: yearKey },
-              { month: 'Jul', collected: 0, pending: 0, year: yearKey },
-              { month: 'Ago', collected: 0, pending: 0, year: yearKey },
-              { month: 'Sep', collected: 0, pending: 0, year: yearKey },
-              { month: 'Oct', collected: 0, pending: 0, year: yearKey },
-              { month: 'Nov', collected: 0, pending: 0, year: yearKey },
-              { month: 'Dic', collected: 0, pending: 0, year: yearKey },
+              { month: 'Ene', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
+              { month: 'Feb', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
+              { month: 'Mar', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
+              { month: 'Abr', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
+              { month: 'May', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
+              { month: 'Jun', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
+              { month: 'Jul', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
+              { month: 'Ago', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
+              { month: 'Sep', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
+              { month: 'Oct', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
+              { month: 'Nov', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
+              { month: 'Dic', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
             ];
           }
           acc.monthlyStatsByYear[yearKey][mMonth - 1].collected += paid;
           acc.monthlyStatsByYear[yearKey][mMonth - 1].pending += balance;
+
+          // Store item details for the drawer
+          const itemDetail = {
+            id: curr.id,
+            clientId: curr.clientId,
+            clientName: curr.client || 'Sin nombre',
+            concept: curr.concept || '-',
+            dueDate: curr.dueDate,
+            amount: fullAmount,
+            paid: paid,
+            balance: balance,
+            status: curr.status
+          };
+
+          if (paid > 0) {
+            acc.monthlyStatsByYear[yearKey][mMonth - 1].collectedItems.push(itemDetail);
+          }
+          if (balance > 0) {
+            acc.monthlyStatsByYear[yearKey][mMonth - 1].pendingItems.push(itemDetail);
+          }
         }
       }
 
@@ -674,6 +694,13 @@ export default function App() {
                   user={user}
                   unitName={businessUnitName || user.unitName}
                   setActiveTab={setActiveTab}
+                  onClientClick={(clientId) => {
+                    const client = filteredClients.find(c => c.id === clientId);
+                    if (client) {
+                      setSelectedClient(client);
+                      setActiveTab('clientDetail');
+                    }
+                  }}
                 />
               )}
               {activeTab === 'clients' && (
