@@ -57,7 +57,7 @@ export const DashboardView = ({ adminStats, user, unitName, setActiveTab, onClie
           onClick={() => setActiveTab('collection')}
         />
         <KPICard
-          title="Proyección Ingresos"
+          title="Por Cobrar siguiente mes"
           value={`$${(adminStats.nextMonthIncome || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} `}
           icon={Calendar}
           color="#10B981"
@@ -172,6 +172,8 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Cliente</th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Total del contrato</th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Saldo pendiente</th>
+                  <th className="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-widest">Total Rentas</th>
+                  <th className="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-widest">Total Servicios</th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Saldo vencido</th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Usuario Market Tec</th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Estado</th>
@@ -192,6 +194,16 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900 font-medium">${(client.pendingBalance || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <div className={`text-sm font-bold ${client.totalRentCount > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
+                        {client.totalRentCount || 0}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <div className={`text-sm font-bold ${client.totalServiceCount > 0 ? 'text-indigo-600' : 'text-gray-400'}`}>
+                        {client.totalServiceCount || 0}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className={`text-sm font-bold flex items-center ${client.overdueBalance > 0 ? 'text-red-600' : 'text-gray-500'}`}>

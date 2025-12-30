@@ -28,6 +28,8 @@ const mapClientFromDB = (dbClient) => {
     totalContract: dbClient.totalContract || 0,
     pendingBalance: dbClient.pendingBalance || 0,
     overdueBalance: dbClient.overdueBalance || 0,
+    totalRentCount: dbClient.totalRentCount || 0,
+    totalServiceCount: dbClient.totalServiceCount || 0,
   }
 }
 
@@ -82,7 +84,7 @@ export const getClients = async (unitId = null) => {
   try {
     let query = supabase
       .from('clients')
-      .select('*, receivables(amount, balance, status, due_date, contract_id), contracts(id, status)')
+      .select('*, receivables(amount, balance, status, due_date, contract_id, type), contracts(id, status)')
       .order('business_name', { ascending: true }) // Usar business_name en lugar de name
 
     // Filtrar por unitId si se proporciona
@@ -117,6 +119,18 @@ export const getClients = async (unitId = null) => {
         return sum + (balance || 0)
       }, 0)
 
+      // Calcular conteos totales por tipo (sin importar status, pero SOLO contratos activos logicamente ya que usamos 'receivables')
+
+      const totalRentCount = receivables.filter(r => {
+        const type = (r.type || '').toLowerCase();
+        return type === 'rent' || type === 'renta';
+      }).length;
+
+      const totalServiceCount = receivables.filter(r => {
+        const type = (r.type || '').toLowerCase();
+        return type !== 'rent' && type !== 'renta';
+      }).length;
+
       const overdueBalance = receivables.reduce((sum, r) => {
         const isPaid = r.status === 'Paid'
         // Chequeo de fechas si no está pagado
@@ -142,7 +156,9 @@ export const getClients = async (unitId = null) => {
         ...client,
         totalContract,
         pendingBalance,
-        overdueBalance
+        overdueBalance,
+        totalRentCount,
+        totalServiceCount
       })
     })
 

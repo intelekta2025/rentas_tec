@@ -114,7 +114,7 @@ export default function NextMonthReceivablesDashboard({ onClientClick, onBack })
                 </button>
 
                 <h2 className="text-2xl font-bold text-slate-900 mb-6">
-                    Proyección de Ingresos - {monthLabel} {nextYear}
+                    Por Cobrar Siguiente Mes - {monthLabel} {nextYear}
                 </h2>
 
                 {/* Loading State */}
