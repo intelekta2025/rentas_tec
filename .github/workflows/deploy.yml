@@ -81,3 +81,9 @@ jobs:
             
             echo "=== LOGS DE LA APP (Últimas 20 líneas) ==="
             docker logs --tail 20 mi-app-react
+
+            # ... (código anterior) ...
+            docker image prune -f
+            
+            echo "=== REDES DISPONIBLES ==="
+            docker network ls
