@@ -67,23 +67,17 @@ jobs:
             docker stop mi-app-react || true
             docker rm mi-app-react || true
             
-            # Correr nuevo contenedor en puerto 5000
+            # Correr nuevo contenedor en la red de Supabase
             docker run -d \
               --name mi-app-react \
               --restart unless-stopped \
+              --network supabase_default \
               -p 5000:80 \
               ghcr.io/${{ env.IMAGE_NAME }}:latest
             
             # Limpiar basura
             docker image prune -f
-            echo "=== ESTADO DE LOS CONTENEDORES ==="
-            docker ps -a
-            
-            echo "=== LOGS DE LA APP (Últimas 20 líneas) ==="
-            docker logs --tail 20 mi-app-react
 
-            # ... (código anterior) ...
-            docker image prune -f
-            
-            echo "=== REDES DISPONIBLES ==="
-            docker network ls
+            # Diagnostico final
+            echo "=== ESTADO FINAL DE LOS CONTENEDORES ==="
+            docker ps -a | grep mi-app-react
