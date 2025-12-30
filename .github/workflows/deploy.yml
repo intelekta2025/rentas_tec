@@ -76,3 +76,8 @@ jobs:
             
             # Limpiar basura
             docker image prune -f
+            echo "=== ESTADO DE LOS CONTENEDORES ==="
+            docker ps -a
+            
+            echo "=== LOGS DE LA APP (Últimas 20 líneas) ==="
+            docker logs --tail 20 mi-app-react
