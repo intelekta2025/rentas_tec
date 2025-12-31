@@ -3,7 +3,7 @@ import { Mail, Save, Eye, ArrowLeft, Send, CheckCircle, AlertCircle, Variable, F
 import { getTemplates, createTemplate, updateTemplate } from '../../services/templateService';
 import { useAuth } from '../../hooks/useAuth';
 
-const EmailTemplateConfig = ({ onBack }) => {
+export default function EmailTemplateConfig({ onBack, unitName }) {
     const { user } = useAuth();
     const [activeStep, setActiveStep] = useState('list'); // list, edit, preview
     const [loading, setLoading] = useState(false);
@@ -35,7 +35,7 @@ const EmailTemplateConfig = ({ onBack }) => {
             const formatted = data.map(t => ({
                 id: t.id,
                 name: t.name,
-                type: t.code,
+                type: t.type || 'Recordatorio', // Default if missing
                 subject: t.subject_template,
                 body: t.body_template,
                 lastUpdated: new Date(t.updated_at).toLocaleDateString(),
@@ -50,7 +50,7 @@ const EmailTemplateConfig = ({ onBack }) => {
         setEditForm({
             id: null,
             name: '',
-            type: '', // code
+            type: 'Recordatorio',
             subject: '',
             body: '',
         });
@@ -68,13 +68,11 @@ const EmailTemplateConfig = ({ onBack }) => {
             return;
         }
 
-        const generatedCode = editForm.type || editForm.name.toLowerCase().replace(/\s+/g, '_').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
         setLoading(true);
         const payload = {
             unit_id: user.unitId,
             name: editForm.name,
-            code: generatedCode,
+            type: editForm.type,
             subject_template: editForm.subject,
             body_template: editForm.body,
             updated_at: new Date().toISOString()
@@ -130,13 +128,13 @@ const EmailTemplateConfig = ({ onBack }) => {
     };
 
     // Pantalla 1: Lista de Plantillas
-    const TemplateList = () => (
+    const renderTemplateList = () => (
         <div className="space-y-6 animate-fade-in">
             <div className="flex justify-between items-center">
                 <div className="flex items-center gap-4">
 
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-800">Plantillas de Notificación</h2>
+                        <h2 className="text-2xl font-bold text-slate-800">Plantillas de Notificación - {unitName || `Unidad ${user.unitId}`}</h2>
                         <p className="text-slate-500">Administra los correos automáticos que envía el sistema.</p>
                     </div>
                 </div>
@@ -167,7 +165,7 @@ const EmailTemplateConfig = ({ onBack }) => {
     );
 
     // Pantalla 2: Editor de Plantilla
-    const TemplateEditor = () => (
+    const renderTemplateEditor = () => (
         <div className="flex flex-col h-full animate-fade-in">
             {/* Header */}
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-200">
@@ -196,6 +194,18 @@ const EmailTemplateConfig = ({ onBack }) => {
 
                 {/* Main Editor */}
                 <div className="flex-1 space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Plantilla</label>
+                        <select
+                            value={editForm.type}
+                            onChange={(e) => setEditForm({ ...editForm, type: e.target.value })}
+                            className="w-full border border-slate-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition bg-white"
+                        >
+                            <option value="Recordatorio">Recordatorio</option>
+                            <option value="Cobranza">Cobranza</option>
+                        </select>
+                    </div>
+
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Nombre de la Plantilla</label>
                         <input
@@ -277,7 +287,7 @@ const EmailTemplateConfig = ({ onBack }) => {
     );
 
     // Pantalla 3: Previsualización
-    const TemplatePreview = () => {
+    const renderTemplatePreview = () => {
         // Simulamos el renderizado reemplazando variables
         const renderText = (text) => {
             return text
@@ -292,8 +302,8 @@ const EmailTemplateConfig = ({ onBack }) => {
         };
 
         return (
-            <div className="h-full flex flex-col animate-fade-in max-w-3xl mx-auto w-full">
-                <div className="flex items-center justify-between mb-6">
+            <div className="h-full flex flex-col animate-fade-in max-w-3xl mx-auto w-full overflow-y-auto pb-10">
+                <div className="flex items-center justify-between mb-6 shrink-0">
                     <button onClick={() => setActiveStep('edit')} className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition font-medium">
                         <ArrowLeft size={18} /> Volver al Editor
                     </button>
@@ -302,7 +312,7 @@ const EmailTemplateConfig = ({ onBack }) => {
                     </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
+                <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden flex flex-col shrink-0">
                     {/* Fake Email Header */}
                     <div className="bg-slate-50 border-b border-slate-200 p-4 space-y-2">
                         <div className="flex gap-2 text-sm">
@@ -334,14 +344,12 @@ const EmailTemplateConfig = ({ onBack }) => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 p-6 font-sans text-slate-800">
-            <div className="max-w-6xl mx-auto h-[85vh]">
-                {activeStep === 'list' && <TemplateList />}
-                {activeStep === 'edit' && <TemplateEditor />}
-                {activeStep === 'preview' && <TemplatePreview />}
-            </div>
-        </div>
+        <>
+            {activeStep === 'list' && renderTemplateList()}
+            {activeStep === 'edit' && renderTemplateEditor()}
+            {activeStep === 'preview' && renderTemplatePreview()}
+        </>
     );
 };
 
-export default EmailTemplateConfig;
+

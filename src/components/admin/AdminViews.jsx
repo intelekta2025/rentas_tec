@@ -2695,7 +2695,7 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
     const fetchTemplates = async () => {
       if (!user?.unitId) return;
       setLoadingTemplates(true);
-      const { data } = await getTemplates(user.unitId);
+      const { data } = await getTemplates(user.unitId, 'Recordatorio');
       if (data) {
         setTemplates(data);
         if (data.length > 0) setSelectedTemplate(data[0].id);
@@ -2754,12 +2754,8 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
       <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-            Recordatorios de Pago
-            <span className="ml-3 px-2.5 py-0.5 bg-gray-100 text-gray-600 text-sm font-semibold rounded-full border border-gray-200">
-              {displayedReminders.length}
-            </span>
+            Recordatorios de Pago - {unitName || `Unidad ${user.unitId} ` || 'Sin unidad'}
           </h2>
-          <p className="text-sm text-gray-500">Unidad: {unitName || `Unidad ${user.unitId} ` || 'Sin unidad'}</p>
         </div>
 
       </div>

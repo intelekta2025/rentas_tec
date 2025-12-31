@@ -5,13 +5,18 @@ import { supabase } from '../lib/supabase';
  * @param {number} unitId 
  * @returns {Promise<{data: any[], error: any}>}
  */
-export const getTemplates = async (unitId) => {
+export const getTemplates = async (unitId, type = null) => {
     try {
-        const { data, error } = await supabase
+        let query = supabase
             .from('communication_templates')
             .select('*')
-            .eq('unit_id', unitId)
-            .order('name');
+            .eq('unit_id', unitId);
+
+        if (type) {
+            query = query.eq('type', type);
+        }
+
+        const { data, error } = await query.order('name');
 
         if (error) throw error;
 

@@ -752,6 +752,7 @@ export default function App() {
               )}
               {activeTab === 'collection' && (
                 <CollectionDashboard
+                  unitName={businessUnitName || user.unitName}
                   onClientClick={(clientId) => {
                     const client = filteredClients.find(c => c.id === clientId);
                     if (client) {
@@ -787,7 +788,10 @@ export default function App() {
               )}
               {activeTab === 'templates' && (
                 <div className="flex-1 overflow-auto p-8">
-                  <EmailTemplateConfig onBack={() => setActiveTab('collection')} />
+                  <EmailTemplateConfig
+                    onBack={() => setActiveTab('collection')}
+                    unitName={businessUnitName || user.unitName}
+                  />
                 </div>
               )}
               {activeTab === 'settings' && (
