@@ -301,7 +301,7 @@ export const generateEstadoCuentaPDF = (client, receivables, contractInfo = {}, 
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(...titleColor);
-        doc.text(title, 14, yPos);
+        doc.text(title, pageWidth / 2, yPos, { align: 'center' });
         yPos += 2;
 
         autoTable(doc, {
@@ -385,7 +385,7 @@ export const generateEstadoCuentaPDF = (client, receivables, contractInfo = {}, 
         doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(0, 0, 0);
-        doc.text('Detalle de Movimientos', 14, yPos);
+        doc.text('Detalle de Movimientos', pageWidth / 2, yPos, { align: 'center' });
         yPos += 8;
         createTable('Rentas', rentas, primaryColor);
     }
@@ -396,7 +396,7 @@ export const generateEstadoCuentaPDF = (client, receivables, contractInfo = {}, 
             doc.setFontSize(12);
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(0, 0, 0);
-            doc.text('Detalle de Movimientos', 14, yPos);
+            doc.text('Detalle de Movimientos', pageWidth / 2, yPos, { align: 'center' });
             yPos += 8;
         }
         createTable('Servicios', servicios, [234, 179, 8]); // amber-500
