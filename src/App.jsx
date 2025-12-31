@@ -29,6 +29,7 @@ import { useBusinessUnit } from './hooks/useBusinessUnit';
 import { useClientPortalUsers } from './hooks/useClientPortalUsers';
 import { generateBulkInvoices, cancelReceivables, revertPayment } from './services/invoiceService';
 import { useContracts } from './hooks/useContracts';
+import { getTemplates } from './services/templateService'; // Cache templates
 
 // Componente wrapper para el formulario de contrato que usa el mismo hook que ClientDetailView
 // Este componente debe compartir el mismo hook que ClientDetailViewWithPortalUsers
@@ -199,6 +200,7 @@ export default function App() {
 
   // New state for navigation history
   const [cameFromDashboard, setCameFromDashboard] = useState(false);
+  const [allTemplates, setAllTemplates] = useState([]); // Cache for templates
   const [selectedOverdue, setSelectedOverdue] = useState([]);
   const [selectedReminders, setSelectedReminders] = useState([]);
   const [contractsRefreshKey, setContractsRefreshKey] = useState(0); // Para forzar recarga de contratos
@@ -252,6 +254,19 @@ export default function App() {
     shouldLoadAdminData ? user.unitId : null,
     60 // días hacia adelante
   );
+
+  // Fetch templates when unitId is available
+  useEffect(() => {
+    const fetchAllTemplates = async () => {
+      if (user?.unitId) {
+        const { data } = await getTemplates(user.unitId);
+        if (data) {
+          setAllTemplates(data);
+        }
+      }
+    };
+    fetchAllTemplates();
+  }, [user?.unitId]);
 
   // Pagos del cliente (solo si es cliente)
   // TODO: Restaurar cuando se implemente usePayments
@@ -761,11 +776,13 @@ export default function App() {
                   user={user}
                   loading={remindersLoading}
                   unitName={businessUnitName || user.unitName}
+                  templates={allTemplates.filter(t => t.type === 'Recordatorio')}
                 />
               )}
               {activeTab === 'collection' && (
                 <CollectionDashboard
                   unitName={businessUnitName || user.unitName}
+                  templates={allTemplates.filter(t => t.type === 'Cobranza')} // Pass filtered templates
                   onBack={cameFromDashboard ? () => { setActiveTab('dashboard'); setCameFromDashboard(false); } : null}
                   onClientClick={(clientId) => {
                     const client = filteredClients.find(c => c.id === clientId);

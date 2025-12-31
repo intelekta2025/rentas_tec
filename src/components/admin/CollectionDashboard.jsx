@@ -20,7 +20,7 @@ import { getTemplates } from '../../services/templateService';
 import { useAuth } from '../../hooks/useAuth';
 
 
-export default function CollectionDashboard({ unitName, onClientClick, onBack }) {
+export default function CollectionDashboard({ unitName, onClientClick, onBack, templates: propTemplates }) {
     const { user } = useAuth();
     const [clients, setClients] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -52,9 +52,19 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack })
     }, [user]);
 
     // Fetch Templates
+    // Fetch Templates or use Props
     React.useEffect(() => {
+        if (propTemplates && propTemplates.length > 0) {
+            setTemplates(propTemplates);
+            // Set default if exists
+            if (propTemplates.length > 0 && selectedTemplate === 'default') {
+                setSelectedTemplate(propTemplates[0].id);
+            }
+            return;
+        }
+
         const fetchTemplates = async () => {
-            if (!user?.unitId) return;
+            if (!user?.unitId || propTemplates) return;
             setLoadingTemplates(true);
             const { data } = await getTemplates(user.unitId, 'Cobranza');
             if (data) {
@@ -64,8 +74,11 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack })
             }
             setLoadingTemplates(false);
         };
-        fetchTemplates();
-    }, [user?.unitId]);
+
+        if (propTemplates === undefined) {
+            fetchTemplates();
+        }
+    }, [user?.unitId, propTemplates]);
 
     // --- Helpers ---
     const toggleRow = (id) => {
@@ -186,10 +199,8 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack })
                     {/* --- Toolbar --- */}
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
-                            <button className="px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2">
-                                <Filter className="w-4 h-4" /> Filtros
-                            </button>
-                            <span className="text-sm text-slate-500 ml-2">Mostrando {clients.length} clientes con deuda</span>
+
+                            <span className="text-sm text-slate-500">Mostrando {clients.length} clientes con deuda</span>
                         </div>
 
                         {/* Bulk Action Indicator */}
@@ -417,7 +428,12 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack })
                                                     // Receivables summary (aggregate)
                                                     const totalBalance = clientData.invoices.reduce((sum, inv) => sum + inv.amount, 0);
                                                     const concepts = clientData.invoices.map(inv => inv.concept).join(', ');
-                                                    const dueDates = clientData.invoices.map(inv => inv.dueDate).join(', ');
+                                                    const dueDates = clientData.invoices.map(inv => {
+                                                        if (!inv.dueDate) return '';
+                                                        const [year, month, day] = inv.dueDate.split('-');
+                                                        const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                                                        return date.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+                                                    }).join(', ');
                                                     const types = [...new Set(clientData.invoices.map(inv => inv.type || 'N/A'))].join(', ');
 
                                                     processed = processed.replace(/\{\{receivables\.concept\}\}/g, concepts);
@@ -474,7 +490,7 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack })
                                                 };
 
                                                 // Call n8n webhook
-                                                const response = await fetch('https://n8n-t.intelekta.ai/webhook-test/c5be4efd-e1b3-40ca-b75e-ca681d345850', {
+                                                const response = await fetch('https://n8n-t.intelekta.ai/webhook/c5be4efd-e1b3-40ca-b75e-ca681d345850', {
                                                     method: 'POST',
                                                     headers: {
                                                         'Content-Type': 'application/json'

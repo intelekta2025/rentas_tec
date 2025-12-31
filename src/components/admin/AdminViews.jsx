@@ -2681,7 +2681,7 @@ export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelecti
   );
 };
 
-export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleReminderSelection, setSelectedReminders, user, unitName }) => {
+export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleReminderSelection, setSelectedReminders, user, unitName, templates: propTemplates }) => {
   const [filterType, setFilterType] = useState('currentMonth'); // 'currentMonth' | 'nextMonth'
   const [showModal, setShowModal] = useState(false);
 
@@ -2691,9 +2691,21 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
   const [loadingTemplates, setLoadingTemplates] = useState(false);
 
   // Fetch Templates
+  // Fetch Templates or use Props
   useEffect(() => {
+    if (propTemplates && propTemplates.length > 0) {
+      setTemplates(propTemplates);
+      if (selectedTemplate === 'default') {
+        setSelectedTemplate(propTemplates[0].id);
+      }
+      return;
+    }
+
     const fetchTemplates = async () => {
-      if (!user?.unitId) return;
+      if (!user?.unitId || propTemplates) return; // Don't fetch if props exist (even empty, implies parent handles it) OR if we want to fallback? 
+      // Actually strictly speaking, if propTemplates passed we rely on it.
+      // But initially it might be empty array.
+
       setLoadingTemplates(true);
       const { data } = await getTemplates(user.unitId, 'Recordatorio');
       if (data) {
@@ -2702,8 +2714,12 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
       }
       setLoadingTemplates(false);
     };
-    fetchTemplates();
-  }, [user?.unitId]);
+
+    // Only fetch if propTemplates is undefined (legacy mode)
+    if (propTemplates === undefined) {
+      fetchTemplates();
+    }
+  }, [user?.unitId, propTemplates]);
 
   const now = new Date();
   const currentMonth = now.getMonth();
@@ -3042,7 +3058,12 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
                         // Receivables summary (aggregate)
                         const totalBalance = clientData.invoices.reduce((sum, inv) => sum + (parseFloat(String(inv.amount).replace(/[^0-9.-]+/g, '')) || 0), 0);
                         const concepts = clientData.invoices.map(inv => inv.concept).join(', ');
-                        const dueDates = clientData.invoices.map(inv => inv.dueDate).join(', ');
+                        const dueDates = clientData.invoices.map(inv => {
+                          if (!inv.dueDate) return '';
+                          const [year, month, day] = inv.dueDate.split('-');
+                          const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                          return date.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+                        }).join(', ');
                         const types = [...new Set(clientData.invoices.map(inv => inv.type || 'N/A'))].join(', ');
 
                         processed = processed.replace(/\{\{receivables\.concept\}\}/g, concepts);
@@ -3094,7 +3115,7 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
                       };
 
                       // Call n8n webhook
-                      const response = await fetch('https://n8n-t.intelekta.ai/webhook-test/c5be4efd-e1b3-40ca-b75e-ca681d345850', {
+                      const response = await fetch('https://n8n-t.intelekta.ai/webhook/c5be4efd-e1b3-40ca-b75e-ca681d345850', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(webhookPayload)
