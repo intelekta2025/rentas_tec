@@ -59,7 +59,8 @@ export const generateEstadoCuentaPDF = (client, receivables, contractInfo = {}, 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     // Usamos el nombre de la unidad de negocio del cliente si está disponible, o un valor por defecto
-    const businessUnitName = client.unit_name || client.business_unit || 'Parque Tecnológico Culiacán';
+    const unitName = client.unit_name || client.business_unit || 'Parque Tecnológico Culiacán';
+    const businessUnitName = `PEI ${unitName}`;
     doc.text(businessUnitName, 14, 29, { align: 'left' });
 
     // ============ INFO CLIENTE Y CONTRATO (TABLA) ============
@@ -320,14 +321,14 @@ export const generateEstadoCuentaPDF = (client, receivables, contractInfo = {}, 
                 cellPadding: 2
             },
             columnStyles: {
-                0: { cellWidth: 35 }, // Concepto (reducido)
-                1: { cellWidth: 20, halign: 'center' }, // Días Vencidos (reducido)
-                2: { cellWidth: 35 }, // Ref MT (AUMENTADO significativamente)
+                0: { cellWidth: 35 }, // Concepto
+                1: { cellWidth: 20, halign: 'center' }, // Días Vencidos
+                2: { cellWidth: 30 }, // Ref MT (Reducido de 35 a 30)
                 3: { cellWidth: 18 }, // Fecha Pago
-                4: { cellWidth: 19, halign: 'right' }, // Monto (reducido)
-                5: { cellWidth: 19, halign: 'right' }, // Pagado (reducido)
-                6: { cellWidth: 19, halign: 'right' }, // Saldo (reducido)
-                7: { cellWidth: 17, halign: 'center' } // Estado (reducido)
+                4: { cellWidth: 19, halign: 'right' }, // Monto
+                5: { cellWidth: 19, halign: 'right' }, // Pagado
+                6: { cellWidth: 19, halign: 'right' }, // Saldo
+                7: { cellWidth: 22, halign: 'center' } // Estado (Aumentado de 17 a 22)
             },
             didParseCell: function (data) {
                 // Colorear Días Vencidos
