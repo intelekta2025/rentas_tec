@@ -516,39 +516,6 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
             </button>
           </div>
         </div>
-
-        {/* Right Side: Portal Users Management */}
-        <div className="w-full md:w-64 bg-gray-50 p-4">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide">Usuarios del Portal</h3>
-            <button className="text-blue-600 hover:text-blue-800 text-xs font-medium flex items-center">
-              <UserPlus size={14} className="mr-1" /> Agregar
-            </button>
-          </div>
-          {portalUsersLoading ? (
-            <div className="py-2 text-center">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-900 mx-auto"></div>
-            </div>
-          ) : portalUsers.length === 0 ? (
-            <p className="text-xs text-gray-500 py-2 text-center italic">Sin usuarios registrados</p>
-          ) : (
-            <div className="space-y-3 max-h-40 overflow-y-auto pr-1">
-              {portalUsers.map((user) => (
-                <div key={user.id} className="flex items-center justify-between text-xs bg-white p-2 rounded border border-gray-200 shadow-sm">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-bold text-gray-900 truncate">{user.name || user.full_name || 'Sin nombre'}</p>
-                    <p className="text-[10px] text-gray-500 truncate">{user.email}</p>
-                  </div>
-                  <div className="flex items-center space-x-1 flex-shrink-0 ml-2">
-                    <button className="text-gray-400 hover:text-red-500 transition-colors" title="Eliminar">
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Main Content Area */}
@@ -1051,7 +1018,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
               <Download size={16} className="mr-2" /> Exportar Excel
             </button>
             <button className="flex items-center justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors">
-              <Mail size={16} className="mr-2" /> Enviar Estado de Cuenta por Correo
+              <FileText size={16} className="mr-2" /> Generar Estado de Cuenta (PDF)
             </button>
           </div>
         </div>
@@ -2711,7 +2678,7 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
     }
 
     const fetchTemplates = async () => {
-      if (!user?.unitId || propTemplates) return; // Don't fetch if props exist (even empty, implies parent handles it) OR if we want to fallback? 
+      if (!user?.unitId || propTemplates) return; // Don't fetch if props exist (even empty, implies parent handles it) OR if we want to fallback?
       // Actually strictly speaking, if propTemplates passed we rely on it.
       // But initially it might be empty array.
 
