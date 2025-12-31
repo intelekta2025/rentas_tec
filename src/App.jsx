@@ -66,7 +66,7 @@ const ContractFormWrapper = ({ client, user, onClose, onContractCreated, contrac
 };
 
 // Componente wrapper para ClientDetailView que carga los usuarios del portal y contratos
-const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, onBackToClients, setContractModalOpen, generateContractPreview, setTerminationModalOpen, contractsRefreshKey, onPrepareEdit, onEditClient, onGenerateCXC, onAddManualReceivable }) => {
+const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, onBackToClients, setContractModalOpen, generateContractPreview, setTerminationModalOpen, contractsRefreshKey, onPrepareEdit, onEditClient, onGenerateCXC, onAddManualReceivable, unitName }) => {
   const { portalUsers, loading: portalUsersLoading } = useClientPortalUsers(client?.id);
   const { contracts, loading: contractsLoading, addContract, finalizeContract, refreshContracts } = useContracts(client?.id);
 
@@ -116,6 +116,7 @@ const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, onBackToClients
   return (
     <ClientDetailView
       client={client}
+      unitName={unitName}
       setActiveTab={setActiveTab}
       onBackToClients={onBackToClients}
       setContractModalOpen={setContractModalOpen}
@@ -748,7 +749,16 @@ export default function App() {
                   setTerminationModalOpen={setTerminationModalOpen}
                   contractsRefreshKey={contractsRefreshKey}
                   onPrepareEdit={setContractToEdit}
-                  onEditClient={handleEditClientProfile}
+                  unitName={businessUnitName || user.unitName}
+                  onEditClient={async (clientId, clientData) => {
+                    const result = await updateClient(clientId, clientData);
+                    if (result.success) {
+                      await refreshClients();
+                      // Actualizar cliente seleccionado también
+                      setSelectedClient(prev => ({ ...prev, ...clientData }));
+                    }
+                    return result;
+                  }}
                   onGenerateCXC={async (invoices) => {
                     const result = await generateBulkInvoices(invoices);
                     // Forzar recarga de movimientos del cliente si fuera necesario

@@ -16,6 +16,7 @@ import { UNITS, mockStaff } from '../../data/constants';
 import * as invoiceService from '../../services/invoiceService';
 import { marketTecService } from '../../services/marketTecService';
 import { getTemplates } from '../../services/templateService';
+import { downloadEstadoCuentaPDF } from '../../services/pdfService';
 
 export const DashboardView = ({ adminStats, user, unitName, setActiveTab, onClientClick }) => {
   const currentYear = new Date().getFullYear();
@@ -231,7 +232,7 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
   );
 };
 
-export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setContractModalOpen, portalUsers = [], portalUsersLoading = false, contracts = [], contractsLoading = false, onFinalizeContract, onEditContract, onEditClient, onGenerateCXC, onUpdateReceivable, onDeleteReceivable, onAddPayment, onAddManualReceivable, onRevertPayment, receivables = [], receivablesLoading = false }) => {
+export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setContractModalOpen, portalUsers = [], portalUsersLoading = false, contracts = [], contractsLoading = false, onFinalizeContract, onEditContract, onEditClient, onGenerateCXC, onUpdateReceivable, onDeleteReceivable, onAddPayment, onAddManualReceivable, onRevertPayment, receivables = [], receivablesLoading = false, unitName }) => {
   const [isGenerateModalOpen, setGenerateModalOpen] = useState(false);
   const [contractToGenerate, setContractToGenerate] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -1017,7 +1018,46 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
             >
               <Download size={16} className="mr-2" /> Exportar Excel
             </button>
-            <button className="flex items-center justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors">
+            <button
+              onClick={() => {
+                // Agregar unitName al objeto cliente para que salga en el PDF
+                const clientForPdf = { ...client, unit_name: unitName };
+
+                // Calcular conteos de Renta y Servicios para el contrato seleccionado
+                // Usamos sortedReceivables que ya contiene los movimientos filtrados y ordenados
+                // pero necesitamos filtrar por el contrato actual si sortedReceivables pudiera tener de otros (aunque aqui ya esta filtrado por contrato)
+                // y contar por tipo.
+                const rentCount = (sortedReceivables || []).filter(r => r.type === 'Rent' || r.type === 'Renta').length;
+                const serviceCount = (sortedReceivables || []).filter(r => r.type === 'Service' || r.type === 'Services' || r.type === 'Luz' || (r.type !== 'Rent' && r.type !== 'Renta')).length;
+
+                // Calcular totales para las tarjetas resumen (mismo calculo que en la vista)
+                const pdfContractTotal = (sortedReceivables || []).reduce((acc, curr) => acc + (curr.amountRaw || 0), 0);
+                const pdfTotalPaid = (sortedReceivables || []).reduce((acc, curr) => acc + (curr.paidAmountRaw || 0), 0);
+
+                const calculatePdfBalance = (items) => items.reduce((acc, curr) => acc + (curr.balanceDueRaw || 0), 0);
+                const pdfBalance = calculatePdfBalance((sortedReceivables || []).filter(i =>
+                  ['pending', 'pendiente', 'partial', 'parcial', 'overdue'].includes(i.status.toLowerCase())
+                ));
+
+                const pdfOverdueTotal = calculatePdfBalance((sortedReceivables || []).filter(i =>
+                  i.status.toLowerCase() === 'overdue'
+                ));
+
+                const contractWithCounts = {
+                  ...selectedContract,
+                  cxc_renta: rentCount,
+                  cxc_servicios: serviceCount,
+                  // Totales para tarjetas
+                  total_contract: pdfContractTotal,
+                  total_paid: pdfTotalPaid,
+                  contract_balance: pdfBalance,
+                  overdue_debt: pdfOverdueTotal
+                };
+
+                downloadEstadoCuentaPDF(clientForPdf, sortedReceivables, contractWithCounts);
+              }}
+              className="flex items-center justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors"
+            >
               <FileText size={16} className="mr-2" /> Generar Estado de Cuenta (PDF)
             </button>
           </div>
