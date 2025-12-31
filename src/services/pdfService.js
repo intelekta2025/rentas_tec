@@ -71,47 +71,55 @@ export const generateEstadoCuentaPDF = (client, receivables, contractInfo = {}, 
     doc.text(client.name || client.business_name || 'Cliente', pageWidth / 2, yPos, { align: 'center' });
     yPos += 8;
 
-    // Preparar datos para la tabla de información
-    const infoRows = [];
+    // Información de Contacto (Centrada)
+    const contactParts = [];
+    if (client.contact || client.contact_name) contactParts.push(`Contacto: ${client.contact || client.contact_name}`);
+    if (client.email) contactParts.push(client.email);
+    if (client.contactPhone || client.contact_phone) contactParts.push(client.contactPhone || client.contact_phone);
 
-    // Columna izquierda: Info del cliente
-    const clientInfo = [];
-    if (client.email) clientInfo.push(`Correo: ${client.email}`);
-    if (client.contact || client.contact_name) clientInfo.push(`Contacto: ${client.contact || client.contact_name}`);
-    if (client.contactPhone || client.contact_phone) clientInfo.push(`Teléfono: ${client.contactPhone || client.contact_phone}`);
-
-    // Market Tec Receiver (movido a la columna izquierda)
-    const marketTecReceiver = client.user_market_tec || client.User_market_tec;
-    if (marketTecReceiver) {
-        clientInfo.push(`Market Tec Receiver: ${marketTecReceiver}`);
+    if (contactParts.length > 0) {
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...grayColor);
+        doc.text(contactParts.join(', '), pageWidth / 2, yPos, { align: 'center' });
+        yPos += 6;
     }
 
-    // Columna derecha: Info del contrato
-    const contractInfoTexts = [];
-    if (contractInfo && Object.keys(contractInfo).length > 0) {
-        // Fechas del contrato
-        if (contractInfo.start_date || contractInfo.end_date) {
-            let contractDates = '';
-            if (contractInfo.start_date) {
-                try {
-                    const startDate = new Date(contractInfo.start_date);
-                    const startFormatted = startDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
-                    contractDates += `Inicio: ${startFormatted}`;
-                } catch (e) {
-                    contractDates += `Inicio: ${contractInfo.start_date}`;
-                }
+    // Centrar información del contrato debajo del cliente
+    if (contractInfo && (contractInfo.start_date || contractInfo.end_date)) {
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...grayColor);
+
+        let contractDates = '';
+        if (contractInfo.start_date) {
+            try {
+                const startDate = new Date(contractInfo.start_date);
+                const startFormatted = startDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+                contractDates += `Inicio: ${startFormatted}`;
+            } catch (e) {
+                contractDates += `Inicio: ${contractInfo.start_date}`;
             }
-            if (contractInfo.end_date) {
-                try {
-                    const endDate = new Date(contractInfo.end_date);
-                    const endFormatted = endDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
-                    contractDates += contractDates ? ` | Fin: ${endFormatted}` : `Fin: ${endFormatted}`;
-                } catch (e) {
-                    contractDates += contractDates ? ` | Fin: ${contractInfo.end_date}` : `Fin: ${contractInfo.end_date}`;
-                }
-            }
-            if (contractDates) contractInfoTexts.push(`Contrato: ${contractDates}`);
         }
+        if (contractInfo.end_date) {
+            try {
+                const endDate = new Date(contractInfo.end_date);
+                const endFormatted = endDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+                contractDates += contractDates ? ` | Fin: ${endFormatted}` : `Fin: ${endFormatted}`;
+            } catch (e) {
+                contractDates += contractDates ? ` | Fin: ${contractInfo.end_date}` : `Fin: ${contractInfo.end_date}`;
+            }
+        }
+
+        if (contractDates) {
+            doc.text(`Contrato: ${contractDates}`, pageWidth / 2, yPos, { align: 'center' });
+            yPos += 6; // Espacio reducido
+        }
+    }
+
+    // Centrar CXC Rentas y Servicios en una sola línea
+    if (contractInfo && Object.keys(contractInfo).length > 0) {
+        let cxcTextParts = [];
 
         // CXC Rentas
         if (contractInfo.monthly_rent_amount != null) {
@@ -120,7 +128,7 @@ export const generateEstadoCuentaPDF = (client, receivables, contractInfo = {}, 
                 : parseFloat(contractInfo.monthly_rent_amount);
             if (!isNaN(amount)) {
                 const count = contractInfo.cxc_renta != null ? contractInfo.cxc_renta : 0;
-                contractInfoTexts.push(`CXC Rentas: $${amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })} (${count})`);
+                cxcTextParts.push(`CXC Rentas: $${amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })} (${count})`);
             }
         }
 
@@ -131,38 +139,21 @@ export const generateEstadoCuentaPDF = (client, receivables, contractInfo = {}, 
                 : parseFloat(contractInfo.monthly_services_amount);
             if (!isNaN(amount)) {
                 const count = contractInfo.cxc_servicios != null ? contractInfo.cxc_servicios : 0;
-                contractInfoTexts.push(`CXC Servicios: $${amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })} (${count})`);
+                cxcTextParts.push(`CXC Servicios: $${amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })} (${count})`);
             }
         }
+
+        if (cxcTextParts.length > 0) {
+            doc.setFontSize(10); // Mismo tamaño que contrato
+            doc.setTextColor(...grayColor);
+            doc.text(cxcTextParts.join('   |   '), pageWidth / 2, yPos, { align: 'center' });
+            yPos += 5; // Espacio reducido (antes 15)
+        } else {
+            yPos += 5;
+        }
+    } else {
+        yPos += 5;
     }
-
-    // Crear filas para la tabla (máximo de líneas entre ambas columnas)
-    const maxRows = Math.max(clientInfo.length, contractInfoTexts.length);
-    for (let i = 0; i < maxRows; i++) {
-        infoRows.push([
-            clientInfo[i] || '',
-            contractInfoTexts[i] || ''
-        ]);
-    }
-
-    // Tabla de información
-    autoTable(doc, {
-        startY: yPos,
-        body: infoRows,
-        theme: 'plain',
-        styles: {
-            fontSize: 9,
-            cellPadding: 1.5,
-            textColor: grayColor
-        },
-        columnStyles: {
-            0: { cellWidth: 95 },
-            1: { cellWidth: 95 }
-        },
-        margin: { left: 14, right: 14 }
-    });
-
-    yPos = doc.lastAutoTable.finalY + 5;
 
     // ============ TARJETAS DE RESUMEN ============
     // Usamos los totales calculados pasados en contractInfo, o calculamos defaults (aunque idealmente siempre vienen)
@@ -171,7 +162,7 @@ export const generateEstadoCuentaPDF = (client, receivables, contractInfo = {}, 
     const saldoPendiente = contractInfo.contract_balance || 0;
     const deudaVencida = contractInfo.overdue_debt || 0;
 
-    const cardsY = yPos + 10;
+    const cardsY = yPos + 5; // Espacio reducido (antes 10)
     const cardWidth = (pageWidth - 28 - (3 * 5)) / 4; // 4 tarjetas con espacio de 5 entre ellas
     const cardHeight = 25;
 
