@@ -256,15 +256,16 @@ export default function App() {
   );
 
   // Fetch templates when unitId is available
-  useEffect(() => {
-    const fetchAllTemplates = async () => {
-      if (user?.unitId) {
-        const { data } = await getTemplates(user.unitId);
-        if (data) {
-          setAllTemplates(data);
-        }
+  const fetchAllTemplates = async () => {
+    if (user?.unitId) {
+      const { data } = await getTemplates(user.unitId);
+      if (data) {
+        setAllTemplates(data);
       }
-    };
+    }
+  };
+
+  useEffect(() => {
     fetchAllTemplates();
   }, [user?.unitId]);
 
@@ -667,15 +668,11 @@ export default function App() {
             </h1>
           </div>
           <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-500 hidden md:inline">
-              {user.role === 'Admin' && (
-                <span className="font-semibold text-blue-800">
-                  {businessUnitName || user.unitName || `Unidad ${user.unitId}` || 'Sin unidad'}
-                </span>
-              )}
+            <span className="text-sm text-gray-600 hidden md:inline font-medium">
+              {user.full_name || user.name || 'Usuario'}
             </span>
             <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-800 font-semibold text-sm">
-              {user.name?.substring(0, 2).toUpperCase() || 'U'}
+              {(user.full_name || user.name)?.substring(0, 2).toUpperCase() || 'U'}
             </div>
           </div>
         </header>
@@ -822,6 +819,7 @@ export default function App() {
                   <EmailTemplateConfig
                     onBack={() => setActiveTab('collection')}
                     unitName={businessUnitName || user.unitName}
+                    onTemplateChange={fetchAllTemplates}
                   />
                 </div>
               )}

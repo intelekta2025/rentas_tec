@@ -3,7 +3,7 @@ import { Mail, Save, Eye, ArrowLeft, Send, CheckCircle, AlertCircle, Variable, F
 import { getTemplates, createTemplate, updateTemplate } from '../../services/templateService';
 import { useAuth } from '../../hooks/useAuth';
 
-export default function EmailTemplateConfig({ onBack, unitName }) {
+export default function EmailTemplateConfig({ onBack, unitName, onTemplateChange }) {
     const { user } = useAuth();
     const [activeStep, setActiveStep] = useState('list'); // list, edit, preview
     const [loading, setLoading] = useState(false);
@@ -89,6 +89,7 @@ export default function EmailTemplateConfig({ onBack, unitName }) {
             alert('Error al guardar: ' + result.error.message);
         } else {
             await loadTemplates();
+            if (onTemplateChange) onTemplateChange(); // Sync parent cache
             setActiveStep('list');
         }
         setLoading(false);

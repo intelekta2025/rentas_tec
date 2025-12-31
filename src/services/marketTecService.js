@@ -259,7 +259,7 @@ export const marketTecService = {
                 recordIds = pendingRecords.map(r => r.id);
             }
 
-            let webhookUrl = `https://n8n-t.intelekta.ai/webhook-test/c0a61e42-37a7-40a9-ac8f-24899ee74dc4?upload_id=${uploadId}`;
+            let webhookUrl = `https://n8n-t.intelekta.ai/webhook/c0a61e42-37a7-40a9-ac8f-24899ee74dc4?upload_id=${uploadId}`;
 
             if (recordIds && recordIds.length > 0) {
                 webhookUrl += `&record_ids=${recordIds.join(',')}`;

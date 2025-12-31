@@ -1971,6 +1971,12 @@ export const MarketTecView = ({ user, unitName }) => {
     setCurrentView(view);
   };
 
+  // Helper: Return to list view with data refresh
+  const handleBackToList = async () => {
+    await loadUploads();
+    setCurrentView('list');
+  };
+
   const handleDeleteUpload = async () => {
     if (!uploadToDelete) return;
 
@@ -2127,6 +2133,9 @@ export const MarketTecView = ({ user, unitName }) => {
               // Mostrar mensaje de éxito
               alert(`Conciliación correcta. Se procesaron ${status.processedCount} registros.${status.errorCount > 0 ? ` ${status.errorCount} registros con error.` : ''}`);
 
+              // Refresh list and go back
+              await loadUploads();
+
               return; // Detener polling
             }
 
@@ -2183,7 +2192,7 @@ export const MarketTecView = ({ user, unitName }) => {
 
           <div className="flex gap-3">
             <button
-              onClick={() => setCurrentView('list')}
+              onClick={handleBackToList}
               disabled={isReconciling}
               className={`px-4 py-2 text-slate-600 rounded-lg font-medium border border-slate-200 ${isReconciling ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'hover:bg-slate-100'}`}
             >
@@ -2693,9 +2702,9 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
   // Fetch Templates
   // Fetch Templates or use Props
   useEffect(() => {
-    if (propTemplates && propTemplates.length > 0) {
+    if (propTemplates !== undefined) {
       setTemplates(propTemplates);
-      if (selectedTemplate === 'default') {
+      if (propTemplates.length > 0 && selectedTemplate === 'default') {
         setSelectedTemplate(propTemplates[0].id);
       }
       return;
