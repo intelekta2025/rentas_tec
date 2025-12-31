@@ -15,6 +15,7 @@ import { StatusBadge, OverdueBadge, KPICard, RevenueChart, Modal } from '../ui/S
 import { UNITS, mockStaff } from '../../data/constants';
 import * as invoiceService from '../../services/invoiceService';
 import { marketTecService } from '../../services/marketTecService';
+import { getTemplates } from '../../services/templateService';
 
 export const DashboardView = ({ adminStats, user, unitName, setActiveTab, onClientClick }) => {
   const currentYear = new Date().getFullYear();
@@ -2681,10 +2682,73 @@ export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelecti
 };
 
 export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleReminderSelection, setSelectedReminders, user, unitName }) => {
-  const pendingReminders = filteredUpcoming.filter(i => !i.sent);
+  const [filterType, setFilterType] = useState('currentMonth'); // 'currentMonth' | 'nextMonth'
+  const [showModal, setShowModal] = useState(false);
+
+  // Template State
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState('default');
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+
+  // Fetch Templates
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      if (!user?.unitId) return;
+      setLoadingTemplates(true);
+      const { data } = await getTemplates(user.unitId);
+      if (data) {
+        setTemplates(data);
+        if (data.length > 0) setSelectedTemplate(data[0].id);
+      }
+      setLoadingTemplates(false);
+    };
+    fetchTemplates();
+  }, [user?.unitId]);
+
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  // Helper para determinar si una fecha cae en el mes actual o siguiente
+  const getMonthCategory = (dateString) => {
+    if (!dateString) return 'unknown';
+    // Ajustar zona horaria si es necesario o usar split para evitar conversiones UTC
+    // Asumimos formato YYYY-MM-DD
+    const [yearStr, monthStr] = String(dateString).split('-');
+    const year = parseInt(yearStr);
+    const month = parseInt(monthStr) - 1; // 0-indexed
+
+    if (year === currentYear && month === currentMonth) return 'currentMonth';
+
+    // Calcular mes siguiente
+    let nextMonth = currentMonth + 1;
+    let nextYear = currentYear;
+    if (nextMonth > 11) {
+      nextMonth = 0;
+      nextYear++;
+    }
+
+    if (year === nextYear && month === nextMonth) return 'nextMonth';
+
+    return 'other';
+  };
+
+  // Filtrar data
+  const currentMonthReminders = filteredUpcoming.filter(i => getMonthCategory(i.dueDate) === 'currentMonth');
+  const nextMonthReminders = filteredUpcoming.filter(i => getMonthCategory(i.dueDate) === 'nextMonth');
+
+  // Selección actual para la tabla
+  const displayedReminders = filterType === 'currentMonth' ? currentMonthReminders : nextMonthReminders;
+  const displayedPending = displayedReminders.filter(i => !i.sent);
+
+  // KPI stats
+  const currentMonthCount = currentMonthReminders.length;
+  const nextMonthCount = nextMonthReminders.length;
+  const pendingCount = displayedPending.length;
 
   return (
     <div className="space-y-6 animate-fade-in">
+
 
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
@@ -2692,57 +2756,121 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
           <h2 className="text-2xl font-bold text-gray-800 flex items-center">
             Recordatorios de Pago
             <span className="ml-3 px-2.5 py-0.5 bg-gray-100 text-gray-600 text-sm font-semibold rounded-full border border-gray-200">
-              {filteredUpcoming.length}
+              {displayedReminders.length}
             </span>
           </h2>
           <p className="text-sm text-gray-500">Unidad: {unitName || `Unidad ${user.unitId} ` || 'Sin unidad'}</p>
         </div>
-        <div className="flex space-x-3">
-          <button className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg flex items-center shadow-sm text-sm font-medium">
-            <Settings size={16} className="mr-2" />
-            Configurar Anticipación
-          </button>
-          <button
-            className={`px-4 py-2 rounded-lg flex items-center shadow-sm text-sm font-medium transition-colors ${selectedReminders.length > 0 ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
-            disabled={selectedReminders.length === 0}
-          >
-            <Send size={16} className="mr-2" />
-            Enviar {selectedReminders.length} Avisos
-          </button>
-        </div>
+
       </div>
 
-      {/* Dashboard Cards for Reminders */}
+      {/* Filter Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex items-center">
-          <div className="bg-blue-100 p-3 rounded-full text-blue-600 mr-3">
+        {/* Card: Vencen Mes Actual */}
+        <div
+          onClick={() => setFilterType('currentMonth')}
+          className={`p-4 rounded-lg border shadow-sm flex items-center cursor-pointer transition-all ${filterType === 'currentMonth' ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-300' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
+        >
+          <div className={`p-3 rounded-full mr-3 ${filterType === 'currentMonth' ? 'bg-blue-200 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
             <Calendar size={20} />
           </div>
           <div>
-            <div className="text-xs text-gray-500 font-medium uppercase">Próximos 15 días</div>
-            <div className="text-lg font-bold text-gray-800">{filteredUpcoming.length} Pagos</div>
+            <div className="text-xs text-gray-500 font-medium uppercase">Vencen Este Mes</div>
+            <div className={`text-lg font-bold ${filterType === 'currentMonth' ? 'text-blue-800' : 'text-gray-700'}`}>
+              {currentMonthCount} Pagos
+            </div>
           </div>
         </div>
 
+        {/* Card: Vencen Mes Siguiente */}
+        <div
+          onClick={() => setFilterType('nextMonth')}
+          className={`p-4 rounded-lg border shadow-sm flex items-center cursor-pointer transition-all ${filterType === 'nextMonth' ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-300' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
+        >
+          <div className={`p-3 rounded-full mr-3 ${filterType === 'nextMonth' ? 'bg-blue-200 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+            <Calendar size={20} />
+          </div>
+          <div>
+            <div className="text-xs text-gray-500 font-medium uppercase">Vencen Mes Siguiente</div>
+            <div className={`text-lg font-bold ${filterType === 'nextMonth' ? 'text-blue-800' : 'text-gray-700'}`}>
+              {nextMonthCount} Pagos
+            </div>
+          </div>
+        </div>
+
+        {/* Card: Pendientes de Envío (del filtro actual) */}
         <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex items-center">
           <div className="bg-yellow-100 p-3 rounded-full text-yellow-600 mr-3">
             <Mail size={20} />
           </div>
           <div>
             <div className="text-xs text-gray-500 font-medium uppercase">Pendientes de Envío</div>
-            <div className="text-lg font-bold text-gray-800">{pendingReminders.length}</div>
+            <div className="text-lg font-bold text-gray-800">{displayedPending.length}</div>
           </div>
+        </div>
+
+        {/* Card: Template Selector */}
+        <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm flex flex-col justify-center">
+          <label className="text-xs text-gray-500 font-medium uppercase mb-1 flex items-center gap-2">
+            <Mail size={12} /> Plantilla de Email
+          </label>
+          <div className="relative">
+            <select
+              value={selectedTemplate}
+              onChange={(e) => setSelectedTemplate(e.target.value)}
+              className="w-full appearance-none bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 pr-8"
+              disabled={loadingTemplates}
+            >
+              <option value="default" disabled>Seleccionar plantilla...</option>
+              {templates.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+              <ChevronDown size={14} />
+            </div>
+          </div>
+          <p className="text-[10px] text-gray-400 mt-1">
+            Se usará al enviar avisos.
+          </p>
         </div>
       </div>
 
       {/* Main Table */}
       <div className="bg-white shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
         <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-          <h3 className="text-lg font-medium leading-6 text-gray-900">Pagos Programados</h3>
-          <div className="flex space-x-2">
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-              Próximos 15 días
+          <div className="flex items-center gap-4">
+            <h3 className="text-lg font-medium leading-6 text-gray-900">Pagos Programados</h3>
+            {selectedReminders.length > 0 && (
+              <span className="text-sm font-medium text-indigo-900 animate-in fade-in">
+                {selectedReminders.length} seleccionados
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2">
+              {filterType === 'currentMonth' ? 'Mes Actual' : 'Mes Siguiente'}
             </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowModal(true)}
+                disabled={selectedReminders.length === 0}
+                className={`px-3 py-1.5 rounded-lg flex items-center shadow-sm text-sm font-medium transition-colors ${selectedReminders.length > 0 ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+              >
+                <Mail size={14} className="mr-1.5" />
+                Enviar Email
+              </button>
+              <button
+                onClick={() => setShowModal(true)}
+                disabled={selectedReminders.length === 0}
+                className={`px-3 py-1.5 rounded-lg flex items-center shadow-sm text-sm font-medium transition-colors ${selectedReminders.length > 0 ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+              >
+                <MessageCircle size={14} className="mr-1.5" />
+                Enviar WhatsApp
+              </button>
+            </div>
           </div>
         </div>
 
@@ -2756,12 +2884,12 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedReminders(pendingReminders.map(i => i.id));
+                        setSelectedReminders(displayedPending.map(i => i.id));
                       } else {
                         setSelectedReminders([]);
                       }
                     }}
-                    checked={selectedReminders.length === pendingReminders.length && pendingReminders.length > 0}
+                    checked={selectedReminders.length === displayedPending.length && displayedPending.length > 0}
                   />
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
@@ -2773,64 +2901,59 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredUpcoming.length > 0 ? (
-                filteredUpcoming.map((item) => (
-                  <tr key={item.id} className={`hover:bg-gray-50 transition-colors ${selectedReminders.includes(item.id) ? 'bg-blue-50' : ''}`}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {!item.sent && (
+              {displayedReminders.length > 0 ? (
+                displayedReminders.map((item) => {
+                  const daysDiff = Math.ceil((new Date(item.dueDate) - new Date()) / (1000 * 60 * 60 * 24));
+                  const isSelected = selectedReminders.includes(item.id);
+                  const isSent = item.sent;
+
+                  return (
+                    <tr key={item.id} className={isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'}>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <input
                           type="checkbox"
                           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          checked={selectedReminders.includes(item.id)}
+                          checked={isSelected}
+                          disabled={isSent}
                           onChange={() => toggleReminderSelection(item.id)}
                         />
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-bold text-gray-900">{item.client}</div>
-                      <div className="text-xs text-gray-500">Fecha límite: {item.dueDate}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-1">
-                        {(item.concepts || [item.concept]).map((c, idx) => (
-                          <span key={idx} className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${c.includes('Luz') ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'}`}>
-                            {c.includes('Luz') && <Zap size={10} className="mr-1 fill-current" />}
-                            {c}
+                      </td>
+                      <td className="px-6 py-4 font-medium text-gray-900">{item.client}</td>
+                      <td className="px-6 py-4 text-sm text-gray-500">{item.concept}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                        {typeof item.amount === 'number'
+                          ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(item.amount)
+                          : item.amount}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-bold rounded-full ${daysDiff < 3 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                          {daysDiff} días
+                        </span>
+                        <div className="text-xs text-gray-400 mt-1">{item.dueDate}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {isSent ? (
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                            Enviado
                           </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-bold text-gray-900">{item.amount}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`text-sm font-medium ${item.daysUntil <= 5 ? 'text-orange-600' : 'text-green-600'}`}>
-                        {item.daysUntil} días
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {item.sent ? (
-                        <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                          Enviado
-                        </span>
-                      ) : (
-                        <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                          Pendiente
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button className="text-gray-400 hover:text-blue-600" title="Ver Previsualización">
-                        <Eye size={18} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                        ) : (
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                            Pendiente
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button className="text-gray-400 hover:text-gray-600">
+                          <Eye size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
-                  <td colSpan="7" className="px-6 py-10 text-center text-gray-500">
-                    <CheckCircle className="mx-auto h-8 w-8 text-green-500 mb-2" />
-                    No hay recordatorios pendientes en esta unidad.
+                  <td colSpan="7" className="px-6 py-10 text-center text-gray-500 italic">
+                    No hay recordatorios encontrados para este periodo
                   </td>
                 </tr>
               )}
@@ -2838,9 +2961,176 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
           </table>
         </div>
       </div>
-    </div>
+      {/* Bulk Action Modal */}
+      {
+        showModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="p-6 border-b border-slate-100">
+                <h3 className="text-lg font-bold text-slate-900">Confirmar Envío Masivo</h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  Estás a punto de enviar recordatorios a <strong>{selectedReminders.length} pagos</strong>.
+                </p>
+              </div>
+              <div className="p-6 bg-slate-50 space-y-4">
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800 flex gap-2">
+                  <AlertCircle className="w-5 h-5 shrink-0" />
+                  <p>El sistema agrupará los pagos por cliente en un solo correo.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-500 uppercase">Resumen</label>
+                  <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100 max-h-40 overflow-y-auto">
+                    {(() => {
+                      const selectedItems = displayedPending.filter(i => selectedReminders.includes(i.id));
+                      const clients = [...new Set(selectedItems.map(i => i.client))];
+                      return clients.map(clientName => {
+                        const count = selectedItems.filter(i => i.client === clientName).length;
+                        return (
+                          <div key={clientName} className="p-3 flex justify-between items-center text-sm">
+                            <span className="truncate max-w-[200px] font-medium text-slate-700">{clientName}</span>
+                            <span className="text-slate-500">{count} pagos</span>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+              </div>
+              <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-white">
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const templateData = templates.find(t => t.id === selectedTemplate);
+                      if (!templateData) {
+                        alert("Por favor selecciona una plantilla válida.");
+                        return;
+                      }
+
+                      const selectedItems = displayedPending.filter(i => selectedReminders.includes(i.id));
+
+                      // Group by client
+                      const groupedItems = selectedItems.reduce((acc, item) => {
+                        const key = item.client;
+                        if (!acc[key]) {
+                          acc[key] = {
+                            clientId: item.clientId,
+                            clientName: item.client,
+                            email: item.email,
+                            contact: item.contactName,
+                            invoices: []
+                          };
+                        }
+                        acc[key].invoices.push(item);
+                        return acc;
+                      }, {});
+
+                      const clientList = Object.values(groupedItems);
+
+                      // Helper function to replace variables in template
+                      const processTemplate = (template, clientData, isBody = false) => {
+                        if (!template) return '';
+                        let processed = template;
+
+                        // Client variables
+                        processed = processed.replace(/\{\{client\.contact_name\}\}/g, clientData.contact || '');
+                        processed = processed.replace(/\{\{client\.business_name\}\}/g, clientData.clientName || '');
+                        processed = processed.replace(/\{\{client\.contact_email\}\}/g, clientData.email || '');
+
+                        // Receivables summary (aggregate)
+                        const totalBalance = clientData.invoices.reduce((sum, inv) => sum + (parseFloat(String(inv.amount).replace(/[^0-9.-]+/g, '')) || 0), 0);
+                        const concepts = clientData.invoices.map(inv => inv.concept).join(', ');
+                        const dueDates = clientData.invoices.map(inv => inv.dueDate).join(', ');
+                        const types = [...new Set(clientData.invoices.map(inv => inv.type || 'N/A'))].join(', ');
+
+                        processed = processed.replace(/\{\{receivables\.concept\}\}/g, concepts);
+                        processed = processed.replace(/\{\{receivables\.due_date\}\}/g, dueDates);
+                        processed = processed.replace(/\{\{receivables\.balance\}\}/g, `$${totalBalance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`);
+                        processed = processed.replace(/\{\{receivables\.type\}\}/g, types);
+
+                        // Business unit
+                        processed = processed.replace(/\{\{business_units\.name\}\}/g, user?.unitName || '');
+
+                        // Convert to HTML if it's the body
+                        if (isBody) {
+                          processed = processed.replace(/\n/g, '<br>');
+                          processed = `<div style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333;">${processed}</div>`;
+                        }
+
+                        return processed;
+                      };
+
+                      const selectedClientData = clientList.map(c => {
+                        const processedSubject = processTemplate(templateData.subject_template, c, false);
+                        const processedBody = processTemplate(templateData.body_template, c, true);
+
+                        return {
+                          clientId: c.id,
+                          clientName: c.clientName,
+                          email: c.email,
+                          contact: c.contact,
+                          subject: processedSubject,
+                          body: processedBody,
+                          receivables: c.invoices.map(inv => ({
+                            concept: inv.concept,
+                            dueDate: inv.dueDate,
+                            amount: inv.amount,
+                            daysOverdue: inv.daysOverdue,
+                            type: inv.type
+                          }))
+                        };
+                      });
+
+                      const webhookPayload = {
+                        templateId: selectedTemplate,
+                        templateName: templateData.name,
+                        unitId: user?.unitId,
+                        unitName: user?.unitName,
+                        clients: selectedClientData,
+                        totalClients: selectedClientData.length,
+                        timestamp: new Date().toISOString()
+                      };
+
+                      // Call n8n webhook
+                      const response = await fetch('https://n8n-t.intelekta.ai/webhook-test/c5be4efd-e1b3-40ca-b75e-ca681d345850', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(webhookPayload)
+                      });
+
+                      if (response.ok) {
+                        alert("Correos enviados exitosamente");
+                        setShowModal(false);
+                        setSelectedReminders([]);
+                      } else {
+                        alert("Error al enviar correos. Intente de nuevo.");
+                      }
+
+                    } catch (error) {
+                      console.error('Error sending:', error);
+                      alert("Error al enviar correos.");
+                    }
+                  }}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow-sm flex items-center gap-2 transition-colors"
+                >
+                  <Send className="w-4 h-4" />
+                  Enviar
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+    </div >
   );
 };
+
 
 // Componente de formulario para crear contrato
 export const ContractForm = ({ client, user, onClose, onSuccess, onAddContract, onUpdateContract, onRefreshContracts, contractToEdit }) => {

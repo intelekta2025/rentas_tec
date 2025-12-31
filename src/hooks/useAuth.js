@@ -98,7 +98,21 @@ export const useAuth = () => {
         const validRoles = ['Admin', 'Client', 'SuperAdmin', 'Staff'];
         if (session.user.role && validRoles.includes(session.user.role)) {
           // Si tiene role válido (app), establecer usuario
-          setUser(session.user)
+          // IMPORTANTE: Preservar datos del usuario actual si existen (ej. unitId)
+          // para evitar perder información durante token refresh
+          setUser(prevUser => {
+            // Si el usuario actual tiene datos que faltan en session.user, preservarlos
+            if (prevUser && prevUser.id === session.user.id) {
+              return {
+                ...prevUser,           // Datos actuales (incluye unitId, unitName, etc.)
+                ...session.user,       // Nuevos datos de sesión
+                // Forzar preservar campos críticos si están undefined en session.user
+                unitId: session.user.unitId ?? prevUser.unitId,
+                unitName: session.user.unitName ?? prevUser.unitName,
+              };
+            }
+            return session.user;
+          });
         } else {
           // Si no tiene role válido (ej. solo 'authenticated' o undefined), no establecer usuario
           console.warn(`⚠️ useAuth: Usuario con rol inválido (${session.user.role}), no estableciendo usuario`)

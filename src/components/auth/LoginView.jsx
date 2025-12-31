@@ -1,7 +1,7 @@
 // src/components/auth/LoginView.jsx
 import React, { useState } from 'react';
 import { Mail, Lock, XCircle } from 'lucide-react';
-import { AppLogo } from '../ui/Shared';
+import logoTec from '../../assets/logotec.png';
 
 export const LoginView = ({ onLogin, loginError }) => {
   const [email, setEmail] = useState('');
@@ -17,9 +17,9 @@ export const LoginView = ({ onLogin, loginError }) => {
     try {
       // onLogin ahora espera (email, password) y retorna una promesa
       const result = await onLogin(email, password);
-      
+
       console.log('📝 LoginView: Resultado del login:', result);
-      
+
       if (!result || !result.success) {
         const errorMessage = result?.error?.message || 'Error al iniciar sesión. Verifica tus credenciales.';
         setError(errorMessage);
@@ -44,17 +44,15 @@ export const LoginView = ({ onLogin, loginError }) => {
   const displayError = error || loginError;
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-white flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
+
         <div className="flex justify-center mb-4">
-           <AppLogo className="h-24 w-auto" />
+          <img src={logoTec} alt="Logo" className="w-96 h-auto" />
         </div>
-        <h2 className="text-center text-3xl font-extrabold text-gray-900">
-          Rentas & Servicios
+        <h2 className="text-center text-xl font-bold text-gray-900">
+          SARC-IA: Sistema Automatizado de Rentas y Cobranza con IA
         </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Acceso Unificado
-        </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">

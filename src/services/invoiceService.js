@@ -100,6 +100,9 @@ const mapReceivableFromDB = (dbReceivable) => {
     periodYear: dbReceivable.period_year || dYear,
     // Nombre del cliente (desde join o campo directo si existe)
     client: dbReceivable.clients?.business_name || dbReceivable.client_name || dbReceivable.client,
+    email: dbReceivable.clients?.contact_email || '',
+    contactName: dbReceivable.clients?.contact_name || '',
+    contactPhone: dbReceivable.clients?.contact_phone || '',
     // Campos formateados adicionales
     paidAmount: formatCurrency(dbReceivable.amount_paid),
     balanceDue: formatCurrency(dbReceivable.balance),
@@ -389,7 +392,7 @@ export const getUpcomingReminders = async (unitId = null, daysAhead = 30) => {
 
     let query = supabase
       .from('receivables') // Tabla real: receivables
-      .select('*, clients(business_name)')
+      .select('*, clients(business_name, contact_email, contact_name, contact_phone)')
       .in('status', ['Pending', 'Scheduled'])
       .gte('due_date', today.toISOString().split('T')[0])
       .lte('due_date', futureDate.toISOString().split('T')[0])

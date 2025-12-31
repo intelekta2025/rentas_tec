@@ -246,7 +246,7 @@ export default function App() {
     loading: remindersLoading
   } = useUpcomingReminders(
     shouldLoadAdminData ? user.unitId : null,
-    30 // días hacia adelante
+    60 // días hacia adelante
   );
 
   // Pagos del cliente (solo si es cliente)
@@ -596,7 +596,7 @@ export default function App() {
         <div className="flex-1 py-6 overflow-y-auto">
           <div className="px-6 mb-6">
             <div className="text-xs text-blue-400 uppercase font-semibold mb-1">
-              {user.role === 'Client' ? 'Portal de Cliente' : 'Unidad de Negocio'}
+              {user.role === 'Client' ? 'Portal de Cliente' : 'Parque Tecnológico'}
             </div>
             <div className="flex items-center text-white font-medium">
               <Building size={16} className="mr-2 text-blue-300" />
