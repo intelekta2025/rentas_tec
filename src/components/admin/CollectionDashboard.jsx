@@ -11,7 +11,8 @@ import {
     AlertCircle,
     ArrowUpRight,
     Send,
-    MessageCircle
+    MessageCircle,
+    ArrowLeft
 } from 'lucide-react';
 
 import { getCollectionStats } from '../../services/clientService';
@@ -19,7 +20,7 @@ import { getTemplates } from '../../services/templateService';
 import { useAuth } from '../../hooks/useAuth';
 
 
-export default function CollectionDashboard({ onClientClick, unitName }) {
+export default function CollectionDashboard({ unitName, onClientClick, onBack }) {
     const { user } = useAuth();
     const [clients, setClients] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -127,6 +128,15 @@ export default function CollectionDashboard({ onClientClick, unitName }) {
                 </div>
             ) : (
                 <div className="space-y-6 animate-fade-in">
+                    {onBack && (
+                        <button
+                            onClick={onBack}
+                            className="mb-2 flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors"
+                        >
+                            <ArrowLeft className="w-4 h-4" />
+                            <span className="text-sm font-medium">Volver al Dashboard</span>
+                        </button>
+                    )}
                     <div className="flex justify-between items-start">
                         <div>
                             <h2 className="text-2xl font-bold text-gray-800">Cobranza - {unitName || `Unidad ${user.unitId}`}</h2>

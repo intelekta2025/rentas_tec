@@ -69,6 +69,7 @@ const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, onBackToClients
   const { portalUsers, loading: portalUsersLoading } = useClientPortalUsers(client?.id);
   const { contracts, loading: contractsLoading, addContract, finalizeContract, refreshContracts } = useContracts(client?.id);
 
+
   // Cargar receivables (Estado de Cuenta) reales
   const { invoices: receivables, loading: receivablesLoading, refreshInvoices, editInvoice, addInvoice, addPayment, removeInvoice } = useInvoices({ clientId: client?.id });
 
@@ -195,6 +196,9 @@ export default function App() {
 
   // Selection & State
   const [selectedClient, setSelectedClient] = useState(null);
+
+  // New state for navigation history
+  const [cameFromDashboard, setCameFromDashboard] = useState(false);
   const [selectedOverdue, setSelectedOverdue] = useState([]);
   const [selectedReminders, setSelectedReminders] = useState([]);
   const [contractsRefreshKey, setContractsRefreshKey] = useState(0); // Para forzar recarga de contratos
@@ -614,11 +618,11 @@ export default function App() {
                 <SidebarItem icon={Users} label="Clientes" active={activeTab === 'clients' || activeTab === 'clientDetail'} onClick={() => setActiveTab('clients')} />
                 <SidebarItem icon={FileSpreadsheet} label="Market Tec" active={activeTab === 'marketTec'} onClick={() => setActiveTab('marketTec')} />
                 <SidebarItem icon={Mail} label="Recordatorios" active={activeTab === 'reminders'} onClick={() => setActiveTab('reminders')} />
-                <SidebarItem icon={DollarSign} label="Cobranza" active={activeTab === 'collection'} onClick={() => setActiveTab('collection')} />
+                <SidebarItem icon={DollarSign} label="Cobranza" active={activeTab === 'collection'} onClick={() => { setActiveTab('collection'); setCameFromDashboard(false); }} />
 
                 <div className="pt-4 pb-2 px-6 text-xs uppercase text-blue-400 font-semibold tracking-wider">Administración</div>
                 <SidebarItem icon={Settings} label="Configuración" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
-                <SidebarItem icon={FileText} label="Plantillas" active={activeTab === 'templates'} onClick={() => setActiveTab('templates')} />
+                <SidebarItem icon={FileText} label="Plantillas" active={activeTab === 'templates'} onClick={() => { setActiveTab('templates'); setCameFromDashboard(false); }} />
               </>
             ) : (
               <>
@@ -693,7 +697,15 @@ export default function App() {
                   adminStats={adminStats}
                   user={user}
                   unitName={businessUnitName || user.unitName}
-                  setActiveTab={setActiveTab}
+                  setActiveTab={(tab) => {
+                    setActiveTab(tab);
+                    // If navigating to collection from dashboard card, set flag
+                    if (tab === 'collection') {
+                      setCameFromDashboard(true);
+                    } else {
+                      setCameFromDashboard(false);
+                    }
+                  }}
                   onClientClick={(clientId) => {
                     const client = filteredClients.find(c => c.id === clientId);
                     if (client) {
@@ -745,6 +757,7 @@ export default function App() {
                   filteredUpcoming={filteredUpcoming}
                   selectedReminders={selectedReminders}
                   toggleReminderSelection={toggleReminderSelection}
+                  setSelectedReminders={setSelectedReminders}
                   user={user}
                   loading={remindersLoading}
                   unitName={businessUnitName || user.unitName}
@@ -753,6 +766,7 @@ export default function App() {
               {activeTab === 'collection' && (
                 <CollectionDashboard
                   unitName={businessUnitName || user.unitName}
+                  onBack={cameFromDashboard ? () => { setActiveTab('dashboard'); setCameFromDashboard(false); } : null}
                   onClientClick={(clientId) => {
                     const client = filteredClients.find(c => c.id === clientId);
                     if (client) {

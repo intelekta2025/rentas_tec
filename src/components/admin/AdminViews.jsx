@@ -2014,8 +2014,8 @@ export const MarketTecView = ({ user, unitName }) => {
     <div className="animate-in fade-in duration-300">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Historial de Importaciones</h2>
-          <p className="text-slate-500 text-sm">Monitor de cargas y conciliación</p>
+          <h2 className="text-lg font-medium text-slate-800">Historial de Importaciones</h2>
+
         </div>
       </div>
 
@@ -3067,7 +3067,7 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
                         const processedBody = processTemplate(templateData.body_template, c, true);
 
                         return {
-                          clientId: c.id,
+                          clientId: c.clientId,
                           clientName: c.clientName,
                           email: c.email,
                           contact: c.contact,
@@ -3076,8 +3076,8 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
                           receivables: c.invoices.map(inv => ({
                             concept: inv.concept,
                             dueDate: inv.dueDate,
-                            amount: inv.amount,
-                            daysOverdue: inv.daysOverdue,
+                            amount: parseFloat(String(inv.amount).replace(/[^0-9.-]+/g, '')) || 0,
+                            daysOverdue: parseInt(inv.daysOverdue) || 0,
                             type: inv.type
                           }))
                         };
@@ -3110,7 +3110,7 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
 
                     } catch (error) {
                       console.error('Error sending:', error);
-                      alert("Error al enviar correos.");
+                      alert(`Error al enviar correos: ${error.message}`);
                     }
                   }}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow-sm flex items-center gap-2 transition-colors"
