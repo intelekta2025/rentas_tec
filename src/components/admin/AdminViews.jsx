@@ -2140,8 +2140,9 @@ export const MarketTecView = ({ user, unitName }) => {
               // Mostrar mensaje de éxito
               alert(`Conciliación correcta. Se procesaron ${status.processedCount} registros.${status.errorCount > 0 ? ` ${status.errorCount} registros con error.` : ''}`);
 
-              // Refresh list and go back
+              // Refresh list and staging data
               await loadUploads();
+              await loadStagingForReview(selectedUploadId);
 
               return; // Detener polling
             }
