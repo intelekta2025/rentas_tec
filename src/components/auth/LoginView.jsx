@@ -1,7 +1,7 @@
 // src/components/auth/LoginView.jsx
 import React, { useState } from 'react';
 import { Mail, Lock, XCircle } from 'lucide-react';
-import logoTec from '../../assets/logotec.png';
+const logoTec = '/logotec.png';
 
 export const LoginView = ({ onLogin, loginError }) => {
   const [email, setEmail] = useState('');
