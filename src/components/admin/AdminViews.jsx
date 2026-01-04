@@ -1928,7 +1928,7 @@ export const MarketTecView = ({ user, unitName }) => {
       const uploadRecord = await marketTecService.createUploadRecord({
         unitId: currentUnitId,
         filename: file.name,
-        uploadedBy: user.id, // ID del usuario de supbase auth
+        uploadedBy: user.user_id, // ID numérico de system_users
         totalRecords,
         totalAmount
       });
