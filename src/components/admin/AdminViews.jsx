@@ -3424,82 +3424,186 @@ export const ContractForm = ({ client, user, onClose, onSuccess, onAddContract, 
   );
 };
 
-export const SettingsView = ({ setAddUserModalOpen }) => (
-  <div className="space-y-6 animate-fade-in">
-    <div className="flex justify-between items-center">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-800">Configuración & Equipo</h2>
-        <p className="text-sm text-gray-500">Gestión de usuarios y permisos del sistema.</p>
-      </div>
-      <button
-        onClick={() => setAddUserModalOpen(true)}
-        className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg flex items-center shadow-sm"
-      >
-        <UserPlus size={18} className="mr-2" />
-        Nuevo Usuario
-      </button>
-    </div>
+export const SettingsView = ({ setAddUserModalOpen, onEditUser }) => {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'Active', 'Inactive'
 
-    <div className="bg-white shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
-      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-        <h3 className="text-lg font-medium text-gray-900">Usuarios del Sistema (Staff)</h3>
-        <div className="flex space-x-2">
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-            {mockStaff.length} Usuarios Activos
-          </span>
+  // Importar el servicio dinámicamente para evitar dependencia circular
+  const loadUsers = async () => {
+    setLoading(true);
+    try {
+      const { getSystemUsers } = await import('../../services/userService');
+      const { data, error } = await getSystemUsers();
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (err) {
+      console.error('Error loading users:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const handleDeleteUser = async (userId, userName) => {
+    if (!window.confirm(`¿Estás seguro de que deseas desactivar al usuario "${userName}"?`)) {
+      return;
+    }
+
+    try {
+      const { deleteSystemUser } = await import('../../services/userService');
+      const { error } = await deleteSystemUser(userId);
+      if (error) throw error;
+
+      // Recargar lista
+      await loadUsers();
+    } catch (err) {
+      alert('Error al desactivar usuario: ' + err.message);
+    }
+  };
+
+  // Filtrar usuarios
+  const filteredUsers = filterStatus === 'all'
+    ? users
+    : users.filter(u => u.status === filterStatus);
+
+  const activeCount = users.filter(u => u.status === 'Active').length;
+
+  // Mapeo de roles a iconos
+  const getRoleIcon = (role) => {
+    switch (role) {
+      case 'Gerente de Unidad':
+        return <Shield size={14} className="mr-1 text-blue-500" />;
+      case 'Auditor':
+        return <Shield size={14} className="mr-1 text-purple-500" />;
+      case 'Asistente':
+        return <Shield size={14} className="mr-1 text-gray-500" />;
+      default:
+        return <Shield size={14} className="mr-1 text-blue-500" />;
+    }
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">Configuración & Equipo</h2>
+          <p className="text-sm text-gray-500">Gestión de usuarios y permisos del sistema.</p>
         </div>
+        <button
+          onClick={() => setAddUserModalOpen(true)}
+          className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg flex items-center shadow-sm"
+        >
+          <UserPlus size={18} className="mr-2" />
+          Nuevo Usuario
+        </button>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unidad Asignada</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-              <th scope="col" className="relative px-6 py-3"><span className="sr-only">Acciones</span></th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {mockStaff.map((staff) => (
-              <tr key={staff.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold text-xs mr-3">
-                      {staff.name.substring(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{staff.name}</div>
-                      <div className="text-xs text-gray-500">{staff.email}</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  <div className="flex items-center">
-                    <Shield size={14} className="mr-1 text-blue-500" />
-                    {staff.role}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {staff.unitId ? (staff.unitName || `Unidad ${staff.unitId} `) : <span className="text-gray-400 italic">Acceso Global</span>}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${staff.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {staff.status === 'Active' ? 'Activo' : 'Inactivo'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button className="text-blue-600 hover:text-blue-900 mr-4">Editar</button>
-                  <button className="text-red-400 hover:text-red-600"><Trash2 size={16} /></button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="bg-white shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
+        <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+          <h3 className="text-lg font-medium text-gray-900">Usuarios del Sistema (Staff)</h3>
+          <div className="flex space-x-2 items-center">
+            {/* Filtro de estado */}
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="text-xs border border-gray-300 rounded px-2 py-1"
+            >
+              <option value="all">Todos</option>
+              <option value="Active">Activos</option>
+              <option value="Inactive">Inactivos</option>
+            </select>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              {activeCount} Usuarios Activos
+            </span>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="p-8 text-center text-gray-500">
+            <Loader2 size={24} className="animate-spin mx-auto mb-2" />
+            Cargando usuarios...
+          </div>
+        ) : error ? (
+          <div className="p-8 text-center text-red-500">
+            Error: {error}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unidad Asignada</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                  <th scope="col" className="relative px-6 py-3"><span className="sr-only">Acciones</span></th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
+                      No hay usuarios para mostrar
+                    </td>
+                  </tr>
+                ) : (
+                  filteredUsers.map((staff) => (
+                    <tr key={staff.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold text-xs mr-3">
+                            {staff.name ? staff.name.substring(0, 2).toUpperCase() : '??'}
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{staff.name}</div>
+                            <div className="text-xs text-gray-500">{staff.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <div className="flex items-center">
+                          {getRoleIcon(staff.role)}
+                          {staff.role}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {staff.unitId ? (staff.unitName || `Unidad ${staff.unitId}`) : <span className="text-gray-400 italic">Acceso Global</span>}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${staff.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          {staff.status === 'Active' ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                          onClick={() => onEditUser && onEditUser(staff)}
+                          className="text-blue-600 hover:text-blue-900 mr-4"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(staff.id, staff.name)}
+                          className="text-red-400 hover:text-red-600"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 
