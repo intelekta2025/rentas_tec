@@ -80,25 +80,45 @@ export const marketTecService = {
         }
 
         // 3. Obtener clientes para validación de "Usuario MT"
-        const receiverNames = [...new Set(newRows.map(row => row['Receiver Name'] || row['Receptor'] || row['raw_order']).filter(Boolean))];
+        const receiverNames = [...new Set(newRows.map(row => (row['Receiver Name'] || row['Receptor'] || row['raw_order'] || '').toString().trim()).filter(Boolean))];
+        console.log('📋 Receiver Names from CSV:', receiverNames);
+
         let clientMap = {};
         if (receiverNames.length > 0) {
+            // Obtener TODOS los clientes con su ID y User_market_tec
             const { data: clients, error: clientError } = await supabase
                 .from('clients')
-                .select('"User_market_tec"')
-                .in('"User_market_tec"', receiverNames);
+                .select('id, "User_market_tec"');
+
+            console.log('📋 Clients query result:', { clients, clientError });
 
             if (!clientError && clients) {
+                // Crear mapa normalizado con el ID del cliente
                 clients.forEach(c => {
-                    clientMap[c.User_market_tec] = true;
+                    if (c.User_market_tec) {
+                        const normalizedKey = c.User_market_tec.toString().trim().toLowerCase();
+                        clientMap[normalizedKey] = c.id; // Guardamos el ID, no solo true
+                    }
                 });
+                console.log('📋 ClientMap keys:', Object.keys(clientMap));
             }
         }
 
         // 4. Mapeo para inserción
-        const formattedRows = newRows.map(row => {
-            const receiverName = row['Receiver Name'] || row['Receptor'] || row['raw_receiver_name'] || '';
-            const hasClient = clientMap[receiverName];
+        const formattedRows = newRows.map((row, index) => {
+            const receiverName = (row['Receiver Name'] || row['Receptor'] || row['raw_receiver_name'] || '').toString().trim();
+            const normalizedReceiverName = receiverName.toLowerCase();
+            const clientId = clientMap[normalizedReceiverName] || null; // Obtener el ID del cliente
+
+            if (index === 0) {
+                console.log('📋 First row matching debug:', {
+                    rawValue: row['Receiver Name'],
+                    receiverName,
+                    normalizedReceiverName,
+                    clientId,
+                    inMap: normalizedReceiverName in clientMap
+                });
+            }
 
             return {
                 upload_id: uploadId,
@@ -109,7 +129,8 @@ export const marketTecService = {
                 raw_receiver_name: receiverName,
                 raw_sku_name: row['SKU Name'] || row['SKU'] || row['raw_sku_name'] || '',
                 raw_status: row['Status raw value (temporary)'] || row['Status'] || row['Estatus'] || row['raw_status'] || '',
-                processing_status: hasClient ? 'PENDIENTE' : 'SIN CLIENTE'
+                client_id: clientId, // ¡CLAVE! Ahora asignamos el client_id
+                processing_status: clientId ? 'PENDIENTE' : 'SIN CXC'
             };
         });
 
@@ -196,14 +217,14 @@ export const marketTecService = {
         if (receiverNames.length > 0) {
             const { data: clients, error: clientError } = await supabase
                 .from('clients')
-                .select('id, business_name, "User_market_tec"') // Seleccionar User_market_tec con comillas
-                .in('"User_market_tec"', receiverNames);
+                .select('id, business_name, "User_market_tec"');
 
             if (!clientError && clients) {
-                // Crear mapa por User_market_tec
+                // Crear mapa normalizado (lowercase, trimmed) para comparación flexible
                 clients.forEach(c => {
                     if (c.User_market_tec) {
-                        clientMap[c.User_market_tec] = c;
+                        const normalizedKey = c.User_market_tec.toString().trim().toLowerCase();
+                        clientMap[normalizedKey] = c;
                     }
                 });
             } else if (clientError) {
@@ -213,7 +234,8 @@ export const marketTecService = {
 
         // 3. Mergear datos
         const enrichedData = stagingData.map(row => {
-            const client = clientMap[row.raw_receiver_name];
+            const normalizedReceiverName = (row.raw_receiver_name || '').toString().trim().toLowerCase();
+            const client = clientMap[normalizedReceiverName];
             return {
                 ...row,
                 client_matched_id: client ? client.id : null,
