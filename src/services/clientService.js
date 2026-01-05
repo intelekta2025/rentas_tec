@@ -99,68 +99,70 @@ export const getClients = async (unitId = null) => {
 
 
     // Mapear los datos al formato del frontend y calcular totales
-    const mappedData = (data || []).map(client => {
-      // Obtener IDs de contratos activos
-      const activeContractIds = (client.contracts || [])
-        .filter(contract => contract.status === 'Activo')
-        .map(contract => contract.id)
+    const mappedData = (data || [])
+      .filter(client => client && client.business_name) // Skip clients with missing data
+      .map(client => {
+        // Obtener IDs de contratos activos
+        const activeContractIds = (client.contracts || [])
+          .filter(contract => contract.status === 'Activo')
+          .map(contract => contract.id)
 
-      // Filtrar receivables solo de contratos activos
-      const receivables = (client.receivables || [])
-        .filter(r => r.contract_id && activeContractIds.includes(r.contract_id))
+        // Filtrar receivables solo de contratos activos
+        const receivables = (client.receivables || [])
+          .filter(r => r.contract_id && activeContractIds.includes(r.contract_id))
 
-      const totalContract = receivables.reduce((sum, r) => {
-        const amount = typeof r.amount === 'string' ? parseFloat(r.amount.replace(/[^0-9.-]+/g, '')) : r.amount
-        return sum + (amount || 0)
-      }, 0)
+        const totalContract = receivables.reduce((sum, r) => {
+          const amount = typeof r.amount === 'string' ? parseFloat(r.amount.replace(/[^0-9.-]+/g, '')) : r.amount
+          return sum + (amount || 0)
+        }, 0)
 
-      const pendingBalance = receivables.reduce((sum, r) => {
-        const balance = typeof r.balance === 'string' ? parseFloat(r.balance.replace(/[^0-9.-]+/g, '')) : r.balance
-        return sum + (balance || 0)
-      }, 0)
-
-      // Calcular conteos totales por tipo (sin importar status, pero SOLO contratos activos logicamente ya que usamos 'receivables')
-
-      const totalRentCount = receivables.filter(r => {
-        const type = (r.type || '').toLowerCase();
-        return type === 'rent' || type === 'renta';
-      }).length;
-
-      const totalServiceCount = receivables.filter(r => {
-        const type = (r.type || '').toLowerCase();
-        return type !== 'rent' && type !== 'renta';
-      }).length;
-
-      const overdueBalance = receivables.reduce((sum, r) => {
-        const isPaid = r.status === 'Paid'
-        // Chequeo de fechas si no está pagado
-        let isOverdue = false
-        if (!isPaid && r.due_date) {
-          const dueDate = new Date(r.due_date)
-          const today = new Date()
-          // Resetear horas para comparación solo de fecha
-          today.setHours(0, 0, 0, 0)
-          // Ajuste de zona horaria simple si es necesario, pero por ahora comparación directa
-          // Si la fecha de vencimiento es anterior a hoy
-          isOverdue = dueDate < today
-        }
-
-        if (isOverdue || r.status === 'Overdue') {
+        const pendingBalance = receivables.reduce((sum, r) => {
           const balance = typeof r.balance === 'string' ? parseFloat(r.balance.replace(/[^0-9.-]+/g, '')) : r.balance
           return sum + (balance || 0)
-        }
-        return sum
-      }, 0)
+        }, 0)
 
-      return mapClientFromDB({
-        ...client,
-        totalContract,
-        pendingBalance,
-        overdueBalance,
-        totalRentCount,
-        totalServiceCount
+        // Calcular conteos totales por tipo (sin importar status, pero SOLO contratos activos logicamente ya que usamos 'receivables')
+
+        const totalRentCount = receivables.filter(r => {
+          const type = (r.type || '').toLowerCase();
+          return type === 'rent' || type === 'renta';
+        }).length;
+
+        const totalServiceCount = receivables.filter(r => {
+          const type = (r.type || '').toLowerCase();
+          return type !== 'rent' && type !== 'renta';
+        }).length;
+
+        const overdueBalance = receivables.reduce((sum, r) => {
+          const isPaid = r.status === 'Paid'
+          // Chequeo de fechas si no está pagado
+          let isOverdue = false
+          if (!isPaid && r.due_date) {
+            const dueDate = new Date(r.due_date)
+            const today = new Date()
+            // Resetear horas para comparación solo de fecha
+            today.setHours(0, 0, 0, 0)
+            // Ajuste de zona horaria simple si es necesario, pero por ahora comparación directa
+            // Si la fecha de vencimiento es anterior a hoy
+            isOverdue = dueDate < today
+          }
+
+          if (isOverdue || r.status === 'Overdue') {
+            const balance = typeof r.balance === 'string' ? parseFloat(r.balance.replace(/[^0-9.-]+/g, '')) : r.balance
+            return sum + (balance || 0)
+          }
+          return sum
+        }, 0)
+
+        return mapClientFromDB({
+          ...client,
+          totalContract,
+          pendingBalance,
+          overdueBalance,
+          totalRentCount,
+          totalServiceCount
+        })
       })
-    })
 
     return { data: mappedData, error: null }
   } catch (error) {
