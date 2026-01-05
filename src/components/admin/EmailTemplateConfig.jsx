@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Save, Eye, ArrowLeft, Send, CheckCircle, AlertCircle, Variable, FileText, Code } from 'lucide-react';
-import { getTemplates, createTemplate, updateTemplate } from '../../services/templateService';
+import { Mail, Save, Eye, ArrowLeft, Send, CheckCircle, AlertCircle, Variable, FileText, Code, Trash2 } from 'lucide-react';
+import { getTemplates, createTemplate, updateTemplate, deleteTemplate } from '../../services/templateService';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function EmailTemplateConfig({ onBack, unitName, onTemplateChange }) {
@@ -95,6 +95,25 @@ export default function EmailTemplateConfig({ onBack, unitName, onTemplateChange
         setLoading(false);
     };
 
+    const handleDelete = async () => {
+        if (!editForm.id) return;
+
+        const confirmed = window.confirm(`¿Estás seguro de que deseas eliminar la plantilla "${editForm.name}"? Esta acción no se puede deshacer.`);
+        if (!confirmed) return;
+
+        setLoading(true);
+        const result = await deleteTemplate(editForm.id);
+
+        if (result.error) {
+            alert('Error al eliminar: ' + result.error.message);
+        } else {
+            await loadTemplates();
+            if (onTemplateChange) onTemplateChange();
+            setActiveStep('list');
+        }
+        setLoading(false);
+    };
+
     const insertVariable = (variable) => {
         if (activeField === 'body') {
             const textarea = document.getElementById('body-editor');
@@ -182,6 +201,11 @@ export default function EmailTemplateConfig({ onBack, unitName, onTemplateChange
                     </div>
                 </div>
                 <div className="flex gap-3">
+                    {editForm.id && (
+                        <button onClick={handleDelete} className="text-red-600 px-4 py-2 rounded-lg hover:bg-red-50 border border-red-300 transition flex items-center gap-2">
+                            <Trash2 size={18} /> Eliminar
+                        </button>
+                    )}
                     <button onClick={() => setActiveStep('preview')} className="text-slate-600 px-4 py-2 rounded-lg hover:bg-slate-100 border border-slate-300 transition flex items-center gap-2">
                         <Eye size={18} /> Previsualizar
                     </button>

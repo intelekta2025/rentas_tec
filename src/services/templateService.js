@@ -72,3 +72,24 @@ export const updateTemplate = async (id, templateData) => {
         return { data: null, error };
     }
 };
+
+/**
+ * Delete a template by ID
+ * @param {number} id 
+ * @returns {Promise<{error: any}>}
+ */
+export const deleteTemplate = async (id) => {
+    try {
+        const { error } = await supabase
+            .from('communication_templates')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+
+        return { error: null };
+    } catch (error) {
+        console.error('Error deleting template:', error);
+        return { error };
+    }
+};
