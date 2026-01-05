@@ -750,14 +750,8 @@ export default function App() {
                   contractsRefreshKey={contractsRefreshKey}
                   onPrepareEdit={setContractToEdit}
                   unitName={businessUnitName || user.unitName}
-                  onEditClient={async (clientId, clientData) => {
-                    const result = await updateClient(clientId, clientData);
-                    if (result.success) {
-                      await refreshClients();
-                      // Actualizar cliente seleccionado también
-                      setSelectedClient(prev => ({ ...prev, ...clientData }));
-                    }
-                    return result;
+                  onEditClient={(client) => {
+                    handleEditClientProfile(client);
                   }}
                   onGenerateCXC={async (invoices) => {
                     const result = await generateBulkInvoices(invoices);
