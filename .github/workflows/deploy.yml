@@ -74,7 +74,13 @@ jobs:
               --network supabase_default \
               -p 5000:80 \
               ghcr.io/${{ env.IMAGE_NAME }}:latest
-            
+              
+            # --- AGREGA ESTO AQUÍ ---
+            echo "Conectando Nginx a la red..."
+            # El "|| true" es importante: significa "si falla porque ya estaba conectado, no te detengas"
+            docker network connect supabase_default supabase-nginx-1 || true
+            docker restart supabase-nginx-1
+            # ------------------------
             # Limpiar basura
             docker image prune -f
 
