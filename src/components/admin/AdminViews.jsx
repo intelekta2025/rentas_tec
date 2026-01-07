@@ -829,7 +829,12 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
 
             <button
               onClick={() => setAddManualReceivableModalOpen(true)}
-              className="ml-4 px-4 py-1.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-sm font-medium flex items-center shadow-sm transition-all active:scale-95"
+              disabled={selectedContract?.status === 'Terminado'}
+              className={`ml-4 px-4 py-1.5 rounded-lg text-sm font-medium flex items-center shadow-sm transition-all active:scale-95 ${selectedContract?.status === 'Terminado'
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-blue-700 hover:bg-blue-800 text-white'
+                }`}
+              title={selectedContract?.status === 'Terminado' ? 'No se puede agregar CXC a un contrato terminado' : ''}
             >
               <Plus size={16} className="mr-2" /> Agregar CXC
             </button>
