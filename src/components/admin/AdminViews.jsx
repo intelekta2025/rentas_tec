@@ -3506,7 +3506,7 @@ export const SettingsView = ({ setAddUserModalOpen, onEditUser }) => {
 
       <div className="bg-white shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
         <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-          <h3 className="text-lg font-medium text-gray-900">Usuarios del Sistema (Staff)</h3>
+          <h3 className="text-lg font-medium text-gray-900">Usuarios del Sistema</h3>
           <div className="flex space-x-2 items-center">
             {/* Filtro de estado */}
             <select
