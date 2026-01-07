@@ -1008,7 +1008,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                         </button>
                         <button
                           className="text-red-400 hover:text-red-600 p-1"
-                          title="Eliminar Registro"
+                          title="Eliminar CXC"
                           onClick={(e) => {
                             e.stopPropagation();
                             setReceivableToDelete(item);
