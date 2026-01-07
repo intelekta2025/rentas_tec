@@ -2,6 +2,61 @@
 // Servicio para operaciones CRUD de usuarios del sistema
 
 import { supabase } from '../lib/supabase'
+import { createClient } from '@supabase/supabase-js'
+
+// Cliente Admin con service_role key para crear usuarios con auto-confirmación
+// NOTA: La service_role key solo debe usarse en backend o con cuidado en admin panel
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const serviceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
+
+let supabaseAdmin = null
+if (supabaseUrl && serviceRoleKey) {
+    supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+        auth: {
+            autoRefreshToken: false,
+            persistSession: false
+        }
+    })
+}
+
+/**
+ * Registra un nuevo usuario del sistema en Supabase Auth con auto-confirmación
+ * Usa la API de Admin para crear usuarios sin enviar correo de confirmación
+ * @param {object} formData - Datos del formulario de usuario
+ * @returns {Promise<{data: object, error: any}>}
+ */
+export const signUpSystemUser = async (formData) => {
+    const { email, password, fullName, role, unitId } = formData;
+
+    // Verificar que tenemos el cliente admin
+    if (!supabaseAdmin) {
+        console.error('No se puede crear usuario: falta VITE_SUPABASE_SERVICE_ROLE_KEY');
+        return {
+            data: null,
+            error: { message: 'Configuración incompleta. Contacta al administrador.' }
+        };
+    }
+
+    try {
+        // Usar la API de Admin para crear usuario con auto-confirmación
+        const { data, error } = await supabaseAdmin.auth.admin.createUser({
+            email,
+            password,
+            email_confirm: true, // Auto-confirmar, no envía correo
+            user_metadata: {
+                full_name: fullName,
+                role: role,
+                unit_id: unitId
+            }
+        });
+
+        if (error) throw error;
+        return { data, error: null };
+    } catch (error) {
+        console.error('Error creating system user:', error);
+        return { data: null, error };
+    }
+};
 
 /**
  * Obtener todos los usuarios del sistema con su unidad asignada

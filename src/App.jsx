@@ -16,6 +16,7 @@ import {
   MarketTecView, OverdueView, RemindersView, SettingsView,
   ContractForm, ClientForm
 } from './components/admin/AdminViews';
+import { UserForm } from './components/admin/UserForm';
 import CollectionDashboard from './components/admin/CollectionDashboard';
 import PendingReceivablesDashboard from './components/admin/PendingReceivablesDashboard';
 import NextMonthReceivablesDashboard from './components/admin/NextMonthReceivablesDashboard';
@@ -628,7 +629,7 @@ export default function App() {
           </div>
 
           <nav className="space-y-1">
-            {user.role === 'Admin' || user.role === 'SuperAdmin' ? (
+            {user.role !== 'Client' ? (
               <>
                 <SidebarItem icon={Home} label="Inicio" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
                 <div className="pt-4 pb-2 px-6 text-xs uppercase text-blue-400 font-semibold tracking-wider">Operaciones</div>
@@ -872,7 +873,12 @@ export default function App() {
         <div className="p-4">Formulario de Terminación</div>
       </Modal>
       <Modal isOpen={isAddUserModalOpen} onClose={() => setAddUserModalOpen(false)} title="Nuevo Usuario">
-        <div className="p-4">Formulario de Usuario</div>
+        <UserForm
+          onSuccess={() => {
+            // Opcional: recargar lista de usuarios si es necesario
+          }}
+          onClose={() => setAddUserModalOpen(false)}
+        />
       </Modal>
 
     </div>

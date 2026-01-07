@@ -95,7 +95,7 @@ export const useAuth = () => {
         // Esto forzará que se muestre la pantalla de login
         // Validar que el rol sea uno de los permitidos por la aplicación
         // Supabase por defecto envía user.role = 'authenticated', lo cual NO es suficiente
-        const validRoles = ['Admin', 'Client', 'SuperAdmin', 'Staff'];
+        const validRoles = ['Admin', 'Client', 'SuperAdmin', 'Staff', 'Administrador', 'Gerente', 'Asistente', 'Auditor'];
         if (session.user.role && validRoles.includes(session.user.role)) {
           // Si tiene role válido (app), establecer usuario
           // IMPORTANTE: Preservar datos del usuario actual si existen (ej. unitId)
@@ -165,7 +165,7 @@ export const useAuth = () => {
       }
 
       // Verificar que el usuario tiene un rol válido de aplicación
-      const validRoles = ['Admin', 'Client', 'SuperAdmin', 'Staff'];
+      const validRoles = ['Admin', 'Client', 'SuperAdmin', 'Staff', 'Administrador', 'Gerente', 'Asistente', 'Auditor'];
       if (!data.user.role || !validRoles.includes(data.user.role)) {
         const errorMessage = 'Usuario sin rol de aplicación asignado'
         console.error('Error: Usuario sin rol válido:', data.user.role);
