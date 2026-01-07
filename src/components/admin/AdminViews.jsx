@@ -2991,11 +2991,7 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button className="text-gray-400 hover:text-gray-600">
-                          <Eye size={18} />
-                        </button>
-                      </td>
+
                     </tr>
                   );
                 })

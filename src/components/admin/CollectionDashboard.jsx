@@ -37,7 +37,9 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack, t
         const fetchData = async () => {
             if (!user) return;
             setLoading(true);
-            const { data, error } = await getCollectionStats(user.unitId);
+            const effectiveUnitId = user.unitId || user.unit_id;
+            console.log('CollectionDashboard: Fetching data with unitId:', effectiveUnitId);
+            const { data, error } = await getCollectionStats(effectiveUnitId);
             if (!error && data) {
                 setClients(data);
                 // Expand first row if data exists
@@ -246,7 +248,6 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack, t
                                         <th className="p-4 text-right">Deuda Total</th>
                                         <th className="p-4 text-center">CXC</th>
                                         <th className="p-4">Antigüedad</th>
-                                        <th className="p-4 text-right">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -301,22 +302,12 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack, t
                                                     <td className="p-4">
                                                         {getBadges(client)}
                                                     </td>
-                                                    <td className="p-4 text-right">
-                                                        <div className="flex justify-end gap-1">
-                                                            <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Enviar Correo">
-                                                                <Mail className="w-4 h-4" />
-                                                            </button>
-                                                            <button className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Contactar por WhatsApp">
-                                                                <MessageCircle className="w-4 h-4" />
-                                                            </button>
-                                                        </div>
-                                                    </td>
                                                 </tr>
 
                                                 {/* Child Row (Invoices Detail) - Accordion Body */}
                                                 {isExpanded && (
                                                     <tr className="bg-slate-50/50 shadow-inner">
-                                                        <td colSpan="6" className="p-0">
+                                                        <td colSpan="5" className="p-0">
                                                             <div className="py-4 pl-16 pr-8 border-l-4 border-indigo-500 ml-0 animate-in slide-in-from-top-2 fade-in duration-200">
                                                                 <table className="w-full text-sm">
                                                                     <thead>
