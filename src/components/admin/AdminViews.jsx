@@ -3492,7 +3492,7 @@ export const SettingsView = ({ setAddUserModalOpen, onEditUser }) => {
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Configuración & Equipo</h2>
+          <h2 className="text-2xl font-bold text-gray-800">Usuarios</h2>
           <p className="text-sm text-gray-500">Gestión de usuarios y permisos del sistema.</p>
         </div>
         <button
