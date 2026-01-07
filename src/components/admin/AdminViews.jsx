@@ -3583,15 +3583,9 @@ export const SettingsView = ({ setAddUserModalOpen, onEditUser }) => {
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
                           onClick={() => onEditUser && onEditUser(staff)}
-                          className="text-blue-600 hover:text-blue-900 mr-4"
+                          className="text-blue-600 hover:text-blue-900"
                         >
                           Editar
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(staff.id, staff.name)}
-                          className="text-red-400 hover:text-red-600"
-                        >
-                          <Trash2 size={16} />
                         </button>
                       </td>
                     </tr>

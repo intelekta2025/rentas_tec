@@ -208,6 +208,7 @@ export default function App() {
   const [contractsRefreshKey, setContractsRefreshKey] = useState(0); // Para forzar recarga de contratos
   const [contractToEdit, setContractToEdit] = useState(null);
   const [clientToEdit, setClientToEdit] = useState(null);
+  const [userToEdit, setUserToEdit] = useState(null);
 
   // Hooks de datos de Supabase
   // Solo ejecutar hooks si el usuario tiene los datos necesarios
@@ -831,6 +832,10 @@ export default function App() {
               {activeTab === 'settings' && (
                 <SettingsView
                   setAddUserModalOpen={setAddUserModalOpen}
+                  onEditUser={(user) => {
+                    setUserToEdit(user);
+                    setAddUserModalOpen(true);
+                  }}
                 />
               )}
             </>
@@ -872,12 +877,17 @@ export default function App() {
       <Modal isOpen={isTerminationModalOpen} onClose={() => setTerminationModalOpen(false)} title="Finalizar Contrato">
         <div className="p-4">Formulario de Terminación</div>
       </Modal>
-      <Modal isOpen={isAddUserModalOpen} onClose={() => setAddUserModalOpen(false)} title="Nuevo Usuario">
+      <Modal
+        isOpen={isAddUserModalOpen}
+        onClose={() => { setAddUserModalOpen(false); setUserToEdit(null); }}
+        title={userToEdit ? "Editar Usuario" : "Nuevo Usuario"}
+      >
         <UserForm
+          userToEdit={userToEdit}
           onSuccess={() => {
             // Opcional: recargar lista de usuarios si es necesario
           }}
-          onClose={() => setAddUserModalOpen(false)}
+          onClose={() => { setAddUserModalOpen(false); setUserToEdit(null); }}
         />
       </Modal>
 

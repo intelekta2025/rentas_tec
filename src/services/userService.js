@@ -141,6 +141,15 @@ export const createSystemUser = async (userData) => {
  * @returns {Promise<{data: object, error: any}>}
  */
 export const updateSystemUser = async (id, userData) => {
+    // Verificar que tenemos el cliente admin
+    if (!supabaseAdmin) {
+        console.error('No se puede actualizar usuario: falta VITE_SUPABASE_SERVICE_ROLE_KEY');
+        return {
+            data: null,
+            error: { message: 'Configuración incompleta. Contacta al administrador.' }
+        };
+    }
+
     try {
         const updateData = {}
 
@@ -150,16 +159,26 @@ export const updateSystemUser = async (id, userData) => {
         if (userData.unitId !== undefined) updateData.unit_id = userData.unitId
         if (userData.status !== undefined) updateData.status = userData.status
 
-        const { data, error } = await supabase
+        console.log('Updating user with id:', id, 'data:', updateData)
+
+        // Usar supabaseAdmin para bypass RLS
+        const { data, error } = await supabaseAdmin
             .from('system_users')
             .update(updateData)
             .eq('id', id)
             .select()
-            .single()
 
         if (error) throw error
 
-        return { data, error: null }
+        // Verificar si se actualizó algún registro
+        if (!data || data.length === 0) {
+            return {
+                data: null,
+                error: { message: 'No se encontró el usuario para actualizar' }
+            }
+        }
+
+        return { data: data[0], error: null }
     } catch (error) {
         console.error('Error updating system user:', error)
         return { data: null, error }
