@@ -392,7 +392,15 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
         'Monto': parseFloat(String(item.amount || 0).replace(/[^0-9.-]+/g, "")),
         'Pagado': parseFloat(String(item.amount_paid || 0).replace(/[^0-9.-]+/g, "")),
         'Saldo': item.balanceDueRaw || 0,
-        'Estado': item.status
+        'Estado': (() => {
+          const status = (item.status || '').toLowerCase();
+          if (status === 'pending') return 'Pendiente';
+          if (status === 'paid') return 'Pagado';
+          if (status === 'overdue') return 'Vencido';
+          if (status === 'partial') return 'Parcial';
+          if (status === 'cancelled') return 'Cancelado';
+          return item.status;
+        })()
       };
     });
 
@@ -1214,7 +1222,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                 <h3 className="text-lg font-bold">¿Estás seguro?</h3>
               </div>
               <p className="text-gray-600">
-                Vas a eliminar el registro: <strong>{receivableToDelete?.concept}</strong> del mes <strong>{receivableToDelete?.periodMonth}/{receivableToDelete?.periodYear}</strong>.
+                Vas a eliminar la CXC: <strong>{receivableToDelete?.concept}</strong> del mes <strong>{receivableToDelete?.periodMonth}/{receivableToDelete?.periodYear}</strong>.
               </p>
               <p className="text-sm text-red-500 font-medium">
                 Esta acción no se puede deshacer y puede afectar los balances del contrato.
