@@ -736,16 +736,18 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                                 </button>
                               </div>
                             )}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onEditContract && onEditContract(contract);
-                              }}
-                              className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                              title="Editar contrato"
-                            >
-                              <Edit size={16} />
-                            </button>
+                            {isActive && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onEditContract && onEditContract(contract);
+                                }}
+                                className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                                title="Editar contrato"
+                              >
+                                <Edit size={16} />
+                              </button>
+                            )}
                             {isActive && (
                               <button
                                 onClick={(e) => {
