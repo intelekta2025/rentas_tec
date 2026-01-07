@@ -535,7 +535,7 @@ export const cancelReceivables = async (ids) => {
 
     const { error } = await supabase
       .from('receivables')
-      .update({ status: 'Cancelled' })
+      .update({ status: 'Cancelado' })
       .in('id', ids);
 
     if (error) throw error;

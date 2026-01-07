@@ -462,9 +462,11 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
     return acc + (curr.paidAmountRaw || 0);
   }, 0);
 
-  const contractTotal = filteredReceivables.reduce((acc, curr) => {
-    return acc + (curr.amountRaw || 0);
-  }, 0);
+  const contractTotal = filteredReceivables
+    .filter(curr => !['cancelled', 'cancelado'].includes((curr.status || '').toLowerCase()))
+    .reduce((acc, curr) => {
+      return acc + (curr.amountRaw || 0);
+    }, 0);
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -829,7 +831,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
               onClick={() => setAddManualReceivableModalOpen(true)}
               className="ml-4 px-4 py-1.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-sm font-medium flex items-center shadow-sm transition-all active:scale-95"
             >
-              <Plus size={16} className="mr-2" /> Agregar Registro
+              <Plus size={16} className="mr-2" /> Agregar CXC
             </button>
           </div>
 
@@ -1374,7 +1376,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
         <Modal
           isOpen={isAddManualReceivableModalOpen}
           onClose={() => !isGenerating && setAddManualReceivableModalOpen(false)}
-          title="Agregar Registro Manual (Estado de Cuenta)"
+          title="Agregar Cuenta x Cobrar"
         >
           <form onSubmit={handleAddManualReceivable} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -1388,7 +1390,6 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                 >
                   <option value="Rent">Renta</option>
                   <option value="Service">Servicio / Luz</option>
-                  <option value="Other">Otro</option>
                 </select>
               </div>
               <div>
@@ -1443,7 +1444,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Concepto (Opcional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Concepto</label>
               <input
                 type="text"
                 placeholder="Ej: Renta Enero 2025, Cargo Extra, etc."
