@@ -2329,7 +2329,7 @@ export const MarketTecView = ({ user, unitName }) => {
                         {row.pending_receivables_count || 0}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        {row.processing_status === 'SIN CXC' ? (
+                        {row.processing_status === 'SIN CXC' || row.processing_status === 'SIN CLIENTE' ? (
                           <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-medium border border-yellow-200">{row.processing_status}</span>
                         ) : (
                           <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded border border-emerald-200 font-medium">{row.processing_status}</span>
@@ -2918,14 +2918,6 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
               >
                 <Mail size={14} className="mr-1.5" />
                 Enviar Email
-              </button>
-              <button
-                onClick={() => setShowModal(true)}
-                disabled={selectedReminders.length === 0}
-                className={`px-3 py-1.5 rounded-lg flex items-center shadow-sm text-sm font-medium transition-colors ${selectedReminders.length > 0 ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
-              >
-                <MessageCircle size={14} className="mr-1.5" />
-                Enviar WhatsApp
               </button>
             </div>
           </div>
