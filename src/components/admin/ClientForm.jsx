@@ -113,29 +113,31 @@ const ClientForm = ({ clientToEdit, onSave, onClose, unitId }) => {
                     />
                 </div>
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Usuario Market Tec</label>
-                    <input
-                        type="text"
-                        name="User_market_tec"
-                        value={formData.User_market_tec}
-                        onChange={handleChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="Nombre de usuario"
-                    />
-                </div>
+                <div className="md:col-span-2 grid grid-cols-4 gap-4">
+                    <div className="col-span-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Usuario Market Tec</label>
+                        <input
+                            type="text"
+                            name="User_market_tec"
+                            value={formData.User_market_tec}
+                            onChange={handleChange}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Nombre de usuario"
+                        />
+                    </div>
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                    <select
-                        name="status"
-                        value={formData.status}
-                        onChange={handleChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                    >
-                        <option value="Activo">Activo</option>
-                        <option value="Inactivo">Inactivo</option>
-                    </select>
+                    <div className="col-span-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                        <select
+                            name="status"
+                            value={formData.status}
+                            onChange={handleChange}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                        >
+                            <option value="Activo">Activo</option>
+                            <option value="Inactivo">Inactivo</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
