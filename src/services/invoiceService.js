@@ -585,3 +585,61 @@ export const revertPayment = async (receivableId) => {
     return { success: false, error };
   }
 };
+
+/**
+ * Reactiva receivables cancelados de un contrato - cambia status de 'Cancelado' a 'Pending' o 'Overdue'
+ * dependiendo de la fecha de vencimiento
+ * @param {number} contractId - ID del contrato
+ * @returns {Promise<{success: boolean, error: object}>}
+ */
+export const reactivateContractReceivables = async (contractId) => {
+  try {
+    // 1. Obtener todos los receivables cancelados del contrato
+    const { data: cancelledReceivables, error: fetchError } = await supabase
+      .from('receivables')
+      .select('id, due_date')
+      .eq('contract_id', contractId)
+      .eq('status', 'Cancelado');
+
+    if (fetchError) throw fetchError;
+
+    if (!cancelledReceivables || cancelledReceivables.length === 0) {
+      return { success: true, error: null };
+    }
+
+    // 2. Determinar el nuevo status para cada receivable basándose en due_date
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const updates = cancelledReceivables.map(r => {
+      let newStatus = 'Pending';
+
+      if (r.due_date) {
+        const [year, month, day] = r.due_date.split('-').map(Number);
+        const dueDate = new Date(year, month - 1, day);
+        dueDate.setHours(0, 0, 0, 0);
+
+        if (dueDate < today) {
+          newStatus = 'Pending'; // El mapeo lo convertirá a Overdue automáticamente
+        }
+      }
+
+      return { id: r.id, status: newStatus };
+    });
+
+    // 3. Actualizar cada receivable
+    for (const update of updates) {
+      const { error: updateError } = await supabase
+        .from('receivables')
+        .update({ status: update.status })
+        .eq('id', update.id);
+
+      if (updateError) throw updateError;
+    }
+
+    return { success: true, error: null };
+  } catch (error) {
+    console.error('Error al reactivar receivables del contrato:', error);
+    return { success: false, error };
+  }
+};

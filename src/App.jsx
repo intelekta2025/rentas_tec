@@ -28,7 +28,7 @@ import { useClients } from './hooks/useClients';
 import { useInvoices, useOverdueInvoices, useUpcomingReminders } from './hooks/useInvoices';
 import { useBusinessUnit } from './hooks/useBusinessUnit';
 import { useClientPortalUsers } from './hooks/useClientPortalUsers';
-import { generateBulkInvoices, cancelReceivables, revertPayment } from './services/invoiceService';
+import { generateBulkInvoices, cancelReceivables, revertPayment, reactivateContractReceivables } from './services/invoiceService';
 import { useContracts } from './hooks/useContracts';
 import { getTemplates } from './services/templateService'; // Cache templates
 
@@ -69,7 +69,7 @@ const ContractFormWrapper = ({ client, user, onClose, onContractCreated, contrac
 // Componente wrapper para ClientDetailView que carga los usuarios del portal y contratos
 const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, onBackToClients, setContractModalOpen, generateContractPreview, setTerminationModalOpen, contractsRefreshKey, onPrepareEdit, onEditClient, onGenerateCXC, onAddManualReceivable, unitName }) => {
   const { portalUsers, loading: portalUsersLoading } = useClientPortalUsers(client?.id);
-  const { contracts, loading: contractsLoading, addContract, finalizeContract, refreshContracts } = useContracts(client?.id);
+  const { contracts, loading: contractsLoading, addContract, finalizeContract, reactivateContract, refreshContracts } = useContracts(client?.id);
 
 
   // Cargar receivables (Estado de Cuenta) reales
@@ -114,6 +114,17 @@ const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, onBackToClients
     return result;
   };
 
+  const handleReactivateContract = async (contract) => {
+    const result = await reactivateContract(contract.id);
+    if (result.success) {
+      // También reactivar los receivables cancelados del contrato
+      await reactivateContractReceivables(contract.id);
+      await refreshContracts();
+      await refreshInvoices();
+    }
+    return result;
+  };
+
   return (
     <ClientDetailView
       client={client}
@@ -130,6 +141,7 @@ const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, onBackToClients
       onFinalizeContract={handleFinalizeContract}
       onEditContract={handleEditContract}
       onAddContract={handleAddContract}
+      onReactivateContract={handleReactivateContract}
       onRefreshContracts={refreshContracts}
       onEditClient={onEditClient}
       onGenerateCXC={async (invoices) => {

@@ -146,3 +146,28 @@ export const terminateContract = async (contractId) => {
   }
 }
 
+/**
+ * Reactiva un contrato terminado (limpia termination_date y pone status a 'Activo')
+ * @param {number} contractId - ID del contrato
+ * @returns {Promise<{data: object, error: object}>}
+ */
+export const reactivateContract = async (contractId) => {
+  try {
+    const { data, error } = await supabase
+      .from('contracts')
+      .update({
+        termination_date: null,
+        status: 'Activo'
+      })
+      .eq('id', contractId)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    return { data, error: null }
+  } catch (error) {
+    console.error('Error al reactivar contract:', error)
+    return { data: null, error }
+  }
+}

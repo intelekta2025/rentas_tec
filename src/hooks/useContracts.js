@@ -2,7 +2,7 @@
 // Hook personalizado para obtener contratos de un cliente
 
 import { useState, useEffect, useCallback } from 'react'
-import { getContracts, createContract, updateContract, terminateContract } from '../services/contractService'
+import { getContracts, createContract, updateContract, terminateContract, reactivateContract as reactivateContractService } from '../services/contractService'
 
 export const useContracts = (clientId) => {
   const [contracts, setContracts] = useState([])
@@ -90,6 +90,20 @@ export const useContracts = (clientId) => {
     }
   }, [clientId])
 
+  const reactivateContractHook = async (contractId) => {
+    try {
+      const { data, error } = await reactivateContractService(contractId)
+      if (error) throw error
+      setContracts(prev => prev.map(contract =>
+        contract.id === contractId ? data : contract
+      ))
+      return { success: true, data, error: null }
+    } catch (err) {
+      setError(err.message)
+      return { success: false, data: null, error: err }
+    }
+  }
+
   return {
     contracts,
     loading,
@@ -97,6 +111,7 @@ export const useContracts = (clientId) => {
     addContract,
     editContract,
     finalizeContract,
+    reactivateContract: reactivateContractHook,
     refreshContracts,
   }
 }

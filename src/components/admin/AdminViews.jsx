@@ -232,7 +232,7 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
   );
 };
 
-export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setContractModalOpen, portalUsers = [], portalUsersLoading = false, contracts = [], contractsLoading = false, onFinalizeContract, onEditContract, onEditClient, onGenerateCXC, onUpdateReceivable, onDeleteReceivable, onAddPayment, onAddManualReceivable, onRevertPayment, receivables = [], receivablesLoading = false, unitName }) => {
+export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setContractModalOpen, portalUsers = [], portalUsersLoading = false, contracts = [], contractsLoading = false, onFinalizeContract, onEditContract, onEditClient, onGenerateCXC, onUpdateReceivable, onDeleteReceivable, onAddPayment, onAddManualReceivable, onRevertPayment, onReactivateContract, receivables = [], receivablesLoading = false, unitName }) => {
   const [isGenerateModalOpen, setGenerateModalOpen] = useState(false);
   const [contractToGenerate, setContractToGenerate] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -758,6 +758,18 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                                 <Ban size={16} />
                               </button>
                             )}
+                            {isTerminated && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onReactivateContract && onReactivateContract(contract);
+                                }}
+                                className="p-1 text-gray-400 hover:text-green-600 transition-colors"
+                                title="Reactivar contrato"
+                              >
+                                <RefreshCw size={16} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -831,8 +843,8 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
               onClick={() => setAddManualReceivableModalOpen(true)}
               disabled={selectedContract?.status === 'Terminado'}
               className={`ml-4 px-4 py-1.5 rounded-lg text-sm font-medium flex items-center shadow-sm transition-all active:scale-95 ${selectedContract?.status === 'Terminado'
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-blue-700 hover:bg-blue-800 text-white'
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-blue-700 hover:bg-blue-800 text-white'
                 }`}
               title={selectedContract?.status === 'Terminado' ? 'No se puede agregar CXC a un contrato terminado' : ''}
             >
