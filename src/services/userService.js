@@ -141,13 +141,11 @@ export const createSystemUser = async (userData) => {
  * @returns {Promise<{data: object, error: any}>}
  */
 export const updateSystemUser = async (id, userData) => {
-    // Verificar que tenemos el cliente admin
+    // Usar supabaseAdmin si está disponible, sino usar supabase normal
+    const client = supabaseAdmin || supabase;
+
     if (!supabaseAdmin) {
-        console.error('No se puede actualizar usuario: falta VITE_SUPABASE_SERVICE_ROLE_KEY');
-        return {
-            data: null,
-            error: { message: 'Configuración incompleta. Contacta al administrador.' }
-        };
+        console.warn('Usando cliente normal de Supabase para actualizar usuario (sin SERVICE_ROLE_KEY)');
     }
 
     try {
@@ -161,8 +159,7 @@ export const updateSystemUser = async (id, userData) => {
 
         console.log('Updating user with id:', id, 'data:', updateData)
 
-        // Usar supabaseAdmin para bypass RLS
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await client
             .from('system_users')
             .update(updateData)
             .eq('id', id)
@@ -174,7 +171,7 @@ export const updateSystemUser = async (id, userData) => {
         if (!data || data.length === 0) {
             return {
                 data: null,
-                error: { message: 'No se encontró el usuario para actualizar' }
+                error: { message: 'No se encontró el usuario para actualizar o no tienes permisos' }
             }
         }
 
