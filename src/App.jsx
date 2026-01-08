@@ -221,6 +221,7 @@ export default function App() {
   const [contractToEdit, setContractToEdit] = useState(null);
   const [clientToEdit, setClientToEdit] = useState(null);
   const [userToEdit, setUserToEdit] = useState(null);
+  const [usersRefreshKey, setUsersRefreshKey] = useState(0);
 
   // Hooks de datos de Supabase
   // Solo ejecutar hooks si el usuario tiene los datos necesarios
@@ -848,6 +849,7 @@ export default function App() {
                     setUserToEdit(user);
                     setAddUserModalOpen(true);
                   }}
+                  refreshKey={usersRefreshKey}
                 />
               )}
             </>
@@ -897,7 +899,7 @@ export default function App() {
         <UserForm
           userToEdit={userToEdit}
           onSuccess={() => {
-            // Opcional: recargar lista de usuarios si es necesario
+            setUsersRefreshKey(prev => prev + 1);
           }}
           onClose={() => { setAddUserModalOpen(false); setUserToEdit(null); }}
         />

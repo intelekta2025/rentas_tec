@@ -3440,7 +3440,7 @@ export const ContractForm = ({ client, user, onClose, onSuccess, onAddContract, 
   );
 };
 
-export const SettingsView = ({ setAddUserModalOpen, onEditUser }) => {
+export const SettingsView = ({ setAddUserModalOpen, onEditUser, refreshKey }) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -3464,7 +3464,7 @@ export const SettingsView = ({ setAddUserModalOpen, onEditUser }) => {
 
   useEffect(() => {
     loadUsers();
-  }, []);
+  }, [refreshKey]);
 
   const handleDeleteUser = async (userId, userName) => {
     if (!window.confirm(`¿Estás seguro de que deseas desactivar al usuario "${userName}"?`)) {
