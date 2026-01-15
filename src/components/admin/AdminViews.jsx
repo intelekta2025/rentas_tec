@@ -25,14 +25,14 @@ export const DashboardView = ({ adminStats, user, unitName, setActiveTab, onClie
   // Extraer años disponibles de los datos mensuales
   const availableYears = React.useMemo(() => {
     const years = new Set();
+    // Always add default years context (Current + Next)
+    years.add(currentYear);
+    years.add(currentYear + 1);
+
     (adminStats.monthlyStats || []).forEach(stat => {
       if (stat.year) years.add(stat.year);
     });
-    // Si no hay años en los datos, usar el año actual y el próximo
-    if (years.size === 0) {
-      years.add(currentYear);
-      years.add(currentYear + 1);
-    }
+
     return Array.from(years).sort((a, b) => b - a); // Orden descendente
   }, [adminStats.monthlyStats, currentYear]);
 

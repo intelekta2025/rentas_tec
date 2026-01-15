@@ -475,50 +475,137 @@ export default function App() {
 
       // 2. Comportamiento Mensual (Gráfica): Para 2025 y 2026
       if (!isCancelled) {
-        // Usar principalmente el periodo, si no el dueDate
-        const mYear = pYear || dYear;
-        const mMonth = pMonth || dMonth;
+        // --- PENDIENTE ---
+        // Se grafica en el mes del periodo/vencimiento de la factura
+        if (balance > 0) {
+          const mYear = pYear || dYear;
+          const mMonth = pMonth || dMonth;
 
-        // Incluir 2025 y 2026
-        if ((mYear === currentYear || mYear === currentYear + 1) && mMonth >= 1 && mMonth <= 12) {
-          const yearKey = mYear;
-          if (!acc.monthlyStatsByYear[yearKey]) {
-            acc.monthlyStatsByYear[yearKey] = [
-              { month: 'Ene', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
-              { month: 'Feb', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
-              { month: 'Mar', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
-              { month: 'Abr', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
-              { month: 'May', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
-              { month: 'Jun', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
-              { month: 'Jul', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
-              { month: 'Ago', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
-              { month: 'Sep', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
-              { month: 'Oct', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
-              { month: 'Nov', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
-              { month: 'Dic', collected: 0, pending: 0, year: yearKey, collectedItems: [], pendingItems: [] },
-            ];
-          }
-          acc.monthlyStatsByYear[yearKey][mMonth - 1].collected += paid;
-          acc.monthlyStatsByYear[yearKey][mMonth - 1].pending += balance;
+          if ((mYear === currentYear || mYear === currentYear + 1 || mYear === currentYear - 1) && mMonth >= 1 && mMonth <= 12) {
+            const yearKey = mYear;
+            if (!acc.monthlyStatsByYear[yearKey]) {
+              acc.monthlyStatsByYear[yearKey] = Array(12).fill(null).map((_, i) => ({
+                month: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][i],
+                collected: 0,
+                pending: 0,
+                year: yearKey,
+                collectedItems: [],
+                pendingItems: []
+              }));
+            }
 
-          // Store item details for the drawer
-          const itemDetail = {
-            id: curr.id,
-            clientId: curr.clientId,
-            clientName: curr.client || 'Sin nombre',
-            concept: curr.concept || '-',
-            dueDate: curr.dueDate,
-            amount: fullAmount,
-            paid: paid,
-            balance: balance,
-            status: curr.status
-          };
+            acc.monthlyStatsByYear[yearKey][mMonth - 1].pending += balance;
 
-          if (paid > 0) {
-            acc.monthlyStatsByYear[yearKey][mMonth - 1].collectedItems.push(itemDetail);
-          }
-          if (balance > 0) {
+            const itemDetail = {
+              id: curr.id,
+              clientId: curr.clientId,
+              clientName: curr.client || 'Sin nombre',
+              concept: curr.concept || '-',
+              dueDate: curr.dueDate,
+              amount: fullAmount,
+              paid: paid,
+              balance: balance,
+              status: curr.status
+            };
             acc.monthlyStatsByYear[yearKey][mMonth - 1].pendingItems.push(itemDetail);
+          }
+        }
+
+        // --- COBRADO ---
+        // Se grafica en el mes REAL del pago (payment_date)
+        if (curr.detailedPayments && curr.detailedPayments.length > 0) {
+          curr.detailedPayments.forEach(payment => {
+            if (payment.date && payment.amount > 0) {
+              const pDate = new Date(payment.date); // Presume YYYY-MM-DD local o ISO
+              // Ajuste simple para evitar desfase de zona horaria si es ISO puro
+              // Si la fecha viene como '2025-01-15', new Date() en local está bien.
+              // Si viene con T00:00:00.000Z, cuidado.
+              // El servicio mapea: app.payment_date || app.payments?.payment_date
+              // Asumimos string YYYY-MM-DD.
+
+              const parts = String(payment.date).split('T')[0].split('-');
+              let pyYear = 0, pyMonth = 0;
+              if (parts.length >= 2) {
+                pyYear = parseInt(parts[0]);
+                pyMonth = parseInt(parts[1]);
+              } else {
+                // Fallback
+                pyYear = pDate.getFullYear();
+                pyMonth = pDate.getMonth() + 1;
+              }
+
+              if ((pyYear === currentYear || pyYear === currentYear + 1 || pyYear === currentYear - 1) && pyMonth >= 1 && pyMonth <= 12) {
+                const yearKey = pyYear;
+                if (!acc.monthlyStatsByYear[yearKey]) {
+                  acc.monthlyStatsByYear[yearKey] = Array(12).fill(null).map((_, i) => ({
+                    month: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][i],
+                    collected: 0,
+                    pending: 0,
+                    year: yearKey,
+                    collectedItems: [],
+                    pendingItems: []
+                  }));
+                }
+
+                acc.monthlyStatsByYear[yearKey][pyMonth - 1].collected += payment.amount;
+
+                const itemDetail = {
+                  id: curr.id,
+                  clientId: curr.clientId,
+                  clientName: curr.client || 'Sin nombre',
+                  concept: curr.concept || '-',
+                  dueDate: curr.dueDate,
+                  amount: fullAmount,
+                  paid: paid, // Total paid for invoice context
+                  balance: balance,
+                  status: curr.status,
+                  paymentDate: payment.date,
+                  paymentAmount: payment.amount, // Amount specific to this payment
+                  paymentReference: payment.reference, // Pass reference info
+                  marketTecReceiver: curr.marketTecReceiver // Pass receiver info
+                };
+                acc.monthlyStatsByYear[yearKey][pyMonth - 1].collectedItems.push(itemDetail);
+              }
+            }
+          });
+        } else if (paid > 0) {
+          // Fallback para pagos antiguos sin detailedPayments (o migrados)
+          console.log('Using fallback for item (no detailedPayments):', curr.client, curr.id);
+          // Usamos la fecha de la factura como fallback si no hay pagos detallados
+          // O mejor, ignoramos si queremos ser estrictos, pero para no perder datos visuales:
+          const mYear = pYear || dYear;
+          const mMonth = pMonth || dMonth;
+
+          if ((mYear === currentYear || mYear === currentYear + 1 || mYear === currentYear - 1) && mMonth >= 1 && mMonth <= 12) {
+            const yearKey = mYear;
+            if (!acc.monthlyStatsByYear[yearKey]) {
+              acc.monthlyStatsByYear[yearKey] = Array(12).fill(null).map((_, i) => ({
+                month: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'][i],
+                collected: 0,
+                pending: 0,
+                year: yearKey,
+                collectedItems: [],
+                pendingItems: []
+              }));
+            }
+            acc.monthlyStatsByYear[yearKey][mMonth - 1].collected += paid;
+
+            const itemDetail = {
+              id: curr.id,
+              clientId: curr.clientId,
+              clientName: curr.client || 'Sin nombre',
+              concept: curr.concept || '-',
+              dueDate: curr.dueDate,
+              amount: fullAmount,
+              paid: paid,
+              balance: balance,
+              status: curr.status,
+              isFallback: true,
+              paymentDate: curr.paymentDates, // Use the string list of dates as fallback
+              paymentReference: curr.paymentReferences, // Use the string list of references as fallback
+              marketTecReceiver: curr.marketTecReceiver // Ensure this is passed too
+            };
+            acc.monthlyStatsByYear[yearKey][mMonth - 1].collectedItems.push(itemDetail);
           }
         }
       }

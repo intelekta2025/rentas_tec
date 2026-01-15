@@ -103,6 +103,7 @@ const mapReceivableFromDB = (dbReceivable) => {
     email: dbReceivable.clients?.contact_email || '',
     contactName: dbReceivable.clients?.contact_name || '',
     contactPhone: dbReceivable.clients?.contact_phone || '',
+    marketTecReceiver: dbReceivable.clients?.User_market_tec || '',
     // Campos formateados adicionales
     paidAmount: formatCurrency(dbReceivable.amount_paid),
     balanceDue: formatCurrency(dbReceivable.balance),
@@ -128,7 +129,14 @@ const mapReceivableFromDB = (dbReceivable) => {
     marketTecUploadIds: dbReceivable.payment_applications
       ?.map(app => app.payments?.upload_id)
       .filter(id => id)
-      .join(', ') || ''
+      .join(', ') || '',
+
+    // Detailed payments for precise graph plotting
+    detailedPayments: dbReceivable.payment_applications?.map(app => ({
+      date: app.payment_date || app.payments?.payment_date,
+      amount: parseFloat(app.amount_applied || 0),
+      reference: app.payments?.Market_tec_Referencia || ''
+    })).filter(p => p.date && p.amount > 0) || []
   }
 }
 
@@ -197,7 +205,7 @@ export const getInvoices = async (filters = {}) => {
       .from('receivables') // Tabla real: receivables
       .select(`
         *, 
-        clients(business_name),
+        clients(business_name, User_market_tec),
         payment_applications(
           payment_id,
           payment_date,
@@ -205,7 +213,8 @@ export const getInvoices = async (filters = {}) => {
             Market_tec_Referencia,
             payment_date,
             upload_id
-          )
+          ),
+          amount_applied
         )
       `)
       .order('due_date', { ascending: false })

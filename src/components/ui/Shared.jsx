@@ -1,9 +1,11 @@
 // src/components/ui/Shared.jsx
 import React, { useState } from 'react';
+import * as XLSX from 'xlsx';
 import {
   AlertTriangle,
   Clock,
-  School
+  School,
+  Download
 } from 'lucide-react';
 import { LOGO_URL } from '../../data/constants';
 
@@ -202,7 +204,7 @@ export const RevenueChart = ({ data, year = new Date().getFullYear(), title = "C
             <p className="text-xs text-gray-500">Comparativo Mensual: Cobrado vs. Pendiente (click en barra para detalles)</p>
           </div>
           <div className="flex items-center space-x-4">
-            {availableYears.length > 1 && onYearChange && (
+            {availableYears.length > 0 && onYearChange && (
               <div className="relative">
                 <select
                   value={year}
@@ -317,14 +319,42 @@ export const RevenueChart = ({ data, year = new Date().getFullYear(), title = "C
                     Total: ${drawerData.total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
-                <button
-                  onClick={() => setDrawerOpen(false)}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => {
+                      const runExport = () => {
+                        const data = drawerData.items.map(item => ({
+                          Cliente: item.clientName,
+                          Concepto: item.concept,
+                          'Fecha de Pago': item.paymentDate || '',
+                          'Fecha Vencimiento': item.dueDate || '',
+                          Monto: item.paymentAmount || item.paid || item.balance,
+                          Status: item.status,
+                          Referencia: item.paymentReference || '',
+                          'Market Tec Receiver': item.marketTecReceiver || ''
+                        }));
+
+                        const ws = XLSX.utils.json_to_sheet(data);
+                        const wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, ws, "Detalle");
+                        XLSX.writeFile(wb, `Detalle_Cobranza_${drawerData.month.replace(/\s/g, '_')}.xlsx`);
+                      };
+                      runExport();
+                    }}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500 hover:text-blue-600"
+                    title="Exportar a Excel"
+                  >
+                    <Download size={20} />
+                  </button>
+                  <button
+                    onClick={() => setDrawerOpen(false)}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -350,17 +380,36 @@ export const RevenueChart = ({ data, year = new Date().getFullYear(), title = "C
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-gray-900 truncate">{item.clientName}</p>
                           <p className="text-xs text-gray-500 truncate">{item.concept}</p>
-                          {item.dueDate && (
-                            <p className="text-xs text-gray-400 mt-1">Vence: {item.dueDate}</p>
+                          {/* Mostrar Fecha de Pago si está disponible (Cobrado), si no Vence (solo para Pendiente) */}
+                          {item.paymentDate ? (
+                            <p className="text-xs text-green-600 mt-1 font-medium">
+                              Fecha de Pago: {item.paymentDate}
+                            </p>
+                          ) : (
+                            // Ocultar Vence si estamos en modo Cobrado (para evitar confusión si falta fecha de pago)
+                            drawerData.type !== 'Cobrado' && item.dueDate && (
+                              <p className="text-xs text-gray-400 mt-1">Vence: {item.dueDate}</p>
+                            )
+                          )}
+                          {/* Mostrar Referencia Market Tec */}
+                          {item.paymentReference && (
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              Ref: {item.paymentReference}
+                            </p>
+                          )}
+                          {/* Mostrar Receiver de Market Tec */}
+                          {item.marketTecReceiver && (
+                            <p className="text-xs text-blue-600 mt-0.5">
+                              Market Tec: {item.marketTecReceiver}
+                            </p>
                           )}
                         </div>
                         <div className="text-right ml-3 flex-shrink-0">
                           {drawerData.type === 'Cobrado' ? (
-                            <p className="font-bold text-green-600">${item.paid?.toLocaleString('es-MX', { minimumFractionDigits: 2 }) || '0.00'}</p>
+                            <p className="font-bold text-green-600">${item.paymentAmount?.toLocaleString('es-MX', { minimumFractionDigits: 2 }) || item.paid?.toLocaleString('es-MX', { minimumFractionDigits: 2 }) || '0.00'}</p>
                           ) : (
                             <p className="font-bold text-orange-600">${item.balance?.toLocaleString('es-MX', { minimumFractionDigits: 2 }) || '0.00'}</p>
                           )}
-                          <p className="text-xs text-gray-400">{item.status}</p>
                         </div>
                       </div>
                       {onClientClick && item.clientId && (
