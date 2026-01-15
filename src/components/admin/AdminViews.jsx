@@ -11,6 +11,7 @@ import {
   ChevronUp, ChevronDown, Upload, AlertCircle, X, Loader2, Bot, ArrowRight,
   LayoutGrid, List, RefreshCw, ChevronLeft, Edit2, Save, UserCheck, UserX, RotateCcw, MessageCircle
 } from 'lucide-react';
+import { useSystemUsers } from '../../hooks/useSystemUsers';
 import { StatusBadge, OverdueBadge, KPICard, RevenueChart, Modal } from '../ui/Shared';
 import { UNITS, mockStaff } from '../../data/constants';
 import * as invoiceService from '../../services/invoiceService';
@@ -3440,31 +3441,9 @@ export const ContractForm = ({ client, user, onClose, onSuccess, onAddContract, 
   );
 };
 
-export const SettingsView = ({ setAddUserModalOpen, onEditUser, refreshKey }) => {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+export const SettingsView = ({ setAddUserModalOpen, onEditUser }) => {
+  const { users, loading, error, refreshUsers } = useSystemUsers();
   const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'Active', 'Inactive'
-
-  // Importar el servicio dinámicamente para evitar dependencia circular
-  const loadUsers = async () => {
-    setLoading(true);
-    try {
-      const { getSystemUsers } = await import('../../services/userService');
-      const { data, error } = await getSystemUsers();
-      if (error) throw error;
-      setUsers(data || []);
-    } catch (err) {
-      console.error('Error loading users:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadUsers();
-  }, [refreshKey]);
 
   const handleDeleteUser = async (userId, userName) => {
     if (!window.confirm(`¿Estás seguro de que deseas desactivar al usuario "${userName}"?`)) {
@@ -3476,8 +3455,9 @@ export const SettingsView = ({ setAddUserModalOpen, onEditUser, refreshKey }) =>
       const { error } = await deleteSystemUser(userId);
       if (error) throw error;
 
-      // Recargar lista
-      await loadUsers();
+      // No es estrictamente necesario llamar a refreshUsers() porque Realtime lo hará,
+      // pero lo dejamos por seguridad o para respuesta inmediata
+      await refreshUsers();
     } catch (err) {
       alert('Error al desactivar usuario: ' + err.message);
     }

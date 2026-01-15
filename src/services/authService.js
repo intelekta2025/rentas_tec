@@ -288,130 +288,38 @@ const updateLastLogin = async (userId) => {
 /**
  * Inicia sesión con email y contraseña
  */
+// Inicia sesión con email y contraseña
 export const signIn = async (email, password) => {
-  console.log('🔐 signIn: Iniciando login optimizado para', email)
+  console.log('🔐 signIn: Iniciando login optimizado...');
   try {
-    // 1. Autenticación con Supabase Auth
-    const loginPromise = supabase.auth.signInWithPassword({ email, password })
+    // 1. Autenticación con Supabase (La respuesta YA incluye los metadatos gracias al Trigger)
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-    const { data: authData, error: authError } = await withTimeout(
-      loginPromise,
-      30000, // 30s timeout
-      'Timeout: La autenticación con Supabase tardó demasiado. Verifica tu conexión.'
-    )
+    if (error) throw error;
+    if (!data?.user) throw new Error('No se recibieron datos del usuario');
 
-    if (authError) {
-      console.error('❌ Error de autenticación:', authError)
-      if (authError.message?.includes('schema')) {
-        return {
-          data: null,
-          error: {
-            message: 'Error de configuración en Supabase (schema).',
-            originalError: authError
-          }
-        }
-      }
-      throw authError
-    }
+    // 2. Extracción INSTANTÁNEA de datos (Sin consultas extra a la BD)
+    // Supabase guarda lo que inyectamos en SQL en "app_metadata"
+    const meta = data.user.app_metadata || {};
 
-    if (!authData?.user) {
-      return { data: null, error: { message: 'No se recibió información del usuario' } }
-    }
+    // Construimos el perfil con lo que ya tenemos en memoria
+    const userProfile = {
+      ...data.user,
+      role: meta.role || 'Client', // Fallback
+      unitId: meta.unitId || meta.unit_id,  // Trigger uses snake_case, JS uses camelCase
+      clientId: meta.clientId || meta.client_id // Trigger uses snake_case
+    };
 
-    // 2. Optimización: Verificar metadata (Custom Claims)
-    // Si el trigger ya sincronizó los datos, no necesitamos consultar la BD
-    const appMeta = authData.user.app_metadata || {};
-    if (appMeta.role && (appMeta.unit_id || appMeta.client_id || appMeta.is_staff || appMeta.is_client)) {
-      console.log('🚀 signIn: Login ultra-rápido usando Custom Claims');
+    // Log for debugging
+    console.log('✅ Login Ultra-Rápido completado:', userProfile.email);
+    console.log('📋 Metadata:', meta);
 
-      const profileData = {
-        id: authData.user.id,
-        role: appMeta.role,
-        unitId: appMeta.unit_id,
-        clientId: appMeta.client_id,
-        // Mapear otros campos si es necesario o dejar que se carguen en background
-      };
-
-      const userData = { ...authData.user, ...profileData };
-
-      // Fire and forget updating last login if client
-      if (profileData.clientId) {
-        updateLastLogin(authData.user.id).catch(console.error);
-      }
-
-      return { data: { ...authData, user: userData }, error: null };
-    }
-
-    // 3. Fallback: Obtener perfil (usando la versión paralela optimizada)
-    console.log('⚠️ signIn: Metadata no encontrada, consultando perfil en BD (Lento)...')
-
-    // Timeout ajustado: cada query individual es 8s, con retry = 16s max
-    // Damos 20s para cubrir ambas queries + overhead
-    let profileData = null
-    let profileError = null
-
-    try {
-      const result = await withTimeout(
-        getUserProfile(authData.user.id),
-        20000,
-        'Timeout al obtener perfil de usuario'
-      )
-      profileData = result.data
-      profileError = result.error
-    } catch (err) {
-      profileError = err
-    }
-
-    if (profileError) {
-      console.error('❌ Error al obtener perfil:', profileError)
-
-      // Si es timeout, retornamos error temporal pero NO cerramos sesión en Supabase
-      // para permitir reintentos transparentes si se implementan en UI
-      if (profileError.isTimeout || profileError.is406 || profileError.message?.includes('Timeout')) {
-        return {
-          data: null,
-          error: {
-            message: 'El servidor tardó demasiado en responder con tu perfil. Por favor intenta de nuevo.',
-            originalError: profileError,
-            isTemporary: true
-          }
-        }
-      }
-
-      // Error real, cerramos sesión
-      await supabase.auth.signOut()
-      return {
-        data: null,
-        error: { message: 'No se pudo obtener el perfil del usuario. Verifica permisos.' }
-      }
-    }
-
-    if (!profileData) {
-      console.error('❌ Perfil no encontrado')
-      await supabase.auth.signOut()
-      return { data: null, error: { message: 'Usuario no autorizado. No tienes perfil asignado.' } }
-    }
-
-    if (!profileData.role) {
-      await supabase.auth.signOut()
-      return { data: null, error: { message: 'Usuario sin rol asignado.' } }
-    }
-
-    // 3. Actualizar last_login (fire and forget)
-    if (profileData.clientId) {
-      updateLastLogin(authData.user.id)
-    }
-
-    const userData = { ...authData.user, ...profileData }
-    console.log('✅ signIn: Login completado para:', userData.email)
-
-    return { data: { ...authData, user: userData }, error: null }
+    // Devolvemos el usuario listo para usar
+    return { data: { ...data, user: userProfile }, error: null };
 
   } catch (error) {
-    if (error.isTimeout) {
-      return { data: null, error: { message: error.message, isTemporary: true } }
-    }
-    return { data: null, error }
+    console.error('❌ Error en login:', error.message);
+    return { data: null, error };
   }
 }
 
