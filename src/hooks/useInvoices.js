@@ -54,26 +54,66 @@ export const useInvoices = (user, filters = {}) => {
     // 2. Suscripción a Realtime (Solo si tenemos unitId para filtrar)
     // Escochamos cambios en la unidad del usuario (Dashboard Admin)
     if (user?.unitId) {
-      const channel = supabase
-        .channel('realtime_receivables')
+      // 1. Suscripción a Receivables (CXC)
+      const channelReceivables = supabase
+        .channel(`realtime_receivables_${user.unitId}`)
         .on(
           'postgres_changes',
           {
-            event: '*', // Escuchar INSERT, UPDATE, DELETE
+            event: '*',
             schema: 'public',
             table: 'receivables',
-            filter: `unit_id=eq.${user.unitId}` // IMPORTANTE: Filtrar por unidad
+            filter: `unit_id=eq.${user.unitId}`
           },
-          (payload) => {
-            console.log('Cambio detectado en BD (Receivables):', payload);
+          () => {
+            console.log('Cambio en CXC detectado');
             fetchInvoices();
           }
         )
         .subscribe();
 
-      // 3. Cleanup al desmontar
+      // 2. Suscripción a Payments (Pagos)
+      const channelPayments = supabase
+        .channel(`realtime_payments_${user.unitId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'payments',
+            filter: `unit_id=eq.${user.unitId}`
+          },
+          () => {
+            console.log('Cambio en Pagos detectado');
+            fetchInvoices();
+          }
+        )
+        .subscribe();
+
+      // 3. Suscripción a Payment Applications (Conciliaciones)
+      // Esta tabla no siempre tiene unit_id, pero al ser eventos de INSERT/UPDATE 
+      // vinculados a pagos, es necesario capturarlos.
+      const channelApps = supabase
+        .channel(`realtime_payment_apps_${user.unitId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'payment_applications'
+          },
+          () => {
+            console.log('Cambio en Aplicación de Pagos detectado');
+            fetchInvoices();
+          }
+        )
+        .subscribe();
+
+      // Cleanup al desmontar o cambiar unitId
       return () => {
-        supabase.removeChannel(channel);
+        supabase.removeChannel(channelReceivables);
+        supabase.removeChannel(channelPayments);
+        supabase.removeChannel(channelApps);
       };
     }
   }, [fetchInvoices, user?.unitId]);

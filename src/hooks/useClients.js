@@ -34,10 +34,11 @@ export const useClients = (user) => {
   useEffect(() => {
     fetchClients()
 
-    // Suscripción Realtime
+    // Suscripciones Realtime
     if (user?.unitId) {
-      const channel = supabase
-        .channel('realtime_clients')
+      // 1. Suscripción a Clients (Existente)
+      const channelClients = supabase
+        .channel(`realtime_clients_${user.unitId}`)
         .on('postgres_changes',
           {
             event: '*',
@@ -45,16 +46,52 @@ export const useClients = (user) => {
             table: 'clients',
             filter: `unit_id=eq.${user.unitId}`
           },
-          (payload) => {
-            console.log('Cambio detectado en BD (Clients):', payload);
-            fetchClients(); // Recargar lista
+          () => {
+            console.log('Cambio en Clientes detectado');
+            fetchClients();
+          }
+        )
+        .subscribe();
+
+      // 2. Suscripción a Contracts (NUEVA)
+      const channelContracts = supabase
+        .channel(`realtime_contracts_unit_${user.unitId}`)
+        .on('postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'contracts',
+            filter: `unit_id=eq.${user.unitId}`
+          },
+          () => {
+            console.log('Cambio en Contratos detectado (Clientes)');
+            fetchClients();
+          }
+        )
+        .subscribe();
+
+      // 3. Suscripción a Receivables (NUEVA - Para saldos)
+      const channelReceivables = supabase
+        .channel(`realtime_receivables_unit_${user.unitId}`)
+        .on('postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'receivables',
+            filter: `unit_id=eq.${user.unitId}`
+          },
+          () => {
+            console.log('Cambio en CXC detectado (Clientes)');
+            fetchClients();
           }
         )
         .subscribe();
 
       // Cleanup
       return () => {
-        supabase.removeChannel(channel);
+        supabase.removeChannel(channelClients);
+        supabase.removeChannel(channelContracts);
+        supabase.removeChannel(channelReceivables);
       };
     }
   }, [fetchClients, user?.unitId])
