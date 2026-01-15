@@ -229,68 +229,7 @@ const getClientUserProfileSimple = async (userId) => {
  * @returns {Promise<{data: object|null, error: object}>}
  */
 const getUserProfile = async (userId) => {
-  // 1. Verificar Caché de Rol
-  const cachedRole = localStorage.getItem(`user_role_${userId}`);
-  console.log('👤 getUserProfile: Buscando perfil para:', userId, cachedRole ? `(Rol cached: ${cachedRole})` : '(Sin cache)');
-
-  if (cachedRole) {
-    if (cachedRole === 'Client') {
-      const result = await getClientUserProfile(userId);
-      // Si hay cache de cliente, confiamos en él. Si falla, invalidamos cache y retornamos error/null.
-      // NO hacemos fallback a race para evitar llamadas innecesarias.
-      if (!result.data) {
-        if (!result.error) {
-          console.warn('⚠️ Perfil de cliente definido en cache pero no encontrado en DB. Limpiando cache.');
-          localStorage.removeItem(`user_role_${userId}`);
-        } else {
-          console.warn('⚠️ Error al buscar cliente (Timeout/Red), manteniendo cache por supervivencia:', result.error);
-
-          // Intentar reconstruir perfil completo desde cache
-          const cachedProfileStr = localStorage.getItem(`user_profile_${userId}`);
-          if (cachedProfileStr) {
-            try {
-              const cachedProfile = JSON.parse(cachedProfileStr);
-              return { data: { ...cachedProfile, from_cache: true }, error: null };
-            } catch (e) {
-              console.warn('Error parseando perfil cache:', e);
-            }
-          }
-
-          return { data: { id: userId, role: cachedRole, from_cache: true }, error: null };
-        }
-      }
-      return result;
-    } else {
-      const result = await getStaffProfile(userId);
-      // Si hay cache de admin, confiamos en él. 
-      // NO intentamos buscar en cliente para evitar error 406.
-      if (!result.data) {
-        // SOLO limpiar cache si fue una búsqueda exitosa pero sin resultados (usuario eliminado?)
-        // Si hubo error (timeout, red), MANTENER el cache como salvavidas
-        if (!result.error) {
-          console.warn('⚠️ Perfil de admin definido en cache pero no encontrado en DB. Limpiando cache.');
-          localStorage.removeItem(`user_role_${userId}`);
-        } else {
-          console.warn('⚠️ Error al buscar admin (Timeout/Red), manteniendo cache por supervivencia:', result.error);
-
-          // Intentar reconstruir perfil completo desde cache
-          const cachedProfileStr = localStorage.getItem(`user_profile_${userId}`);
-          if (cachedProfileStr) {
-            try {
-              const cachedProfile = JSON.parse(cachedProfileStr);
-              console.log('🛡️ Recuperando perfil COMPLETO desde caché:', cachedProfile);
-              return { data: { ...cachedProfile, from_cache: true }, error: null };
-            } catch (e) {
-              console.warn('Error parseando perfil cache:', e);
-            }
-          }
-
-          return { data: { id: userId, role: cachedRole, from_cache: true }, error: null };
-        }
-      }
-      return result;
-    }
-  }
+  console.log('👤 getUserProfile: Buscando perfil para:', userId);
 
   // 3. Estrategia Secuencial (Admin Primero)
   // Consultamos primero system_users. Si existe, es Admin y NO tocamos client_portal_users.
@@ -301,7 +240,6 @@ const getUserProfile = async (userId) => {
 
     if (staffResult.data) {
       // console.log('✅ getUserProfile: Encontrado en system_users (Admin).');
-      localStorage.setItem(`user_role_${userId}`, staffResult.data.role || 'Admin');
       return staffResult;
     }
 
@@ -314,7 +252,6 @@ const getUserProfile = async (userId) => {
       // Asegurar rol
       if (!clientResult.data.role) clientResult.data.role = 'Client';
 
-      localStorage.setItem(`user_role_${userId}`, 'Client');
       return clientResult;
     }
 
@@ -324,21 +261,6 @@ const getUserProfile = async (userId) => {
 
   } catch (error) {
     console.error('Error en getUserProfile:', error);
-
-    // FALLBACK FINAL: Si la BD falla (timeout, conexión), intentar recuperar del caché
-    // Esto evita sacar al usuario si la BD tiene un hipo
-    const cachedRole = localStorage.getItem(`user_role_${userId}`);
-    if (cachedRole) {
-      console.log(`🛡️ getUserProfile: Recuperando rol desde caché tras error de BD: ${cachedRole}`);
-      return {
-        data: {
-          id: userId,
-          role: cachedRole,
-          from_cache: true
-        },
-        error: null
-      };
-    }
 
     return {
       data: null,
@@ -396,8 +318,32 @@ export const signIn = async (email, password) => {
       return { data: null, error: { message: 'No se recibió información del usuario' } }
     }
 
-    // 2. Obtener perfil (usando la versión paralela optimizada)
-    console.log('✅ signIn: Auth exitoso, obteniendo perfil...')
+    // 2. Optimización: Verificar metadata (Custom Claims)
+    // Si el trigger ya sincronizó los datos, no necesitamos consultar la BD
+    const appMeta = authData.user.app_metadata || {};
+    if (appMeta.role && (appMeta.unit_id || appMeta.client_id || appMeta.is_staff || appMeta.is_client)) {
+      console.log('🚀 signIn: Login ultra-rápido usando Custom Claims');
+
+      const profileData = {
+        id: authData.user.id,
+        role: appMeta.role,
+        unitId: appMeta.unit_id,
+        clientId: appMeta.client_id,
+        // Mapear otros campos si es necesario o dejar que se carguen en background
+      };
+
+      const userData = { ...authData.user, ...profileData };
+
+      // Fire and forget updating last login if client
+      if (profileData.clientId) {
+        updateLastLogin(authData.user.id).catch(console.error);
+      }
+
+      return { data: { ...authData, user: userData }, error: null };
+    }
+
+    // 3. Fallback: Obtener perfil (usando la versión paralela optimizada)
+    console.log('⚠️ signIn: Metadata no encontrada, consultando perfil en BD (Lento)...')
 
     // Timeout ajustado: cada query individual es 8s, con retry = 16s max
     // Damos 20s para cubrir ambas queries + overhead
@@ -456,11 +402,6 @@ export const signIn = async (email, password) => {
       updateLastLogin(authData.user.id)
     }
 
-    // Cache explícito también aquí por seguridad
-    if (profileData.role) {
-      localStorage.setItem(`user_role_${authData.user.id}`, profileData.role);
-    }
-
     const userData = { ...authData.user, ...profileData }
     console.log('✅ signIn: Login completado para:', userData.email)
 
@@ -479,19 +420,6 @@ export const signIn = async (email, password) => {
  */
 export const signOut = async () => {
   try {
-    // Intentar obtener usuario actual para limpiar su caché específico antes de salir
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      localStorage.removeItem(`user_role_${user.id}`)
-    }
-
-    // Limpieza general de claves de rol y perfil por seguridad
-    Object.keys(localStorage).forEach(key => {
-      if (key.startsWith('user_role_') || key.startsWith('user_profile_')) {
-        localStorage.removeItem(key)
-      }
-    })
-
     const { error } = await supabase.auth.signOut()
     if (error) throw error
     return { error: null }
@@ -546,7 +474,27 @@ export const getCurrentUser = async () => {
 export const onAuthStateChange = (callback) => {
   return supabase.auth.onAuthStateChange(async (event, session) => {
     if (session?.user) {
-      // Solo obtener perfil completo en SIGNED_IN inicial, no en cada refresh de token
+      // 1. Optimización: Verificar Custom Claims en el token (JWT)
+      // Esto evita llamar a la base de datos en cada re-render/refresh si el token ya tiene la data
+      const appMeta = session.user.app_metadata || {};
+
+      if (appMeta.role) {
+        // Ya tenemos el rol en el token, confiamos en él
+        const profileFromToken = {
+          role: appMeta.role,
+          unitId: appMeta.unit_id,
+          clientId: appMeta.client_id
+        };
+
+        // Si falta info crítica (ej. unitId para admins), tal vez queramos hacer fetch,
+        // pero por ahora asumimos que el trigger sincroniza todo.
+        if (event === 'SIGNED_IN' || !session.user.role) {
+          callback(event, { ...session, user: { ...session.user, ...profileFromToken } });
+          return;
+        }
+      }
+
+      // 2. Solo obtener perfil completo en SIGNED_IN inicial si no vino en metadata
       if (event === 'SIGNED_IN' || !session.user.role) {
         // Login inicial o sesión sin perfil - obtener perfil completo
         try {
@@ -554,53 +502,17 @@ export const onAuthStateChange = (callback) => {
           if (profile) {
             callback(event, { ...session, user: { ...session.user, ...profile } })
           } else {
-            // Fallback a cache completo si falla
-            const cachedProfileStr = localStorage.getItem(`user_profile_${session.user.id}`);
-            if (cachedProfileStr) {
-              try {
-                const cachedProfile = JSON.parse(cachedProfileStr);
-                callback(event, { ...session, user: { ...session.user, ...cachedProfile, from_cache: true } })
-              } catch (e) {
-                // Fallback a solo rol si falla el JSON
-                const cachedRole = localStorage.getItem(`user_role_${session.user.id}`)
-                callback(event, { ...session, user: { ...session.user, role: cachedRole } })
-              }
-            } else {
-              const cachedRole = localStorage.getItem(`user_role_${session.user.id}`)
-              callback(event, { ...session, user: { ...session.user, role: cachedRole } })
-            }
+            // Si falla y no obtenemos perfil, enviamos la sesión tal cual
+            // El hook useAuth manejará la falta de rol apropiadamente
+            callback(event, session)
           }
         } catch (e) {
           console.warn('Error obteniendo perfil en SIGNED_IN:', e)
-          const cachedProfileStr = localStorage.getItem(`user_profile_${session.user.id}`);
-          if (cachedProfileStr) {
-            try {
-              const cachedProfile = JSON.parse(cachedProfileStr);
-              callback(event, { ...session, user: { ...session.user, ...cachedProfile, from_cache: true } })
-            } catch (e2) {
-              const cachedRole = localStorage.getItem(`user_role_${session.user.id}`)
-              callback(event, { ...session, user: { ...session.user, role: cachedRole } })
-            }
-          } else {
-            const cachedRole = localStorage.getItem(`user_role_${session.user.id}`)
-            callback(event, { ...session, user: { ...session.user, role: cachedRole } })
-          }
+          callback(event, session)
         }
       } else {
-        // TOKEN_REFRESHED u otros eventos - usar cache de perfil completo, NO consultar BD
-        const cachedProfileStr = localStorage.getItem(`user_profile_${session.user.id}`);
-        if (cachedProfileStr) {
-          try {
-            const cachedProfile = JSON.parse(cachedProfileStr);
-            callback(event, { ...session, user: { ...session.user, ...cachedProfile, from_cache: true } })
-          } catch (e) {
-            const cachedRole = localStorage.getItem(`user_role_${session.user.id}`)
-            callback(event, { ...session, user: { ...session.user, role: cachedRole } })
-          }
-        } else {
-          const cachedRole = localStorage.getItem(`user_role_${session.user.id}`)
-          callback(event, { ...session, user: { ...session.user, role: cachedRole || session.user.role } })
-        }
+        // TOKEN_REFRESHED u otros eventos - ya tenemos role en session.user o no es necesario refrescar perfil completo
+        callback(event, session)
       }
     } else {
       callback(event, session)

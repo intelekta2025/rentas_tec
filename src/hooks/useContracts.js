@@ -1,7 +1,5 @@
-// src/hooks/useContracts.js
-// Hook personalizado para obtener contratos de un cliente
-
 import { useState, useEffect, useCallback } from 'react'
+import { supabase } from '../lib/supabase'
 import { getContracts, createContract, updateContract, terminateContract, reactivateContract as reactivateContractService } from '../services/contractService'
 
 export const useContracts = (clientId) => {
@@ -9,37 +7,58 @@ export const useContracts = (clientId) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  useEffect(() => {
+  const fetchContracts = useCallback(async () => {
     if (!clientId) {
       setContracts([])
       setLoading(false)
       return
     }
-
-    const loadContracts = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const { data, error } = await getContracts(clientId)
-        if (error) throw error
-        setContracts(data || [])
-      } catch (err) {
-        console.error('Error al cargar contratos:', err)
-        setError(err.message)
-        setContracts([])
-      } finally {
-        setLoading(false)
-      }
+    setLoading(true)
+    setError(null)
+    try {
+      const { data, error } = await getContracts(clientId)
+      if (error) throw error
+      setContracts(data || [])
+    } catch (err) {
+      console.error('Error al cargar contratos:', err)
+      setError(err.message)
+      setContracts([])
+    } finally {
+      setLoading(false)
     }
-
-    loadContracts()
   }, [clientId])
+
+  useEffect(() => {
+    fetchContracts()
+
+    if (clientId) {
+      const channel = supabase
+        .channel(`realtime_contracts_${clientId}`)
+        .on('postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'contracts',
+            filter: `client_id=eq.${clientId}`
+          },
+          (payload) => {
+            console.log('Cambio detectado en BD (Contracts):', payload);
+            fetchContracts();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [fetchContracts, clientId])
 
   const addContract = async (contractData) => {
     try {
       const { data, error } = await createContract(contractData)
       if (error) throw error
-      setContracts(prev => [data, ...prev])
+      await fetchContracts()
       return { success: true, data, error: null }
     } catch (err) {
       setError(err.message)
@@ -51,9 +70,7 @@ export const useContracts = (clientId) => {
     try {
       const { data, error } = await updateContract(contractId, contractData)
       if (error) throw error
-      setContracts(prev => prev.map(contract =>
-        contract.id === contractId ? data : contract
-      ))
+      await fetchContracts()
       return { success: true, data, error: null }
     } catch (err) {
       setError(err.message)
@@ -65,9 +82,7 @@ export const useContracts = (clientId) => {
     try {
       const { data, error } = await terminateContract(contractId)
       if (error) throw error
-      setContracts(prev => prev.map(contract =>
-        contract.id === contractId ? data : contract
-      ))
+      await fetchContracts()
       return { success: true, data, error: null }
     } catch (err) {
       setError(err.message)
@@ -75,28 +90,13 @@ export const useContracts = (clientId) => {
     }
   }
 
-  const refreshContracts = useCallback(async () => {
-    if (!clientId) return
-    setLoading(true)
-    setError(null)
-    try {
-      const { data, error } = await getContracts(clientId)
-      if (error) throw error
-      setContracts(data || [])
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }, [clientId])
+  const refreshContracts = fetchContracts
 
   const reactivateContractHook = async (contractId) => {
     try {
       const { data, error } = await reactivateContractService(contractId)
       if (error) throw error
-      setContracts(prev => prev.map(contract =>
-        contract.id === contractId ? data : contract
-      ))
+      await fetchContracts()
       return { success: true, data, error: null }
     } catch (err) {
       setError(err.message)

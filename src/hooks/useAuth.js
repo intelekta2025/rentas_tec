@@ -49,20 +49,7 @@ export const useAuth = () => {
           }
           setUser(null)
         } else {
-          // Éxito: Asegurar que el rol Y perfil estén en caché para futuras consultas (Survival Mode)
-          if (data && data.id) {
-            // Guardar rol (retrocompatibilidad)
-            const roleToCache = data.role || data.rol || 'Client';
-            localStorage.setItem(`user_role_${data.id}`, roleToCache);
-
-            // Guardar perfil completo (para evitar "Unidad undefined" en fallback)
-            try {
-              localStorage.setItem(`user_profile_${data.id}`, JSON.stringify(data));
-            } catch (e) {
-              console.warn('Error guardando perfil en cache:', e);
-            }
-          }
-
+          // Éxito: Asegurar que el rol Y perfil estén disponibles
           console.log('Usuario cargado:', data ? data.email : 'ninguno')
           setUser(data)
         }

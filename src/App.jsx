@@ -35,20 +35,14 @@ import { getTemplates } from './services/templateService'; // Cache templates
 // Componente wrapper para el formulario de contrato que usa el mismo hook que ClientDetailView
 // Este componente debe compartir el mismo hook que ClientDetailViewWithPortalUsers
 // Para que cuando se cree un contrato, se actualice automáticamente la lista
-const ContractFormWrapper = ({ client, user, onClose, onContractCreated, contractToEdit }) => {
+// Componente wrapper para el formulario de contrato que usa el mismo hook que ClientDetailView
+// Este componente comparte el contexto de useContracts para que las actualizaciones sean fluidas
+const ContractFormWrapper = ({ client, user, onClose, contractToEdit }) => {
   const { addContract, editContract } = useContracts(client?.id);
 
   const handleSuccess = async () => {
-    // Cerrar modal primero para mejor UX
+    // Cerrar modal. La actualización de la lista ocurre vía Realtime
     onClose();
-
-    // Notificar al componente padre que se creó un contrato para forzar recarga
-    // Agregamos un pequeño delay para asegurar que Supabase haya propagado el cambio
-    if (onContractCreated) {
-      setTimeout(() => {
-        onContractCreated();
-      }, 500);
-    }
   };
 
   return (
@@ -67,21 +61,14 @@ const ContractFormWrapper = ({ client, user, onClose, onContractCreated, contrac
 };
 
 // Componente wrapper para ClientDetailView que carga los usuarios del portal y contratos
-const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, onBackToClients, setContractModalOpen, generateContractPreview, setTerminationModalOpen, contractsRefreshKey, onPrepareEdit, onEditClient, onGenerateCXC, onAddManualReceivable, unitName }) => {
+const ClientDetailViewWithPortalUsers = ({ user, client, setActiveTab, onBackToClients, setContractModalOpen, generateContractPreview, setTerminationModalOpen, onPrepareEdit, onEditClient, onGenerateCXC, onAddManualReceivable, unitName }) => {
   const { portalUsers, loading: portalUsersLoading } = useClientPortalUsers(client?.id);
   const { contracts, loading: contractsLoading, addContract, finalizeContract, reactivateContract, refreshContracts } = useContracts(client?.id);
 
-
   // Cargar receivables (Estado de Cuenta) reales
-  const { invoices: receivables, loading: receivablesLoading, refreshInvoices, editInvoice, addInvoice, addPayment, removeInvoice } = useInvoices({ clientId: client?.id });
+  const { invoices: receivables, loading: receivablesLoading, refreshInvoices, editInvoice, addInvoice, addPayment, removeInvoice } = useInvoices(user, { clientId: client?.id });
 
-  // Recargar contratos cuando cambie contractsRefreshKey
-  useEffect(() => {
-    if (contractsRefreshKey > 0) {
-      refreshContracts();
-      refreshInvoices();
-    }
-  }, [contractsRefreshKey, refreshContracts, refreshInvoices]);
+  // Nota: useEffect de recarga eliminado. useContracts y useInvoices ahora escuchan cambios en realtime.
 
   const handleFinalizeContract = async (contractId, receivableIdsToCancel = []) => {
     // Si hay receivables para cancelar, lo hacemos primero
@@ -90,11 +77,8 @@ const ClientDetailViewWithPortalUsers = ({ client, setActiveTab, onBackToClients
     }
 
     const result = await finalizeContract(contractId);
-    if (result.success) {
-      await refreshContracts();
-      // También refrescar facturas ya que cambiamos estados
-      await refreshInvoices();
-    }
+    // No necesitamos refresh manual, useContracts lo hará
+    // (A menos que finalizeContract no actualice localmente y el trigger falle, pero asumimos realtime)
     return result;
   };
 
@@ -217,7 +201,7 @@ export default function App() {
   const [allTemplates, setAllTemplates] = useState([]); // Cache for templates
   const [selectedOverdue, setSelectedOverdue] = useState([]);
   const [selectedReminders, setSelectedReminders] = useState([]);
-  const [contractsRefreshKey, setContractsRefreshKey] = useState(0); // Para forzar recarga de contratos
+  // contractsRefreshKey eliminado: Realtime ahora actualiza los contratos
   const [contractToEdit, setContractToEdit] = useState(null);
   const [clientToEdit, setClientToEdit] = useState(null);
   const [userToEdit, setUserToEdit] = useState(null);
@@ -234,6 +218,7 @@ export default function App() {
   )
 
   // Clientes - filtrados por unitId si es admin, null si es cliente
+  // Clientes - filtrados por unitId si es admin, null si es cliente
   const {
     clients: filteredClients,
     loading: clientsLoading,
@@ -242,13 +227,14 @@ export default function App() {
     editClient,
     removeClient,
     refreshClients
-  } = useClients(shouldLoadAdminData ? user.unitId : null);
+  } = useClients(user);
 
   // Facturas/CXC - filtradas según el rol
   const {
     invoices: filteredCXC,
     loading: invoicesLoading
   } = useInvoices(
+    user,
     shouldLoadAdminData
       ? { unitId: user.unitId }
       : shouldLoadClientData
@@ -844,12 +830,12 @@ export default function App() {
               )}
               {activeTab === 'clientDetail' && selectedClient && (
                 <ClientDetailViewWithPortalUsers
+                  user={user}
                   client={selectedClient}
                   setActiveTab={setActiveTab}
                   onBackToClients={handleBackToClients}
                   setContractModalOpen={setContractModalOpen}
                   setTerminationModalOpen={setTerminationModalOpen}
-                  contractsRefreshKey={contractsRefreshKey}
                   onPrepareEdit={setContractToEdit}
                   unitName={businessUnitName || user.unitName}
                   onEditClient={(client) => {
@@ -857,8 +843,6 @@ export default function App() {
                   }}
                   onGenerateCXC={async (invoices) => {
                     const result = await generateBulkInvoices(invoices);
-                    // Forzar recarga de movimientos del cliente si fuera necesario
-                    // Por ahora, el estado de cuenta se recarga al entrar a la pestaña o refrescar
                     return { success: !result.error, error: result.error };
                   }}
                 />
@@ -964,10 +948,6 @@ export default function App() {
             user={user}
             onClose={() => { setContractModalOpen(false); setContractToEdit(null); }}
             contractToEdit={contractToEdit}
-            onContractCreated={() => {
-              // Forzar recarga de contratos en ClientDetailViewWithPortalUsers
-              setContractsRefreshKey(prev => prev + 1);
-            }}
           />
         ) : (
           <div className="p-4">
