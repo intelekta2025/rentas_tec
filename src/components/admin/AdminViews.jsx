@@ -2135,11 +2135,11 @@ export const MarketTecView = ({ user, unitName }) => {
     const [isReconciling, setIsReconciling] = useState(false);
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [processingProgress, setProcessingProgress] = useState(null);
-
-
+    const [lastResult, setLastResult] = useState(null);
 
     const handleTriggerReconciliation = async () => {
       setIsReconciling(true);
+      setLastResult(null); // Limpiar resultado previo
       try {
         // No enviamos IDs específicos para que el servicio filtre automáticamente los PENDIENTES
         const { success, error, data, recordCount } = await marketTecService.triggerReconciliation(selectedUploadId);
@@ -2163,7 +2163,14 @@ export const MarketTecView = ({ user, unitName }) => {
           setIsReconciling(false);
           setProcessingProgress(null);
           await loadStagingForReview(selectedUploadId, true);
-          alert(`Conciliación correcta. Se procesaron ${initialStatus.processedCount} registros.${initialStatus.errorCount > 0 ? ` ${initialStatus.errorCount} registros con error.` : ''}`);
+
+          const handled = initialStatus.processedCount + initialStatus.noCxcCount + initialStatus.noClientCount;
+          setLastResult({
+            success: true,
+            message: `Conciliación completa. Se procesaron ${handled} registros.`,
+            details: initialStatus.errorCount > 0 ? `${initialStatus.errorCount} con error.` : null
+          });
+
           await loadUploads();
           return;
         }
@@ -2187,8 +2194,13 @@ export const MarketTecView = ({ user, unitName }) => {
               setIsReconciling(false);
               setProcessingProgress(null);
 
-              // Mostrar mensaje de éxito
-              alert(`Conciliación correcta. Se procesaron ${status.processedCount} registros.${status.errorCount > 0 ? ` ${status.errorCount} registros con error.` : ''}`);
+              // Mostrar mensaje de éxito en UI
+              const handled = status.processedCount + status.noCxcCount + status.noClientCount;
+              setLastResult({
+                success: true,
+                message: `Conciliación completa. Se procesaron ${handled} registros.`,
+                details: status.errorCount > 0 ? `${status.errorCount} con error.` : null
+              });
 
               // Refresh list and staging data
               await loadUploads();
@@ -2316,6 +2328,22 @@ export const MarketTecView = ({ user, unitName }) => {
             </button>
           </div>
         </div>
+
+        {/* Banner de Resultado */}
+        {lastResult && (
+          <div className={`mb-6 p-4 rounded-xl border animate-in fade-in slide-in-from-top-2 duration-300 flex items-center justify-between ${lastResult.success ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+            <div className="flex items-center gap-3">
+              {lastResult.success ? <CheckCircle size={24} className="text-emerald-500" /> : <AlertTriangle size={24} className="text-red-500" />}
+              <div>
+                <p className="font-bold">{lastResult.message}</p>
+                {lastResult.details && <p className="text-sm opacity-80">{lastResult.details}</p>}
+              </div>
+            </div>
+            <button onClick={() => setLastResult(null)} className="p-1 hover:bg-black/5 rounded-full">
+              <X size={18} />
+            </button>
+          </div>
+        )}
 
         {/* Tarjetas de Validación */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
