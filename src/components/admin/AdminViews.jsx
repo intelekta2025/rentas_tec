@@ -2133,6 +2133,7 @@ export const MarketTecView = ({ user, unitName }) => {
   // 2. NUEVA VISTA: REVISIÓN PRE-N8N (Staging Data Real)
   const ReviewStagingView = () => {
     const [isReconciling, setIsReconciling] = useState(false);
+    const [isTriggering, setIsTriggering] = useState(false); // Nuevo para el botón
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [processingProgress, setProcessingProgress] = useState(null);
     const [lastResult, setLastResult] = useState(null);
@@ -2140,6 +2141,7 @@ export const MarketTecView = ({ user, unitName }) => {
 
     const handleTriggerReconciliation = async () => {
       console.log(`[MarketTec] Triggering reconciliation v${VERSION}...`);
+      setIsTriggering(true); // Bloquear botón inmediatamente
       setIsReconciling(true);
       setLastResult(null); // Limpiar resultado previo
       try {
@@ -2156,9 +2158,12 @@ export const MarketTecView = ({ user, unitName }) => {
           } else {
             setShowErrorModal(true);
           }
+          setIsTriggering(false);
           setIsReconciling(false);
           return;
         }
+
+        setIsTriggering(false); // Webhook enviado correctamente
 
         console.log('n8n response:', data);
         console.log(`Procesamiento iniciado para ${recordCount} registros. Verificando estado...`);
@@ -2219,9 +2224,9 @@ export const MarketTecView = ({ user, unitName }) => {
                 details: errors > 0 ? `${errors} con error.` : "Todos los registros fueron atendidos."
               });
 
-              // Refresh list and staging data
+              // Refresh list and staging data (Silenciosamente)
               await loadUploads();
-              await loadStagingForReview(selectedUploadId);
+              await loadStagingForReview(selectedUploadId, true);
 
               return; // Detener polling
             }
@@ -2317,18 +2322,25 @@ export const MarketTecView = ({ user, unitName }) => {
           <div className="flex gap-3">
             <button
               onClick={handleBackToList}
-              disabled={isReconciling}
-              className={`px-4 py-2 text-slate-600 rounded-lg font-medium border border-slate-200 ${isReconciling ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'hover:bg-slate-100'}`}
+              disabled={isReconciling || isTriggering}
+              className={`px-4 py-2 text-slate-600 rounded-lg font-medium border border-slate-200 ${isReconciling || isTriggering ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'hover:bg-slate-100'}`}
             >
               <ChevronLeft size={18} className="inline mr-1" /> Volver
             </button>
             <button
               onClick={handleTriggerReconciliation}
-              disabled={isReconciling}
-              className={`bg-slate-900 hover:bg-slate-800 text-white px-6 py-2 rounded-lg shadow-lg shadow-slate-200 flex items-center gap-2 font-medium transition-all transform hover:scale-105 ${isReconciling ? 'opacity-70 cursor-wait' : ''}`}
+              disabled={isReconciling || isTriggering}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all shadow-sm ${isReconciling || isTriggering
+                  ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                  : 'bg-slate-900 text-white hover:bg-black active:scale-[0.98]'
+                }`}
             >
-              {isReconciling ? <Loader2 size={18} className="animate-spin" /> : <Bot size={18} className="text-purple-300" />}
-              {isReconciling ? 'Ejecutando...' : 'Ejecutar Conciliación IA'}
+              {isTriggering || isReconciling ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Bot size={18} className="text-purple-300" />
+              )}
+              {isTriggering || isReconciling ? 'Ejecutando...' : 'Ejecutar Conciliación IA'}
             </button>
           </div>
         </div>
@@ -2517,7 +2529,7 @@ export const MarketTecView = ({ user, unitName }) => {
             </div>
           </div>
         </Modal>
-      </div>
+      </div >
     );
   };
 
