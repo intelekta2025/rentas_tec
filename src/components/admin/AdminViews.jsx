@@ -2163,6 +2163,9 @@ export const MarketTecView = ({ user, unitName }) => {
 
             console.log('Estado de procesamiento:', status);
 
+            // Refrescar los datos de la tabla durante el polling
+            await loadStagingForReview(selectedUploadId);
+
             if (status.isComplete) {
               // Procesamiento completado
               setIsReconciling(false);
@@ -2356,11 +2359,25 @@ export const MarketTecView = ({ user, unitName }) => {
                         {row.pending_receivables_count || 0}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        {row.processing_status === 'SIN CXC' || row.processing_status === 'SIN CLIENTE' ? (
-                          <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-medium border border-yellow-200">{row.processing_status}</span>
-                        ) : (
-                          <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded border border-emerald-200 font-medium">{row.processing_status}</span>
-                        )}
+                        {(() => {
+                          const s = row.processing_status;
+                          if (s === 'SIN CXC' || s === 'SIN CLIENTE') {
+                            return <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-medium border border-yellow-200">{s}</span>;
+                          }
+                          if (s === 'PROCESADO') {
+                            return <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded border border-emerald-200 font-medium">{s}</span>;
+                          }
+                          if (s === 'PENDIENTE') {
+                            return <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded border border-gray-200 font-medium">{s}</span>;
+                          }
+                          if (s === 'PROCESANDO') {
+                            return <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded border border-purple-200 font-medium animate-pulse">{s}</span>;
+                          }
+                          if (s === 'ERROR') {
+                            return <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded border border-red-200 font-medium">{s}</span>;
+                          }
+                          return <span className="text-xs bg-gray-50 text-gray-400 px-2 py-1 rounded border border-gray-100">{s}</span>;
+                        })()}
                       </td>
                     </tr>
                   ))}
