@@ -2144,7 +2144,11 @@ export const MarketTecView = ({ user, unitName }) => {
         const { success, error, data, recordCount } = await marketTecService.triggerReconciliation(selectedUploadId);
 
         if (!success) {
-          setShowErrorModal(true);
+          if (error && error.includes('No hay registros pendientes')) {
+            alert(error);
+          } else {
+            setShowErrorModal(true);
+          }
           setIsReconciling(false);
           return;
         }
@@ -2152,7 +2156,18 @@ export const MarketTecView = ({ user, unitName }) => {
         console.log('n8n response:', data);
         console.log(`Procesamiento iniciado para ${recordCount} registros. Verificando estado...`);
 
-        // Implementar polling para verificar el estado de procesamiento
+        // Comprobar estado inmediatamente por si ya terminó
+        const initialStatus = await marketTecService.checkProcessingStatus(selectedUploadId);
+        if (initialStatus.isComplete) {
+          setIsReconciling(false);
+          setProcessingProgress(null);
+          await loadStagingForReview(selectedUploadId, true);
+          alert(`Conciliación correcta. Se procesaron ${initialStatus.processedCount} registros.${initialStatus.errorCount > 0 ? ` ${initialStatus.errorCount} registros con error.` : ''}`);
+          await loadUploads();
+          return;
+        }
+
+        // Implementar polling para verificar el estado de procesamiento si no ha terminado
         const pollInterval = 3000; // 3 segundos
         const maxPollingTime = 600000; // 10 minutos máximo (aumentado de 5)
         const startTime = Date.now();
@@ -2212,11 +2227,37 @@ export const MarketTecView = ({ user, unitName }) => {
         setTimeout(checkStatus, pollInterval);
 
       } catch (err) {
+        console.error('Error in reconciliation trigger:', err);
         setShowErrorModal(true);
-        console.error(err);
         setIsReconciling(false);
       }
     };
+
+    // Subscripción Realtime para cambios en staging
+    useEffect(() => {
+      if (!selectedUploadId) return;
+
+      const channel = supabase
+        .channel(`staging_changes_${selectedUploadId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'payment_staging',
+            filter: `upload_id=eq.${selectedUploadId}`
+          },
+          () => {
+            // Refrescar datos silenciosamente al detectar cambios en la DB
+            loadStagingForReview(selectedUploadId, true);
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }, [selectedUploadId]);
     // Calcular KPIs básicos del staging
     const totalRecords = stagingData.length;
     const totalAmount = stagingData.reduce((acc, r) => acc + (r.raw_total_value || 0), 0);
