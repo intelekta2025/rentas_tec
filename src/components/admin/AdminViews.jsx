@@ -2136,8 +2136,10 @@ export const MarketTecView = ({ user, unitName }) => {
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [processingProgress, setProcessingProgress] = useState(null);
     const [lastResult, setLastResult] = useState(null);
+    const VERSION = "1.0.4"; // Para verificar recarga de cache
 
     const handleTriggerReconciliation = async () => {
+      console.log(`[MarketTec] Triggering reconciliation v${VERSION}...`);
       setIsReconciling(true);
       setLastResult(null); // Limpiar resultado previo
       try {
@@ -2168,11 +2170,16 @@ export const MarketTecView = ({ user, unitName }) => {
           setProcessingProgress(null);
           await loadStagingForReview(selectedUploadId, true);
 
-          const handled = (initialStatus.processedCount || 0) + (initialStatus.noCxcCount || 0) + (initialStatus.noClientCount || 0);
+          const processed = initialStatus.processedCount || 0;
+          const noCxc = initialStatus.noCxcCount || 0;
+          const noClient = initialStatus.noClientCount || 0;
+          const errors = initialStatus.errorCount || 0;
+          const handled = processed + noCxc + noClient + errors;
+
           setLastResult({
             success: true,
             message: `Conciliación completa. Se procesaron ${handled} registros.`,
-            details: (initialStatus.errorCount || 0) > 0 ? `${initialStatus.errorCount} con error.` : null
+            details: errors > 0 ? `${errors} con error.` : "Todos los registros fueron atendidos."
           });
 
           await loadUploads();
@@ -2197,12 +2204,19 @@ export const MarketTecView = ({ user, unitName }) => {
               setIsReconciling(false);
               setProcessingProgress(null);
 
-              // Mostrar mensaje de éxito en UI
-              const handled = (status.processedCount || 0) + (status.noCxcCount || 0) + (status.noClientCount || 0);
+              // Mostrar mensaje de éxito en UI (Banner persistente)
+              const processed = status.processedCount || 0;
+              const noCxc = status.noCxcCount || 0;
+              const noClient = status.noClientCount || 0;
+              const errors = status.errorCount || 0;
+              const handled = processed + noCxc + noClient + errors;
+
+              console.log('[MarketTec] Processing complete:', { processed, noCxc, noClient, errors, handled });
+
               setLastResult({
                 success: true,
                 message: `Conciliación completa. Se procesaron ${handled} registros.`,
-                details: (status.errorCount || 0) > 0 ? `${status.errorCount} con error.` : null
+                details: errors > 0 ? `${errors} con error.` : "Todos los registros fueron atendidos."
               });
 
               // Refresh list and staging data
