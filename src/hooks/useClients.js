@@ -87,11 +87,46 @@ export const useClients = (user) => {
         )
         .subscribe();
 
+      // 4. Suscripción a Payments (NUEVA)
+      const channelPayments = supabase
+        .channel(`realtime_payments_unit_${user.unitId}`)
+        .on('postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'payments',
+            filter: `unit_id=eq.${user.unitId}`
+          },
+          () => {
+            console.log('Cambio en Pagos detectado (Clientes)');
+            fetchClients();
+          }
+        )
+        .subscribe();
+
+      // 5. Suscripción a Payment Applications (NUEVA)
+      const channelApps = supabase
+        .channel(`realtime_apps_unit_${user.unitId}`)
+        .on('postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'payment_applications'
+          },
+          () => {
+            console.log('Cambio en Aplicaciones detectado (Clientes)');
+            fetchClients();
+          }
+        )
+        .subscribe();
+
       // Cleanup
       return () => {
         supabase.removeChannel(channelClients);
         supabase.removeChannel(channelContracts);
         supabase.removeChannel(channelReceivables);
+        supabase.removeChannel(channelPayments);
+        supabase.removeChannel(channelApps);
       };
     }
   }, [fetchClients, user?.unitId])
