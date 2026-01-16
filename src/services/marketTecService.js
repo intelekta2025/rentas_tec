@@ -309,41 +309,23 @@ export const marketTecService = {
     // 7. Verificar estado de procesamiento
     checkProcessingStatus: async (uploadId) => {
         try {
-            const { data, error } = await supabase
-                .from('payment_staging')
-                .select('processing_status')
-                .eq('upload_id', uploadId);
+            const { data, error } = await supabase.rpc('get_upload_progress', { p_upload_id: uploadId });
 
             if (error) throw error;
 
-            if (!data || data.length === 0) {
-                return { isComplete: true, pendingCount: 0, totalCount: 0 };
-            }
-
-            const totalCount = data.length;
-            const pendingCount = data.filter(r => r.processing_status === 'PENDIENTE').length;
-            const processingCount = data.filter(r => r.processing_status === 'PROCESANDO').length;
-            const processedCount = data.filter(r => r.processing_status === 'PROCESADO').length;
-            const errorCount = data.filter(r => r.processing_status === 'ERROR').length;
-            const noCxcCount = data.filter(r => r.processing_status === 'SIN CXC').length;
-            const noClientCount = data.filter(r => r.processing_status === 'SIN CLIENTE').length;
-
-            // Se considera completo cuando no hay registros PENDIENTES ni PROCESANDO
-            const isComplete = (pendingCount + processingCount) === 0;
-
+            // Mapeo directo de la respuesta RPC a lo que espera tu componente
             return {
-                isComplete,
-                totalCount,
-                pendingCount,
-                processingCount,
-                processedCount,
-                errorCount,
-                noCxcCount,
-                noClientCount
+                isComplete: data.is_complete,
+                totalCount: data.total,
+                pendingCount: data.pending,
+                processingCount: data.processing,
+                processedCount: data.completed_count, // Simplificado para la UI
+                errorCount: 0 // Ya incluido en completed para lógica de UI, o extráelo si lo necesitas separado
             };
         } catch (error) {
             console.error('Error checking processing status:', error);
-            return { isComplete: true, error: error.message };
+            // Fail-safe para que la UI no crea que terminó si hay error de red
+            return { isComplete: false, error: error.message };
         }
     },
 

@@ -2193,9 +2193,20 @@ export const MarketTecView = ({ user, unitName }) => {
 
         // Implementar polling para verificar el estado de procesamiento si no ha terminado
         const pollInterval = 3000; // 3 segundos
-        const startTime = Date.now();
+        const MAX_ATTEMPTS = 100; // Ej. 5 minutos (100 * 3s)
+        let attempts = 0;
 
         const checkStatus = async () => {
+          attempts++;
+
+          // 1. Timeout Safety Check
+          if (attempts > MAX_ATTEMPTS) {
+            setIsReconciling(false);
+            setProcessingProgress(null);
+            alert("El proceso está tardando demasiado. Por favor revisa manualmente el estado más tarde.");
+            return;
+          }
+
           try {
             const status = await marketTecService.checkProcessingStatus(selectedUploadId);
 
@@ -2331,8 +2342,8 @@ export const MarketTecView = ({ user, unitName }) => {
               onClick={handleTriggerReconciliation}
               disabled={isReconciling || isTriggering}
               className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all shadow-sm ${isReconciling || isTriggering
-                  ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
-                  : 'bg-slate-900 text-white hover:bg-black active:scale-[0.98]'
+                ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                : 'bg-slate-900 text-white hover:bg-black active:scale-[0.98]'
                 }`}
             >
               {isTriggering || isReconciling ? (
