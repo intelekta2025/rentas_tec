@@ -2146,7 +2146,11 @@ export const MarketTecView = ({ user, unitName }) => {
 
         if (!success) {
           if (error && error.includes('No hay registros pendientes')) {
-            alert(error);
+            // No mostrar error modal para este caso informativo
+            setLastResult({
+              success: true,
+              message: error
+            });
           } else {
             setShowErrorModal(true);
           }
@@ -2164,11 +2168,11 @@ export const MarketTecView = ({ user, unitName }) => {
           setProcessingProgress(null);
           await loadStagingForReview(selectedUploadId, true);
 
-          const handled = initialStatus.processedCount + initialStatus.noCxcCount + initialStatus.noClientCount;
+          const handled = (initialStatus.processedCount || 0) + (initialStatus.noCxcCount || 0) + (initialStatus.noClientCount || 0);
           setLastResult({
             success: true,
             message: `Conciliación completa. Se procesaron ${handled} registros.`,
-            details: initialStatus.errorCount > 0 ? `${initialStatus.errorCount} con error.` : null
+            details: (initialStatus.errorCount || 0) > 0 ? `${initialStatus.errorCount} con error.` : null
           });
 
           await loadUploads();
@@ -2177,7 +2181,6 @@ export const MarketTecView = ({ user, unitName }) => {
 
         // Implementar polling para verificar el estado de procesamiento si no ha terminado
         const pollInterval = 3000; // 3 segundos
-        const maxPollingTime = 600000; // 10 minutos máximo (aumentado de 5)
         const startTime = Date.now();
 
         const checkStatus = async () => {
@@ -2195,11 +2198,11 @@ export const MarketTecView = ({ user, unitName }) => {
               setProcessingProgress(null);
 
               // Mostrar mensaje de éxito en UI
-              const handled = status.processedCount + status.noCxcCount + status.noClientCount;
+              const handled = (status.processedCount || 0) + (status.noCxcCount || 0) + (status.noClientCount || 0);
               setLastResult({
                 success: true,
                 message: `Conciliación completa. Se procesaron ${handled} registros.`,
-                details: status.errorCount > 0 ? `${status.errorCount} con error.` : null
+                details: (status.errorCount || 0) > 0 ? `${status.errorCount} con error.` : null
               });
 
               // Refresh list and staging data
@@ -2215,24 +2218,11 @@ export const MarketTecView = ({ user, unitName }) => {
               total: status.totalCount
             });
 
-            // Verificar timeout
-            if (Date.now() - startTime > maxPollingTime) {
-              setIsReconciling(false);
-              setProcessingProgress(null);
-              alert('El procesamiento está tomando más tiempo del esperado. Se han actualizado los registros procesados hasta ahora. Por favor, verifica el resto en unos momentos.');
-
-              // Refresh data even on timeout to show partial results
-              await loadUploads();
-              await loadStagingForReview(selectedUploadId);
-              return;
-            }
-
             // Continuar polling
             setTimeout(checkStatus, pollInterval);
           } catch (err) {
             console.error('Error checking status:', err);
             setIsReconciling(false);
-            alert('Error al verificar el estado del procesamiento.');
           }
         };
 
