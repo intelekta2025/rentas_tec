@@ -2133,6 +2133,7 @@ export const MarketTecView = ({ user, unitName }) => {
   const ReviewStagingView = () => {
     const [isReconciling, setIsReconciling] = useState(false);
     const [showErrorModal, setShowErrorModal] = useState(false);
+    const [processingProgress, setProcessingProgress] = useState(null);
 
 
 
@@ -2153,7 +2154,7 @@ export const MarketTecView = ({ user, unitName }) => {
 
         // Implementar polling para verificar el estado de procesamiento
         const pollInterval = 3000; // 3 segundos
-        const maxPollingTime = 300000; // 5 minutos máximo
+        const maxPollingTime = 600000; // 10 minutos máximo (aumentado de 5)
         const startTime = Date.now();
 
         const checkStatus = async () => {
@@ -2165,6 +2166,7 @@ export const MarketTecView = ({ user, unitName }) => {
             if (status.isComplete) {
               // Procesamiento completado
               setIsReconciling(false);
+              setProcessingProgress(null);
 
               // Mostrar mensaje de éxito
               alert(`Conciliación correcta. Se procesaron ${status.processedCount} registros.${status.errorCount > 0 ? ` ${status.errorCount} registros con error.` : ''}`);
@@ -2176,10 +2178,21 @@ export const MarketTecView = ({ user, unitName }) => {
               return; // Detener polling
             }
 
+            // Actualizar progreso
+            setProcessingProgress({
+              done: status.processedCount + status.errorCount,
+              total: status.totalCount
+            });
+
             // Verificar timeout
             if (Date.now() - startTime > maxPollingTime) {
               setIsReconciling(false);
-              alert('El procesamiento está tomando más tiempo del esperado. Por favor, verifica el estado manualmente.');
+              setProcessingProgress(null);
+              alert('El procesamiento está tomando más tiempo del esperado. Se han actualizado los registros procesados hasta ahora. Por favor, verifica el resto en unos momentos.');
+
+              // Refresh data even on timeout to show partial results
+              await loadUploads();
+              await loadStagingForReview(selectedUploadId);
               return;
             }
 
@@ -2220,9 +2233,22 @@ export const MarketTecView = ({ user, unitName }) => {
             <div className="flex items-center gap-3">
               <h2 className="text-2xl font-bold text-slate-800">Revisión de Carga</h2>
               {isReconciling && (
-                <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-xs font-bold animate-pulse flex items-center gap-2 border border-purple-200">
-                  <Loader2 size={12} className="animate-spin" /> Procesando con IA...
-                </span>
+                <div className="flex flex-col gap-1">
+                  <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-xs font-bold animate-pulse flex items-center gap-2 border border-purple-200">
+                    <Loader2 size={12} className="animate-spin" />
+                    {processingProgress
+                      ? `Procesando: ${processingProgress.done} de ${processingProgress.total}...`
+                      : 'Iniciando asistente IA...'}
+                  </span>
+                  {processingProgress && (
+                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className="bg-purple-500 h-full transition-all duration-500"
+                        style={{ width: `${(processingProgress.done / processingProgress.total) * 100}%` }}
+                      ></div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
