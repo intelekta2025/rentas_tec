@@ -1987,15 +1987,15 @@ export const MarketTecView = ({ user, unitName }) => {
     }
   };
 
-  const loadStagingForReview = async (uploadId) => {
+  const loadStagingForReview = async (uploadId, silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const data = await marketTecService.getStagingData(uploadId);
       setStagingData(data || []);
     } catch (error) {
       console.error('Error loading staging data:', error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -2163,8 +2163,8 @@ export const MarketTecView = ({ user, unitName }) => {
 
             console.log('Estado de procesamiento:', status);
 
-            // Refrescar los datos de la tabla durante el polling
-            await loadStagingForReview(selectedUploadId);
+            // Refrescar los datos de la tabla durante el polling (Silenciosamente para evitar parpadeo)
+            await loadStagingForReview(selectedUploadId, true);
 
             if (status.isComplete) {
               // Procesamiento completado
