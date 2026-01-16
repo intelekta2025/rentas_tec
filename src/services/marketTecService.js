@@ -313,14 +313,18 @@ export const marketTecService = {
 
             if (error) throw error;
 
-            // Mapeo directo de la respuesta RPC a lo que espera tu componente
+            // La RPC ya devuelve 'is_complete' calculado correctamente
+            // Mapear todos los campos necesarios para la UI
             return {
                 isComplete: data.is_complete,
                 totalCount: data.total,
                 pendingCount: data.pending,
                 processingCount: data.processing,
-                processedCount: data.completed_count, // Simplificado para la UI
-                errorCount: 0 // Ya incluido en completed para lógica de UI, o extráelo si lo necesitas separado
+                processedCount: data.completed_count, // Suma de exitosos + errores
+                // Campos adicionales para desglose detallado en la UI
+                noCxcCount: data.no_cxc || 0,
+                noClientCount: data.no_client || 0,
+                errorCount: data.error || 0
             };
         } catch (error) {
             console.error('Error checking processing status:', error);
