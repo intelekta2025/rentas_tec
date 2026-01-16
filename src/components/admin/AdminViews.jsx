@@ -2180,7 +2180,7 @@ export const MarketTecView = ({ user, unitName }) => {
 
             // Actualizar progreso
             setProcessingProgress({
-              done: status.processedCount + status.errorCount,
+              done: status.totalCount - status.pendingCount - status.processingCount,
               total: status.totalCount
             });
 

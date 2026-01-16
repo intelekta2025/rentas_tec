@@ -325,6 +325,8 @@ export const marketTecService = {
             const processingCount = data.filter(r => r.processing_status === 'PROCESANDO').length;
             const processedCount = data.filter(r => r.processing_status === 'PROCESADO').length;
             const errorCount = data.filter(r => r.processing_status === 'ERROR').length;
+            const noCxcCount = data.filter(r => r.processing_status === 'SIN CXC').length;
+            const noClientCount = data.filter(r => r.processing_status === 'SIN CLIENTE').length;
 
             // Se considera completo cuando no hay registros PENDIENTES ni PROCESANDO
             const isComplete = (pendingCount + processingCount) === 0;
@@ -335,7 +337,9 @@ export const marketTecService = {
                 pendingCount,
                 processingCount,
                 processedCount,
-                errorCount
+                errorCount,
+                noCxcCount,
+                noClientCount
             };
         } catch (error) {
             console.error('Error checking processing status:', error);
