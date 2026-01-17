@@ -47,9 +47,9 @@ export const DashboardView = ({ adminStats, user, unitName, setActiveTab, onClie
   // Extraer años disponibles de los datos mensuales
   const availableYears = React.useMemo(() => {
     const years = new Set();
-    // Always add default years context (Current + Next)
+    // Always add default years context (Current)
     years.add(currentYear);
-    years.add(currentYear + 1);
+    // Removed forced currentYear + 1 to avoid empty 2027 unless data exists
 
     (adminStats.monthlyStats || []).forEach(stat => {
       if (stat.year) years.add(stat.year);
@@ -1506,9 +1506,8 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
               <input
                 type="date"
                 name="paymentDate"
-                defaultValue={new Date().toISOString().split('T')[0]}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-blue-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
