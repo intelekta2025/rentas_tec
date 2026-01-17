@@ -58,13 +58,17 @@ export const useContracts = (clientId) => {
     try {
       const { data, error } = await createContract(contractData)
       if (error) throw error
+
+      // Siempre hacer fetch para asegurar que tenemos los datos correctos
       await fetchContracts()
+
       return { success: true, data, error: null }
     } catch (err) {
       setError(err.message)
       return { success: false, data: null, error: err }
     }
   }
+
 
   const editContract = async (contractId, contractData) => {
     try {

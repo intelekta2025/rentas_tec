@@ -41,7 +41,7 @@ const ContractFormWrapper = ({ client, user, onClose, contractToEdit }) => {
   const { addContract, editContract } = useContracts(client?.id);
 
   const handleSuccess = async () => {
-    // Cerrar modal. La actualización de la lista ocurre vía Realtime
+    // Cerrar modal después de que el contrato se haya guardado
     onClose();
   };
 
@@ -54,8 +54,6 @@ const ContractFormWrapper = ({ client, user, onClose, contractToEdit }) => {
       onAddContract={addContract}
       onUpdateContract={editContract}
       contractToEdit={contractToEdit}
-    // No pasamos onRefreshContracts interna porque queremos que la recarga la maneje el padre
-    // a través de onContractCreated -> refreshKey
     />
   );
 };
@@ -91,10 +89,7 @@ const ClientDetailViewWithPortalUsers = ({ user, client, setActiveTab, onBackToC
 
   const handleAddContract = async (contractData) => {
     const result = await addContract(contractData);
-    if (result.success) {
-      // Recargar contratos después de crear uno nuevo
-      await refreshContracts();
-    }
+    // El hook ya se encargó del estado interno con actualización optimista
     return result;
   };
 
