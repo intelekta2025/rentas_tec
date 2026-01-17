@@ -166,6 +166,33 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
               </svg>
             </div>
           </div>
+          {/* Export to Excel Button */}
+          <button
+            onClick={() => {
+              const exportData = finalFilteredClients.map(client => ({
+                'Cliente': client.name,
+                'Contacto': client.contact,
+                'Email': client.email,
+                'Teléfono': client.contactPhone || '',
+                'Usuario Market Tec': client.user_market_tec || client.User_market_tec || '',
+                'Total del Contrato': client.totalContract || 0,
+                'Saldo Pendiente': client.pendingBalance || 0,
+                'Total Rentas': client.totalRentCount || 0,
+                'Total Servicios': client.totalServiceCount || 0,
+                'Saldo Vencido': client.overdueBalance || 0,
+                'Estatus': client.status
+              }));
+
+              const ws = XLSX.utils.json_to_sheet(exportData);
+              const wb = XLSX.utils.book_new();
+              XLSX.utils.book_append_sheet(wb, ws, "Clientes");
+              XLSX.writeFile(wb, `Clientes_${unitName || user.unitId}_${selectedYear}.xlsx`);
+            }}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center shadow-sm transition-all active:scale-95"
+            title="Exportar a Excel"
+          >
+            <Download size={18} className="mr-2" /> Excel
+          </button>
           <button onClick={() => setAddClientModalOpen(true)} className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg flex items-center shadow-sm transition-all active:scale-95">
             <Plus size={18} className="mr-2" /> Nuevo Cliente
           </button>
