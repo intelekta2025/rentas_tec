@@ -117,9 +117,13 @@ export const DashboardView = ({ adminStats, user, unitName, setActiveTab, onClie
   );
 };
 
-export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClientClick, user, unitName, loading, error }) => {
+export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClientClick, user, unitName, loading, error, selectedYear, onYearChange }) => {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('Activo') // 'Todos', 'Activo', 'Inactivo'
+
+  // Generate available years (current year and previous 2 years)
+  const currentYear = new Date().getFullYear();
+  const availableYears = [currentYear, currentYear - 1, currentYear - 2, currentYear + 1];
 
   // Filtrar clientes por término de búsqueda y estado
   const finalFilteredClients = filteredClients.filter(client => {
@@ -139,14 +143,33 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-          Clientes - {unitName || `Unidad ${user.unitId}`}
+          Clientes - {unitName || `Unidad ${user.unitId}`} {selectedYear}
           <span className="ml-3 px-2.5 py-0.5 bg-gray-100 text-gray-600 text-sm font-semibold rounded-full border border-gray-200">
             {finalFilteredClients.length}
           </span>
         </h2>
-        <button onClick={() => setAddClientModalOpen(true)} className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg flex items-center shadow-sm transition-all active:scale-95">
-          <Plus size={18} className="mr-2" /> Nuevo Cliente
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Year Selector */}
+          <div className="relative">
+            <select
+              value={selectedYear}
+              onChange={(e) => onYearChange(parseInt(e.target.value))}
+              className="appearance-none bg-gray-50 border border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block px-3 py-2 pr-8 font-medium"
+            >
+              {availableYears.map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+          <button onClick={() => setAddClientModalOpen(true)} className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg flex items-center shadow-sm transition-all active:scale-95">
+            <Plus size={18} className="mr-2" /> Nuevo Cliente
+          </button>
+        </div>
       </div>
 
       {/* Mostrar error si existe */}

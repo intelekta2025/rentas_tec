@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { getClients, createClient, updateClient, deleteClient } from '../services/clientService'
 
-export const useClients = (user) => {
+export const useClients = (user, year = null) => {
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -18,7 +18,7 @@ export const useClients = (user) => {
     setLoading(true)
     setError(null)
     try {
-      const { data, error } = await getClients(user.unitId)
+      const { data, error } = await getClients(user.unitId, year)
       if (error) throw error
       setClients(data || [])
     } catch (err) {
@@ -28,7 +28,7 @@ export const useClients = (user) => {
     } finally {
       setLoading(false)
     }
-  }, [user?.unitId])
+  }, [user?.unitId, year])
 
   // Cargar clientes al montar o cuando cambie unitId
   useEffect(() => {

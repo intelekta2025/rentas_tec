@@ -205,6 +205,7 @@ export default function App() {
   const [contractToEdit, setContractToEdit] = useState(null);
   const [clientToEdit, setClientToEdit] = useState(null);
   const [userToEdit, setUserToEdit] = useState(null);
+  const [clientsYear, setClientsYear] = useState(new Date().getFullYear()); // Year filter for clients view
 
   // Hooks de datos de Supabase
   // Solo ejecutar hooks si el usuario tiene los datos necesarios
@@ -226,7 +227,7 @@ export default function App() {
     editClient,
     removeClient,
     refreshClients
-  } = useClients(user);
+  } = useClients(user, clientsYear);
 
   // Facturas/CXC - filtradas según el rol
   const {
@@ -825,6 +826,8 @@ export default function App() {
                   error={clientsError}
                   onAddClient={addClient}
                   unitName={businessUnitName || user.unitName}
+                  selectedYear={clientsYear}
+                  onYearChange={setClientsYear}
                 />
               )}
               {activeTab === 'clientDetail' && selectedClient && (

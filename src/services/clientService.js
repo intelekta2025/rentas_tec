@@ -76,12 +76,16 @@ const mapClientToDB = (clientData) => {
 }
 
 /**
- * Obtiene todos los clientes, opcionalmente filtrados por unitId
+ * Obtiene todos los clientes, opcionalmente filtrados por unitId y año
  * @param {number|null} unitId - ID de la unidad para filtrar (null = todos)
+ * @param {number|null} year - Año para filtrar receivables por due_date (null = año actual)
  * @returns {Promise<{data: array, error: object}>}
  */
-export const getClients = async (unitId = null) => {
+export const getClients = async (unitId = null, year = null) => {
   try {
+    // Si no se proporciona año, usar el año actual
+    const filterYear = year || new Date().getFullYear();
+
     let query = supabase
       .from('clients')
       .select('*, receivables(amount, balance, status, due_date, contract_id, type), contracts(id, status)')
@@ -102,14 +106,14 @@ export const getClients = async (unitId = null) => {
     const mappedData = (data || [])
       .filter(client => client && client.business_name) // Skip clients with missing data
       .map(client => {
-        // Obtener IDs de contratos activos
-        const activeContractIds = (client.contracts || [])
-          .filter(contract => contract.status === 'Activo')
-          .map(contract => contract.id)
-
-        // Filtrar receivables solo de contratos activos
+        // Filtrar receivables por año basándose en due_date
+        // Ya NO filtramos por contratos activos
         const receivables = (client.receivables || [])
-          .filter(r => r.contract_id && activeContractIds.includes(r.contract_id))
+          .filter(r => {
+            if (!r.due_date) return false;
+            const dueYear = new Date(r.due_date).getFullYear();
+            return dueYear === filterYear;
+          });
 
         const totalContract = receivables.reduce((sum, r) => {
           const amount = typeof r.amount === 'string' ? parseFloat(r.amount.replace(/[^0-9.-]+/g, '')) : r.amount
@@ -121,8 +125,7 @@ export const getClients = async (unitId = null) => {
           return sum + (balance || 0)
         }, 0)
 
-        // Calcular conteos totales por tipo (sin importar status, pero SOLO contratos activos logicamente ya que usamos 'receivables')
-
+        // Calcular conteos totales por tipo
         const totalRentCount = receivables.filter(r => {
           const type = (r.type || '').toLowerCase();
           return type === 'rent' || type === 'renta';
