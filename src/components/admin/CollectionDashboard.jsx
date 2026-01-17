@@ -12,7 +12,9 @@ import {
     ArrowUpRight,
     Send,
     MessageCircle,
-    ArrowLeft
+    ArrowLeft,
+    X,
+    Calendar
 } from 'lucide-react';
 
 import { getCollectionStats } from '../../services/clientService';
@@ -32,6 +34,14 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack, t
     const [templates, setTemplates] = useState([]);
     const [selectedTemplate, setSelectedTemplate] = useState('default'); // 'default' or template id
     const [loadingTemplates, setLoadingTemplates] = useState(false);
+
+    // Filter State
+    const [showFilters, setShowFilters] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [dueDateFilter, setDueDateFilter] = useState({ type: 'all', date: '' });
+    const [overdueRangeFilter, setOverdueRangeFilter] = useState([]);
+    const [debtAmountFilter, setDebtAmountFilter] = useState({ min: '', max: '' });
+    const [statusFilter, setStatusFilter] = useState([]);
 
     React.useEffect(() => {
         const fetchData = async () => {
@@ -104,10 +114,10 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack, t
     };
 
     const toggleAll = () => {
-        if (selectedClients.size === clients.length) {
+        if (selectedClients.size === filteredClients.length && filteredClients.length > 0) {
             setSelectedClients(new Set());
         } else {
-            setSelectedClients(new Set(clients.map(c => c.id)));
+            setSelectedClients(new Set(filteredClients.map(c => c.id)));
         }
     };
 
@@ -125,6 +135,108 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack, t
         if (maxDays > 45) return <span className="px-2 py-1 text-xs font-semibold text-red-700 bg-red-100 rounded-full border border-red-200">Crítico ({maxDays} días)</span>;
         if (maxDays > 15) return <span className="px-2 py-1 text-xs font-semibold text-orange-700 bg-orange-100 rounded-full border border-orange-200">Vencido ({maxDays} días)</span>;
         return <span className="px-2 py-1 text-xs font-semibold text-blue-700 bg-blue-100 rounded-full border border-blue-200">Reciente</span>;
+    };
+
+    const getClientStatus = (client) => {
+        const maxDays = Math.max(...client.invoices.map(i => i.daysOverdue));
+        if (maxDays > 45) return 'Crítico';
+        if (maxDays > 15) return 'Vencido';
+        return 'Reciente';
+    };
+
+    // Filter Logic
+    const filteredClients = useMemo(() => {
+        return clients.filter(client => {
+            // Search filter
+            if (searchTerm) {
+                const search = searchTerm.toLowerCase();
+                const matchesSearch =
+                    client.clientName?.toLowerCase().includes(search) ||
+                    client.contactEmail?.toLowerCase().includes(search) ||
+                    client.contactPhone?.toLowerCase().includes(search);
+                if (!matchesSearch) return false;
+            }
+
+            // Due date filter
+            if (dueDateFilter.type !== 'all' && dueDateFilter.date) {
+                const filterDate = new Date(dueDateFilter.date);
+                // Reset time to compare only dates
+                filterDate.setHours(0, 0, 0, 0);
+
+                const allInvoicesMatch = client.invoices.every(inv => {
+                    if (!inv.dueDate) return true; // Skip invoices without due date
+                    const invDate = new Date(inv.dueDate);
+                    invDate.setHours(0, 0, 0, 0);
+
+                    if (dueDateFilter.type === 'before') {
+                        return invDate < filterDate;
+                    } else if (dueDateFilter.type === 'after') {
+                        return invDate > filterDate;
+                    }
+                    return true;
+                });
+                if (!allInvoicesMatch) return false;
+            }
+
+            // Overdue range filter
+            if (overdueRangeFilter.length > 0) {
+                const maxDays = Math.max(...client.invoices.map(i => i.daysOverdue));
+                const matchesRange = overdueRangeFilter.some(range => {
+                    if (range === '0-15') return maxDays >= 0 && maxDays <= 15;
+                    if (range === '15-30') return maxDays > 15 && maxDays <= 30;
+                    if (range === '30-45') return maxDays > 30 && maxDays <= 45;
+                    if (range === '45+') return maxDays > 45;
+                    return false;
+                });
+                if (!matchesRange) return false;
+            }
+
+            // Debt amount filter
+            const totalDebt = clientDebt(client);
+            if (debtAmountFilter.min !== '' && totalDebt < parseFloat(debtAmountFilter.min)) {
+                return false;
+            }
+            if (debtAmountFilter.max !== '' && totalDebt > parseFloat(debtAmountFilter.max)) {
+                return false;
+            }
+
+            // Status filter
+            if (statusFilter.length > 0) {
+                const status = getClientStatus(client);
+                if (!statusFilter.includes(status)) return false;
+            }
+
+            return true;
+        });
+    }, [clients, searchTerm, dueDateFilter, overdueRangeFilter, debtAmountFilter, statusFilter]);
+
+    // Clear all filters
+    const clearAllFilters = () => {
+        setSearchTerm('');
+        setDueDateFilter({ type: 'all', date: '' });
+        setOverdueRangeFilter([]);
+        setDebtAmountFilter({ min: '', max: '' });
+        setStatusFilter([]);
+    };
+
+    // Count active filters
+    const activeFilterCount = useMemo(() => {
+        let count = 0;
+        if (searchTerm) count++;
+        if (dueDateFilter.type !== 'all' && dueDateFilter.date) count++;
+        if (overdueRangeFilter.length > 0) count++;
+        if (debtAmountFilter.min !== '' || debtAmountFilter.max !== '') count++;
+        if (statusFilter.length > 0) count++;
+        return count;
+    }, [searchTerm, dueDateFilter, overdueRangeFilter, debtAmountFilter, statusFilter]);
+
+    // Toggle filter checkbox
+    const toggleFilterArray = (value, array, setter) => {
+        if (array.includes(value)) {
+            setter(array.filter(item => item !== value));
+        } else {
+            setter([...array, value]);
+        }
     };
 
 
@@ -200,9 +312,25 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack, t
 
                     {/* --- Toolbar --- */}
                     <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2">
-
-                            <span className="text-sm text-slate-500">Mostrando {clients.length} clientes con deuda</span>
+                        <div className="flex items-center gap-4">
+                            <button
+                                onClick={() => setShowFilters(!showFilters)}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${showFilters
+                                    ? 'bg-indigo-600 text-white shadow-md'
+                                    : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
+                                    }`}
+                            >
+                                <Filter className="w-4 h-4" />
+                                Filtros
+                                {activeFilterCount > 0 && (
+                                    <span className="ml-1 px-2 py-0.5 bg-white text-indigo-600 text-xs font-bold rounded-full">
+                                        {activeFilterCount}
+                                    </span>
+                                )}
+                            </button>
+                            <span className="text-sm text-slate-500">
+                                Mostrando {filteredClients.length} de {clients.length} clientes
+                            </span>
                         </div>
 
                         {/* Bulk Action Indicator */}
@@ -229,6 +357,143 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack, t
                         )}
                     </div>
 
+                    {/* --- Filter Panel --- */}
+                    {showFilters && (
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6 animate-in slide-in-from-top-2 fade-in duration-200">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                                    <Filter className="w-5 h-5" />
+                                    Filtros de Búsqueda
+                                </h3>
+                                {activeFilterCount > 0 && (
+                                    <button
+                                        onClick={clearAllFilters}
+                                        className="text-sm text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
+                                    >
+                                        <X className="w-4 h-4" />
+                                        Limpiar filtros
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {/* Search Filter */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        Buscar Cliente
+                                    </label>
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            placeholder="Nombre, email o teléfono..."
+                                            className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Due Date Filter */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        Fecha de Vencimiento
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <select
+                                            value={dueDateFilter.type}
+                                            onChange={(e) => setDueDateFilter({ ...dueDateFilter, type: e.target.value })}
+                                            className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                                        >
+                                            <option value="all">Todas</option>
+                                            <option value="before">Antes de</option>
+                                            <option value="after">Después de</option>
+                                        </select>
+                                        <input
+                                            type="date"
+                                            value={dueDateFilter.date}
+                                            onChange={(e) => setDueDateFilter({ ...dueDateFilter, date: e.target.value })}
+                                            disabled={dueDateFilter.type === 'all'}
+                                            className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Debt Amount Filter */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        Monto de Deuda
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="number"
+                                            value={debtAmountFilter.min}
+                                            onChange={(e) => setDebtAmountFilter({ ...debtAmountFilter, min: e.target.value })}
+                                            placeholder="Mínimo"
+                                            className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                                        />
+                                        <input
+                                            type="number"
+                                            value={debtAmountFilter.max}
+                                            onChange={(e) => setDebtAmountFilter({ ...debtAmountFilter, max: e.target.value })}
+                                            placeholder="Máximo"
+                                            className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Overdue Range Filter */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        Días de Vencimiento
+                                    </label>
+                                    <div className="space-y-2">
+                                        {[
+                                            { value: '0-15', label: '0-15 días' },
+                                            { value: '15-30', label: '15-30 días' },
+                                            { value: '30-45', label: '30-45 días' },
+                                            { value: '45+', label: 'Más de 45 días' }
+                                        ].map(range => (
+                                            <label key={range.value} className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={overdueRangeFilter.includes(range.value)}
+                                                    onChange={() => toggleFilterArray(range.value, overdueRangeFilter, setOverdueRangeFilter)}
+                                                    className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                                                />
+                                                <span className="text-sm text-slate-700">{range.label}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Status Filter */}
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        Estado
+                                    </label>
+                                    <div className="space-y-2">
+                                        {[
+                                            { value: 'Reciente', label: 'Reciente', color: 'text-blue-700' },
+                                            { value: 'Vencido', label: 'Vencido', color: 'text-orange-700' },
+                                            { value: 'Crítico', label: 'Crítico', color: 'text-red-700' }
+                                        ].map(status => (
+                                            <label key={status.value} className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={statusFilter.includes(status.value)}
+                                                    onChange={() => toggleFilterArray(status.value, statusFilter, setStatusFilter)}
+                                                    className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                                                />
+                                                <span className={`text-sm font-medium ${status.color}`}>{status.label}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* --- Main Table (Client Centric) --- */}
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                         <div className="overflow-x-auto">
@@ -237,7 +502,7 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack, t
                                     <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-semibold tracking-wider">
                                         <th className="p-4 w-12 text-center">
                                             <button onClick={toggleAll} className="focus:outline-none">
-                                                {selectedClients.size === clients.length && clients.length > 0 ? (
+                                                {selectedClients.size === filteredClients.length && filteredClients.length > 0 ? (
                                                     <CheckSquare className="w-5 h-5 text-indigo-600" />
                                                 ) : (
                                                     <Square className="w-5 h-5 text-slate-300 hover:text-slate-400" />
@@ -251,7 +516,7 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack, t
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {clients.map((client) => {
+                                    {filteredClients.map((client) => {
                                         const isExpanded = expandedRows.has(client.id);
                                         const isSelected = selectedClients.has(client.id);
                                         const total = clientDebt(client);
@@ -313,7 +578,7 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack, t
                                                                     <thead>
                                                                         <tr className="text-slate-400 border-b border-slate-200/60">
                                                                             <th className="pb-2 font-medium text-left">Concepto</th>
-                                                                            <th className="pb-2 font-medium text-left">Fecha Emisión</th>
+                                                                            <th className="pb-2 font-medium text-left">Fecha Vencimiento</th>
                                                                             <th className="pb-2 font-medium text-center">Días Vencido</th>
                                                                             <th className="pb-2 font-medium text-center">Estado</th>
                                                                             <th className="pb-2 font-medium text-right">Monto</th>
@@ -380,7 +645,7 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack, t
                                     <div className="space-y-2">
                                         <label className="text-xs font-semibold text-slate-500 uppercase">Resumen del envío</label>
                                         <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100 max-h-40 overflow-y-auto">
-                                            {clients.filter(c => selectedClients.has(c.id)).map(c => (
+                                            {filteredClients.filter(c => selectedClients.has(c.id)).map(c => (
                                                 <div key={c.id} className="p-3 flex justify-between items-center text-sm">
                                                     <span className="truncate max-w-[200px] font-medium text-slate-700">{c.clientName}</span>
                                                     <span className="text-slate-500">{c.invoices.length} facturas</span>

@@ -396,14 +396,15 @@ export const deleteInvoice = async (id) => {
 export const getUpcomingReminders = async (unitId = null, daysAhead = 30) => {
   try {
     const today = new Date()
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
     const futureDate = new Date()
     futureDate.setDate(today.getDate() + daysAhead)
 
     let query = supabase
       .from('receivables') // Tabla real: receivables
       .select('*, clients(business_name, contact_email, contact_name, contact_phone)')
-      .in('status', ['Pending', 'Scheduled'])
-      .gte('due_date', today.toISOString().split('T')[0])
+      .in('status', ['Pending', 'Scheduled', 'Overdue', 'Partial', 'pendiente', 'vencido', 'parcial'])
+      .gte('due_date', startOfMonth.toISOString().split('T')[0])
       .lte('due_date', futureDate.toISOString().split('T')[0])
       .order('due_date', { ascending: true })
 
