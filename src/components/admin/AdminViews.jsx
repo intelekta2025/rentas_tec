@@ -348,6 +348,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
     concept: ''
   });
   const [contractStatusFilter, setContractStatusFilter] = useState('Activo');
+  const [customConceptTemplate, setCustomConceptTemplate] = useState('');
 
   // Seleccionar automáticamente el primer contrato activo si no hay ninguno seleccionado
   // Y actualizar la selección cuando cambia el filtro
@@ -465,6 +466,12 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
     if (sortConfig.key !== key) return <ChevronUp size={14} className="ml-1 text-gray-300" />;
     return sortConfig.direction === 'asc' ? <ChevronUp size={14} className="ml-1 text-blue-600" /> : <ChevronDown size={14} className="ml-1 text-blue-600" />;
   };
+
+  useEffect(() => {
+    if (isGenerateModalOpen && contractToGenerate) {
+      setCustomConceptTemplate(generationType === 'Rent' ? 'Renta [Mes] [Año]' : 'Luz [Mes] [Año]');
+    }
+  }, [isGenerateModalOpen, contractToGenerate, generationType]);
 
   const handleFinalizeClick = (contract) => {
     // Buscar CXC pendientes (saldo > 0) para este contrato
@@ -1774,7 +1781,13 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                   </div>
                   <div className="col-span-2">
                     <span className="block text-xs text-gray-500 uppercase font-bold tracking-wider">Concepto Sugerido</span>
-                    <span className="text-sm text-gray-700 italic">"{generationType === 'Rent' ? 'Renta' : 'Luz'} [Mes] [Año]"</span>
+                    <input
+                      type="text"
+                      value={customConceptTemplate}
+                      onChange={(e) => setCustomConceptTemplate(e.target.value)}
+                      className="w-full mt-1 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-blue-500 focus:border-blue-500 italic"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Usa [Mes] y [Año] como marcadores.</p>
                   </div>
                 </div>
 
@@ -1832,7 +1845,19 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                           const dueDateStr = `${y}-${mStr}-${dStr}`;
 
                           const amount = generationType === 'Rent' ? contractToGenerate.monthly_rent_amount : contractToGenerate.monthly_services_amount;
-                          const conceptPrefix = generationType === 'Rent' ? 'Renta' : 'Luz';
+
+                          // Generar concepto basado en template
+                          let concept = customConceptTemplate
+                            .replace(/\[Mes\]/g, monthNames[mIndex])
+                            .replace(/\[Año\]/g, year)
+                            .replace(/\[Anyo\]/g, year); // Por si acaso
+
+                          // Fallback si quedó vacío o algo raro
+                          if (!concept || concept.trim() === '') {
+                            const conceptPrefix = generationType === 'Rent' ? 'Renta' : 'Luz';
+                            concept = `${conceptPrefix} ${monthNames[mIndex]} ${year}`;
+                          }
+
                           const typeVal = generationType === 'Rent' ? 'Rent' : 'Service';
 
                           invoices.push({
@@ -1840,7 +1865,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                             clientId: contractToGenerate.client_id,
                             contractId: contractToGenerate.id,
                             amount: amount,
-                            concept: `${conceptPrefix} ${monthNames[mIndex]} ${year}`,
+                            concept: concept,
                             dueDate: dueDateStr,
                             status: 'Pending',
                             type: typeVal,
