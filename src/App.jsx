@@ -32,36 +32,12 @@ import { generateBulkInvoices, cancelReceivables, revertPayment, reactivateContr
 import { useContracts } from './hooks/useContracts';
 import { getTemplates } from './services/templateService'; // Cache templates
 
-// Componente wrapper para el formulario de contrato que usa el mismo hook que ClientDetailView
-// Este componente debe compartir el mismo hook que ClientDetailViewWithPortalUsers
-// Para que cuando se cree un contrato, se actualice automáticamente la lista
-// Componente wrapper para el formulario de contrato que usa el mismo hook que ClientDetailView
-// Este componente comparte el contexto de useContracts para que las actualizaciones sean fluidas
-const ContractFormWrapper = ({ client, user, onClose, contractToEdit }) => {
-  const { addContract, editContract } = useContracts(client?.id);
-
-  const handleSuccess = async () => {
-    // Cerrar modal después de que el contrato se haya guardado
-    onClose();
-  };
-
-  return (
-    <ContractForm
-      client={client}
-      user={user}
-      onClose={onClose}
-      onSuccess={handleSuccess}
-      onAddContract={addContract}
-      onUpdateContract={editContract}
-      contractToEdit={contractToEdit}
-    />
-  );
-};
+// ContractFormWrapper eliminado - el modal ahora vive dentro de ClientDetailViewWithPortalUsers
 
 // Componente wrapper para ClientDetailView que carga los usuarios del portal y contratos
-const ClientDetailViewWithPortalUsers = ({ user, client, setActiveTab, onBackToClients, setContractModalOpen, generateContractPreview, setTerminationModalOpen, onPrepareEdit, onEditClient, onGenerateCXC, onAddManualReceivable, unitName }) => {
+const ClientDetailViewWithPortalUsers = ({ user, client, setActiveTab, onBackToClients, isContractModalOpen, setContractModalOpen, contractToEdit, setContractToEdit, setTerminationModalOpen, onEditClient, unitName }) => {
   const { portalUsers, loading: portalUsersLoading } = useClientPortalUsers(client?.id);
-  const { contracts, loading: contractsLoading, addContract, finalizeContract, reactivateContract, refreshContracts } = useContracts(client?.id);
+  const { contracts, loading: contractsLoading, addContract, editContract, finalizeContract, reactivateContract, refreshContracts } = useContracts(client?.id);
 
   // Cargar receivables (Estado de Cuenta) reales
   const { invoices: receivables, loading: receivablesLoading, refreshInvoices, editInvoice, addInvoice, addPayment, removeInvoice } = useInvoices(user, { clientId: client?.id });
@@ -81,15 +57,25 @@ const ClientDetailViewWithPortalUsers = ({ user, client, setActiveTab, onBackToC
   };
 
   const handleEditContract = (contract) => {
-    if (onPrepareEdit) {
-      onPrepareEdit(contract);
-    }
+    setContractToEdit(contract);
     setContractModalOpen(true);
   };
 
   const handleAddContract = async (contractData) => {
     const result = await addContract(contractData);
-    // El hook ya se encargó del estado interno con actualización optimista
+    if (result.success) {
+      setContractModalOpen(false);
+      setContractToEdit(null);
+    }
+    return result;
+  };
+
+  const handleUpdateContract = async (id, data) => {
+    const result = await editContract(id, data);
+    if (result.success) {
+      setContractModalOpen(false);
+      setContractToEdit(null);
+    }
     return result;
   };
 
@@ -105,73 +91,91 @@ const ClientDetailViewWithPortalUsers = ({ user, client, setActiveTab, onBackToC
   };
 
   return (
-    <ClientDetailView
-      client={client}
-      unitName={unitName}
-      setActiveTab={setActiveTab}
-      onBackToClients={onBackToClients}
-      setContractModalOpen={setContractModalOpen}
-      generateContractPreview={generateContractPreview}
-      setTerminationModalOpen={setTerminationModalOpen}
-      portalUsers={portalUsers}
-      portalUsersLoading={portalUsersLoading}
-      contracts={contracts}
-      contractsLoading={contractsLoading}
-      onFinalizeContract={handleFinalizeContract}
-      onEditContract={handleEditContract}
-      onAddContract={handleAddContract}
-      onReactivateContract={handleReactivateContract}
-      onRefreshContracts={refreshContracts}
-      onEditClient={onEditClient}
-      onGenerateCXC={async (invoices) => {
-        const result = await onGenerateCXC(invoices);
-        if (result.success) {
-          await refreshInvoices();
-        }
-        return result;
-      }}
-      onUpdateReceivable={async (id, data) => {
-        const result = await editInvoice(id, data);
-        if (result.success) {
-          await refreshInvoices();
-        }
-        return result;
-      }}
-      onAddPayment={async (paymentData) => {
-        const result = await addPayment(paymentData);
-        if (result.success) {
-          await refreshInvoices();
-          await refreshContracts(); // Refresh contracts to update KPI cards
-        }
-        return result;
-      }}
-      onAddManualReceivable={async (data) => {
-        const result = await addInvoice(data);
-        if (result.success) {
-          await refreshInvoices();
-          await refreshContracts(); // Refresh contracts to update KPI cards
-        }
-        return result;
-      }}
-      onDeleteReceivable={async (id) => {
-        const result = await removeInvoice(id);
-        if (result.success) {
-          await refreshInvoices();
-          await refreshContracts(); // Refresh contracts to update KPI cards
-        }
-        return result;
-      }}
-      onRevertPayment={async (id) => {
-        const result = await revertPayment(id);
-        if (result.success) {
-          await refreshInvoices();
-          await refreshContracts(); // Refresh contracts to update KPI cards
-        }
-        return result;
-      }}
-      receivables={receivables}
-      receivablesLoading={receivablesLoading}
-    />
+    <>
+      <ClientDetailView
+        client={client}
+        unitName={unitName}
+        setActiveTab={setActiveTab}
+        onBackToClients={onBackToClients}
+        setContractModalOpen={setContractModalOpen}
+        setTerminationModalOpen={setTerminationModalOpen}
+        portalUsers={portalUsers}
+        portalUsersLoading={portalUsersLoading}
+        contracts={contracts}
+        contractsLoading={contractsLoading}
+        onFinalizeContract={handleFinalizeContract}
+        onEditContract={handleEditContract}
+        onAddContract={handleAddContract}
+        onReactivateContract={handleReactivateContract}
+        onRefreshContracts={refreshContracts}
+        onEditClient={onEditClient}
+        onGenerateCXC={async (invoices) => {
+          const result = await generateBulkInvoices(invoices);
+          if (!result.error) {
+            await refreshInvoices();
+          }
+          return { success: !result.error, error: result.error };
+        }}
+        onUpdateReceivable={async (id, data) => {
+          const result = await editInvoice(id, data);
+          if (result.success) {
+            await refreshInvoices();
+          }
+          return result;
+        }}
+        onAddPayment={async (paymentData) => {
+          const result = await addPayment(paymentData);
+          if (result.success) {
+            await refreshInvoices();
+            await refreshContracts(); // Refresh contracts to update KPI cards
+          }
+          return result;
+        }}
+        onAddManualReceivable={async (data) => {
+          const result = await addInvoice(data);
+          if (result.success) {
+            await refreshInvoices();
+            await refreshContracts(); // Refresh contracts to update KPI cards
+          }
+          return result;
+        }}
+        onDeleteReceivable={async (id) => {
+          const result = await removeInvoice(id);
+          if (result.success) {
+            await refreshInvoices();
+            await refreshContracts(); // Refresh contracts to update KPI cards
+          }
+          return result;
+        }}
+        onRevertPayment={async (id) => {
+          const result = await revertPayment(id);
+          if (result.success) {
+            await refreshInvoices();
+            await refreshContracts(); // Refresh contracts to update KPI cards
+          }
+          return result;
+        }}
+        receivables={receivables}
+        receivablesLoading={receivablesLoading}
+      />
+
+      {/* Modal de Contrato - Comparte la misma instancia de useContracts */}
+      <Modal
+        isOpen={isContractModalOpen}
+        onClose={() => { setContractModalOpen(false); setContractToEdit(null); }}
+        title={contractToEdit ? "Editar Contrato" : "Crear Contrato"}
+      >
+        <ContractForm
+          client={client}
+          user={user}
+          onClose={() => { setContractModalOpen(false); setContractToEdit(null); }}
+          onSuccess={() => { }}
+          onAddContract={handleAddContract}
+          onUpdateContract={handleUpdateContract}
+          contractToEdit={contractToEdit}
+        />
+      </Modal>
+    </>
   );
 };
 
@@ -831,9 +835,11 @@ export default function App() {
                   client={selectedClient}
                   setActiveTab={setActiveTab}
                   onBackToClients={handleBackToClients}
+                  isContractModalOpen={isContractModalOpen}  // NUEVO
+                  setContractToEdit={setContractToEdit}  // NUEVO
                   setContractModalOpen={setContractModalOpen}
+                  contractToEdit={contractToEdit}  // NUEVO
                   setTerminationModalOpen={setTerminationModalOpen}
-                  onPrepareEdit={setContractToEdit}
                   unitName={businessUnitName || user.unitName}
                   onEditClient={(client) => {
                     handleEditClientProfile(client);
@@ -937,20 +943,7 @@ export default function App() {
           unitId={user.unitId}
         />
       </Modal>
-      <Modal isOpen={isContractModalOpen} onClose={() => { setContractModalOpen(false); setContractToEdit(null); }} title={contractToEdit ? "Editar Contrato" : "Crear Contrato"}>
-        {selectedClient && user ? (
-          <ContractFormWrapper
-            client={selectedClient}
-            user={user}
-            onClose={() => { setContractModalOpen(false); setContractToEdit(null); }}
-            contractToEdit={contractToEdit}
-          />
-        ) : (
-          <div className="p-4">
-            <p className="text-gray-600">No se puede crear un contrato sin un cliente seleccionado.</p>
-          </div>
-        )}
-      </Modal>
+
       <Modal isOpen={isTerminationModalOpen} onClose={() => setTerminationModalOpen(false)} title="Finalizar Contrato">
         <div className="p-4">Formulario de Terminación</div>
       </Modal>

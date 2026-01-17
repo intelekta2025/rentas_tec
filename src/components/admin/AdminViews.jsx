@@ -347,14 +347,35 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
     amount: '',
     concept: ''
   });
+  const [contractStatusFilter, setContractStatusFilter] = useState('Activo');
 
   // Seleccionar automáticamente el primer contrato activo si no hay ninguno seleccionado
+  // Y actualizar la selección cuando cambia el filtro
   useEffect(() => {
-    if (!selectedContractId && contracts.length > 0) {
-      const activeContract = contracts.find(c => c.status === 'Activo' || c.status === 'activo') || contracts[0];
-      setSelectedContractId(activeContract.id);
+    // Definir qué contratos son visibles según el filtro
+    const visibleContracts = contracts.filter(c => {
+      if (contractStatusFilter === 'Todos') return true;
+      const status = (c.status || '').toLowerCase();
+      const isActive = status === 'active' || status === 'activo';
+      const isTerminated = status === 'terminated' || status === 'terminado';
+
+      if (contractStatusFilter === 'Activo') return isActive;
+      if (contractStatusFilter === 'Terminado') return isTerminated;
+      return true;
+    });
+
+    if (visibleContracts.length > 0) {
+      // Si el contrato seleccionado actualmente NO está en la lista visible, seleccionar el primero visible
+      const isSelectedVisible = visibleContracts.some(c => c.id === selectedContractId);
+
+      if (!selectedContractId || !isSelectedVisible) {
+        setSelectedContractId(visibleContracts[0].id);
+      }
+    } else {
+      // Si no hay contratos visibles, limpiar selección
+      setSelectedContractId(null);
     }
-  }, [contracts, selectedContractId]);
+  }, [contracts, selectedContractId, contractStatusFilter]);
 
   // Auto-calcular concepto para registro manual
   useEffect(() => {
@@ -618,32 +639,28 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
       {/* Main Content Area */}
       <div className="space-y-4">
         {/* Financial Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white p-3 rounded-lg shadow border-l-4 border-gray-400 transition-all hover:shadow-md">
-            <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Total del contrato</div>
-            <div className="text-xl font-bold text-gray-900 mt-1">${contractTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
-          </div>
-          <div className="bg-white p-3 rounded-lg shadow border-l-4 border-green-500 transition-all hover:shadow-md">
-            <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Total de pagos del contrato</div>
-            <div className="text-xl font-bold text-green-600 mt-1">${totalPaid.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
-          </div>
-          <div className="bg-white p-3 rounded-lg shadow border-l-4 border-blue-500 transition-all hover:shadow-md">
-            <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Saldo del contrato</div>
-            <div className="text-xl font-bold text-gray-900 mt-1">${balance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
-          </div>
-          <div className="bg-white p-3 rounded-lg shadow border-l-4 border-red-500 transition-all hover:shadow-md">
-            <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Deuda Vencida</div>
-            <div className="text-xl font-bold text-red-600 mt-1 flex items-center">
-              ${overdueTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-              {overdueTotal > 0 && <AlertTriangle size={16} className="ml-2" />}
-            </div>
-          </div>
-        </div>
+
 
         {/* Contratos Existentes */}
         <div className="bg-white shadow rounded-lg overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-            <h3 className="text-lg font-medium text-gray-900">Contratos</h3>
+            <div className="flex items-center space-x-4">
+              <h3 className="text-lg font-medium text-gray-900">Contratos</h3>
+              <div className="flex bg-gray-100 p-0.5 rounded-lg border border-gray-200">
+                {['Activo', 'Terminado', 'Todos'].map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setContractStatusFilter(f)}
+                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${contractStatusFilter === f
+                      ? "bg-white text-blue-700 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                      }`}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+            </div>
             <button
               onClick={() => { setContractModalOpen(true); }}
               className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-sm font-medium flex items-center shadow-sm"
@@ -672,205 +689,252 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                     <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Renta Mensual</th>
                     <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CXC Renta</th>
                     <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CXC Servicios</th>
+                    <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Contrato</th>
+                    <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Pagado</th>
+                    <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo</th>
+                    <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deuda Vencida</th>
                     <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Terminación</th>
                     <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                     <th className="px-6 py-2.5 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {contracts.map((contract) => {
-                    const isSelected = selectedContractId === contract.id;
-                    const startDateRaw = contract.start_date
-                    const endDateRaw = contract.end_date
-                    const terminationDateRaw = contract.termination_date
+                  {contracts
+                    .filter((contract) => {
+                      if (contractStatusFilter === 'Todos') return true;
+                      const status = (contract.status || '').toLowerCase();
+                      const isActive = status === 'active' || status === 'activo';
+                      const isTerminated = status === 'terminated' || status === 'terminado';
 
-                    const contractStatus = contract.status || 'Active'
-                    const isActive = contractStatus === 'Active' || contractStatus === 'activo' || contractStatus === 'Activo'
-                    const isTerminated = contractStatus === 'Terminado' || contractStatus === 'terminado' || contractStatus === 'Terminated'
+                      if (contractStatusFilter === 'Activo') return isActive;
+                      if (contractStatusFilter === 'Terminado') return isTerminated;
+                      return true;
+                    })
+                    .map((contract) => {
+                      const isSelected = selectedContractId === contract.id;
+                      const startDateRaw = contract.start_date
+                      const endDateRaw = contract.end_date
+                      const terminationDateRaw = contract.termination_date
 
-                    let startDateFormatted = '-'
-                    if (startDateRaw) {
-                      try {
-                        const [year, month, day] = startDateRaw.split('T')[0].split('-')
-                        const date = new Date(year, month - 1, day)
-                        if (!isNaN(date.getTime())) {
-                          startDateFormatted = date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' }).replace('.', '')
+                      const contractStatus = contract.status || 'Active'
+                      const isActive = contractStatus === 'Active' || contractStatus === 'activo' || contractStatus === 'Activo'
+                      const isTerminated = contractStatus === 'Terminado' || contractStatus === 'terminado' || contractStatus === 'Terminated'
+
+                      let startDateFormatted = '-'
+                      if (startDateRaw) {
+                        try {
+                          const [year, month, day] = startDateRaw.split('T')[0].split('-')
+                          const date = new Date(year, month - 1, day)
+                          if (!isNaN(date.getTime())) {
+                            startDateFormatted = date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' }).replace('.', '')
+                          }
+                        } catch (_) {
+                          // Ignorar errores de parsing
                         }
-                      } catch (_) {
-                        // Ignorar errores de parsing
                       }
-                    }
 
-                    let endDateFormatted = 'Activo'
-                    if (endDateRaw) {
-                      try {
-                        const [year, month, day] = endDateRaw.split('T')[0].split('-')
-                        const date = new Date(year, month - 1, day)
-                        if (!isNaN(date.getTime())) {
-                          endDateFormatted = date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' }).replace('.', '')
+                      let endDateFormatted = 'Activo'
+                      if (endDateRaw) {
+                        try {
+                          const [year, month, day] = endDateRaw.split('T')[0].split('-')
+                          const date = new Date(year, month - 1, day)
+                          if (!isNaN(date.getTime())) {
+                            endDateFormatted = date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' }).replace('.', '')
+                          }
+                        } catch (_) {
+                          // Ignorar errores de parsing
                         }
-                      } catch (_) {
-                        // Ignorar errores de parsing
                       }
-                    }
 
-                    const monthlyRentRaw = contract.monthly_rent_amount
-                    let monthlyRentFormatted = '$0.00'
-                    if (monthlyRentRaw) {
-                      const amount = typeof monthlyRentRaw === 'string' ? parseFloat(monthlyRentRaw.replace(/[^0-9.-]+/g, '')) : parseFloat(monthlyRentRaw)
-                      if (!isNaN(amount)) monthlyRentFormatted = `$${amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                    }
+                      const monthlyRentRaw = contract.monthly_rent_amount
+                      let monthlyRentFormatted = '$0.00'
+                      if (monthlyRentRaw) {
+                        const amount = typeof monthlyRentRaw === 'string' ? parseFloat(monthlyRentRaw.replace(/[^0-9.-]+/g, '')) : parseFloat(monthlyRentRaw)
+                        if (!isNaN(amount)) monthlyRentFormatted = `$${amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      }
 
-                    const serviceRentRaw = contract.monthly_services_amount
-                    let serviceRentFormatted = '$0.00'
-                    if (serviceRentRaw) {
-                      const amount = typeof serviceRentRaw === 'string' ? parseFloat(serviceRentRaw.replace(/[^0-9.-]+/g, '')) : parseFloat(serviceRentRaw)
-                      if (!isNaN(amount)) serviceRentFormatted = `$${amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                    }
+                      const serviceRentRaw = contract.monthly_services_amount
+                      let serviceRentFormatted = '$0.00'
+                      if (serviceRentRaw) {
+                        const amount = typeof serviceRentRaw === 'string' ? parseFloat(serviceRentRaw.replace(/[^0-9.-]+/g, '')) : parseFloat(serviceRentRaw)
+                        if (!isNaN(amount)) serviceRentFormatted = `$${amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      }
 
-                    const rentCount = (receivables || []).filter(r => r.contractId === contract.id && (r.type === 'Rent' || r.type === 'Renta')).length;
-                    const serviceCount = (receivables || []).filter(r => r.contractId === contract.id && (r.type === 'Service' || r.type === 'Services' || r.type === 'Luz')).length;
+                      const rentCount = (receivables || []).filter(r => r.contractId === contract.id && (r.type === 'Rent' || r.type === 'Renta')).length;
+                      const serviceCount = (receivables || []).filter(r => r.contractId === contract.id && (r.type === 'Service' || r.type === 'Services' || r.type === 'Luz')).length;
 
-                    return (
-                      <tr
-                        key={contract.id}
-                        onClick={() => setSelectedContractId(contract.id)}
-                        className={`transition-colors cursor-pointer border-l-4 ${isSelected ? 'bg-blue-50 border-blue-500' : 'hover:bg-gray-50 border-transparent'}`}
-                      >
-                        <td className="px-6 py-3 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {startDateFormatted} - {endDateFormatted}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center md:text-left font-bold text-blue-700">
-                          {contract.num_months || '-'}
-                        </td>
-                        <td className="px-6 py-3 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {serviceRentFormatted}
-                          </div>
-                        </td>
-                        <td className="px-6 py-3 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {monthlyRentFormatted}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${rentCount > 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-500'}`}>
-                            {rentCount}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${serviceCount > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-500'}`}>
-                            {serviceCount}
-                          </span>
-                        </td>
-                        <td className="px-6 py-3 whitespace-nowrap">
-                          <div className="text-sm text-gray-500">
-                            {(() => {
-                              let terminationDateFormatted = '-'
-                              if (terminationDateRaw) {
-                                try {
-                                  const [year, month, day] = terminationDateRaw.split('T')[0].split('-')
-                                  const date = new Date(year, month - 1, day)
-                                  if (!isNaN(date.getTime())) {
-                                    terminationDateFormatted = date.toLocaleDateString('es-MX', {
-                                      day: '2-digit',
-                                      month: 'short',
-                                      year: '2-digit'
-                                    }).replace('.', '')
+                      return (
+                        <tr
+                          key={contract.id}
+                          onClick={() => setSelectedContractId(contract.id)}
+                          className={`transition-colors cursor-pointer border-l-4 ${isSelected ? 'bg-blue-50 border-blue-500' : 'hover:bg-gray-50 border-transparent'}`}
+                        >
+                          <td className="px-6 py-3 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {startDateFormatted} - {endDateFormatted}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center md:text-left font-bold text-blue-700">
+                            {contract.num_months || '-'}
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {serviceRentFormatted}
+                            </div>
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {monthlyRentFormatted}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${rentCount > 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-500'}`}>
+                              {rentCount}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${serviceCount > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-500'}`}>
+                              {serviceCount}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap">
+                            <div className="text-sm font-bold text-gray-900">
+                              {/* Calculate Total Contract for this specific contract */}
+                              ${(receivables.filter(r => r.contractId === contract.id && !['cancelled', 'cancelado'].includes((r.status || '').toLowerCase())).reduce((acc, curr) => acc + (curr.amountRaw || 0), 0)).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                            </div>
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap">
+                            <div className="text-sm font-bold text-green-600">
+                              {/* Calculate Total Paid for this specific contract */}
+                              ${(receivables.filter(r => r.contractId === contract.id).reduce((acc, curr) => acc + (curr.paidAmountRaw || 0), 0)).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                            </div>
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap">
+                            <div className="text-sm font-bold text-gray-900">
+                              {/* Calculate Balance for this specific contract */}
+                              ${(receivables.filter(r => r.contractId === contract.id && ['pending', 'pendiente', 'partial', 'parcial', 'overdue'].includes((r.status || '').toLowerCase())).reduce((acc, curr) => acc + (curr.balanceDueRaw || 0), 0)).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                            </div>
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap">
+                            <div className="text-sm font-bold flex items-center text-red-600">
+                              {/* Calculate Overdue for this specific contract */}
+                              {(() => {
+                                const overdueVal = receivables.filter(r => r.contractId === contract.id && (r.status || '').toLowerCase() === 'overdue').reduce((acc, curr) => acc + (curr.balanceDueRaw || 0), 0);
+                                return (
+                                  <>
+                                    ${overdueVal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                                    {overdueVal > 0 && <AlertTriangle size={14} className="ml-1" />}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap">
+                            <div className="text-sm text-gray-500">
+                              {(() => {
+                                let terminationDateFormatted = '-'
+                                if (terminationDateRaw) {
+                                  try {
+                                    const [year, month, day] = terminationDateRaw.split('T')[0].split('-')
+                                    const date = new Date(year, month - 1, day)
+                                    if (!isNaN(date.getTime())) {
+                                      terminationDateFormatted = date.toLocaleDateString('es-MX', {
+                                        day: '2-digit',
+                                        month: 'short',
+                                        year: '2-digit'
+                                      }).replace('.', '')
+                                    }
+                                  } catch (e) {
+                                    console.warn('Error al formatear terminationDate:', e)
                                   }
-                                } catch (e) {
-                                  console.warn('Error al formatear terminationDate:', e)
                                 }
-                              }
-                              return terminationDateFormatted
-                            })()}
-                          </div>
-                        </td>
-                        <td className="px-6 py-3 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${isActive
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                            }`}>
-                            {contractStatus === 'Active' || contractStatus === 'activo' || contractStatus === 'Activo'
-                              ? 'Activo'
-                              : isTerminated
-                                ? 'Terminado'
-                                : contractStatus || 'Activo'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex justify-end space-x-2">
-                            {isActive && (
-                              <div className="flex space-x-1">
+                                return terminationDateFormatted
+                              })()}
+                            </div>
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${isActive
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-800'
+                              }`}>
+                              {contractStatus === 'Active' || contractStatus === 'activo' || contractStatus === 'Activo'
+                                ? 'Activo'
+                                : isTerminated
+                                  ? 'Terminado'
+                                  : contractStatus || 'Activo'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <div className="flex justify-end space-x-2">
+                              {isActive && (
+                                <div className="flex space-x-1">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setGenerationType('Rent');
+                                      setContractToGenerate(contract);
+                                      setGenerateModalOpen(true);
+                                    }}
+                                    className="p-1 text-gray-400 hover:text-green-600 transition-colors"
+                                    title="Generar CXC de Rentas"
+                                  >
+                                    <Zap size={18} />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setGenerationType('Service');
+                                      setContractToGenerate(contract);
+                                      setGenerateModalOpen(true);
+                                    }}
+                                    className="p-1 text-gray-400 hover:text-yellow-600 transition-colors"
+                                    title="Generar CXC de Luz/Servicios"
+                                  >
+                                    <Lightbulb size={18} />
+                                  </button>
+                                </div>
+                              )}
+                              {isActive && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setGenerationType('Rent');
-                                    setContractToGenerate(contract);
-                                    setGenerateModalOpen(true);
+                                    onEditContract && onEditContract(contract);
+                                  }}
+                                  className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                                  title="Editar contrato"
+                                >
+                                  <Edit size={16} />
+                                </button>
+                              )}
+                              {isActive && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleFinalizeClick(contract);
+                                  }}
+                                  className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                                  title="Finalizar contrato"
+                                >
+                                  <Ban size={16} />
+                                </button>
+                              )}
+                              {isTerminated && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onReactivateContract && onReactivateContract(contract);
                                   }}
                                   className="p-1 text-gray-400 hover:text-green-600 transition-colors"
-                                  title="Generar CXC de Rentas"
+                                  title="Reactivar contrato"
                                 >
-                                  <Zap size={18} />
+                                  <RefreshCw size={16} />
                                 </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setGenerationType('Service');
-                                    setContractToGenerate(contract);
-                                    setGenerateModalOpen(true);
-                                  }}
-                                  className="p-1 text-gray-400 hover:text-yellow-600 transition-colors"
-                                  title="Generar CXC de Luz/Servicios"
-                                >
-                                  <Lightbulb size={18} />
-                                </button>
-                              </div>
-                            )}
-                            {isActive && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onEditContract && onEditContract(contract);
-                                }}
-                                className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                                title="Editar contrato"
-                              >
-                                <Edit size={16} />
-                              </button>
-                            )}
-                            {isActive && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleFinalizeClick(contract);
-                                }}
-                                className="p-1 text-gray-400 hover:text-red-500 transition-colors"
-                                title="Finalizar contrato"
-                              >
-                                <Ban size={16} />
-                              </button>
-                            )}
-                            {isTerminated && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onReactivateContract && onReactivateContract(contract);
-                                }}
-                                className="p-1 text-gray-400 hover:text-green-600 transition-colors"
-                                title="Reactivar contrato"
-                              >
-                                <RefreshCw size={16} />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
                 </tbody>
               </table>
             </div>
@@ -948,7 +1012,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
             </button>
           </div>
 
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-[800px] overflow-y-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-white sticky top-0 shadow-sm z-10">
                 <tr>
