@@ -685,10 +685,8 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                   <tr>
                     <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Período</th>
                     <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Meses</th>
-                    <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Renta de Servicios</th>
-                    <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Renta Mensual</th>
-                    <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CXC Renta</th>
-                    <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CXC Servicios</th>
+                    <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Renta Servicios (CXC)</th>
+                    <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Renta Mensual (CXC)</th>
                     <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Contrato</th>
                     <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Pagado</th>
                     <th className="px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo</th>
@@ -780,22 +778,14 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                           <td className="px-6 py-3 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">
                               {serviceRentFormatted}
+                              {serviceCount > 0 && <span className="ml-2 text-xs font-bold text-blue-600">({serviceCount})</span>}
                             </div>
                           </td>
                           <td className="px-6 py-3 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">
                               {monthlyRentFormatted}
+                              {rentCount > 0 && <span className="ml-2 text-xs font-bold text-blue-600">({rentCount})</span>}
                             </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${rentCount > 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-500'}`}>
-                              {rentCount}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${serviceCount > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-500'}`}>
-                              {serviceCount}
-                            </span>
                           </td>
                           <td className="px-6 py-3 whitespace-nowrap">
                             <div className="text-sm font-bold text-gray-900">

@@ -78,15 +78,16 @@ const ClientForm = ({ clientToEdit, onSave, onClose, unitId }) => {
 
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                    <input
-                        type="text"
+                    <textarea
                         name="contact_email"
                         value={formData.contact_email}
                         onChange={handleChange}
                         required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="correo@ejemplo.com"
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        placeholder="correo@ejemplo.com, otro@ejemplo.com"
                     />
+                    <p className="mt-1 text-xs text-gray-500">Separar múltiples correos con comas</p>
                 </div>
 
                 <div>

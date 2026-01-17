@@ -82,8 +82,13 @@ export const generateEstadoCuentaPDF = (client, receivables, contractInfo = {}, 
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(...grayColor);
-        doc.text(contactParts.join(', '), pageWidth / 2, yPos, { align: 'center' });
-        yPos += 6;
+
+        const contactText = contactParts.join(', ');
+        const maxWidth = pageWidth - 28; // Margen de 14 a cada lado
+        const splitText = doc.splitTextToSize(contactText, maxWidth);
+
+        doc.text(splitText, pageWidth / 2, yPos, { align: 'center' });
+        yPos += (splitText.length * 5) + 2; // Ajustar espacio según número de líneas
     }
 
     // Centrar información del contrato debajo del cliente
@@ -95,7 +100,9 @@ export const generateEstadoCuentaPDF = (client, receivables, contractInfo = {}, 
         let contractDates = '';
         if (contractInfo.start_date) {
             try {
-                const startDate = new Date(contractInfo.start_date);
+                // Parse "YYYY-MM-DD" manually to avoid timezone issues
+                const [y, m, d] = contractInfo.start_date.split('T')[0].split('-');
+                const startDate = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
                 const startFormatted = startDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
                 contractDates += `Inicio: ${startFormatted}`;
             } catch (e) {
@@ -104,7 +111,9 @@ export const generateEstadoCuentaPDF = (client, receivables, contractInfo = {}, 
         }
         if (contractInfo.end_date) {
             try {
-                const endDate = new Date(contractInfo.end_date);
+                // Parse "YYYY-MM-DD" manually to avoid timezone issues
+                const [y, m, d] = contractInfo.end_date.split('T')[0].split('-');
+                const endDate = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
                 const endFormatted = endDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
                 contractDates += contractDates ? ` | Fin: ${endFormatted}` : `Fin: ${endFormatted}`;
             } catch (e) {
@@ -307,7 +316,7 @@ export const generateEstadoCuentaPDF = (client, receivables, contractInfo = {}, 
 
         autoTable(doc, {
             startY: yPos,
-            head: [['Concepto', 'Días Vencidos', 'Ref MT', 'Fecha Pago', 'Monto', 'Pagado', 'Saldo', 'Estado']],
+            head: [['Concepto', 'Atraso', 'Ref MT', 'Fecha Pago', 'Monto', 'Pagado', 'Saldo', 'Estado']],
             body: tableData,
             theme: 'striped',
             headStyles: {
@@ -322,13 +331,13 @@ export const generateEstadoCuentaPDF = (client, receivables, contractInfo = {}, 
             },
             columnStyles: {
                 0: { cellWidth: 35 }, // Concepto
-                1: { cellWidth: 20, halign: 'center' }, // Días Vencidos
-                2: { cellWidth: 30 }, // Ref MT (Reducido de 35 a 30)
-                3: { cellWidth: 18 }, // Fecha Pago
-                4: { cellWidth: 19, halign: 'right' }, // Monto
-                5: { cellWidth: 19, halign: 'right' }, // Pagado
-                6: { cellWidth: 19, halign: 'right' }, // Saldo
-                7: { cellWidth: 22, halign: 'center' } // Estado (Aumentado de 17 a 22)
+                1: { cellWidth: 14, halign: 'center' }, // Atraso (antes Días Vencidos, reducido de 20)
+                2: { cellWidth: 26 }, // Ref MT (Reducido de 30)
+                3: { cellWidth: 17 }, // Fecha Pago (Reducido de 18)
+                4: { cellWidth: 23, halign: 'right' }, // Monto (Aumentado de 19)
+                5: { cellWidth: 22, halign: 'right' }, // Pagado (Aumentado de 19)
+                6: { cellWidth: 23, halign: 'right' }, // Saldo (Aumentado de 19)
+                7: { cellWidth: 22, halign: 'center' } // Estado
             },
             didParseCell: function (data) {
                 // Colorear Días Vencidos
