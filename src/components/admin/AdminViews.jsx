@@ -13,7 +13,7 @@ import {
   LayoutGrid, List, RefreshCw, ChevronLeft, Edit2, Save, UserCheck, UserX, RotateCcw, MessageCircle
 } from 'lucide-react';
 import { useSystemUsers } from '../../hooks/useSystemUsers';
-import { StatusBadge, OverdueBadge, KPICard, RevenueChart, Modal } from '../ui/Shared';
+import { StatusBadge, OverdueBadge, KPICard, RevenueChart, Modal, AccumulatedChart } from '../ui/Shared';
 import { UNITS, mockStaff } from '../../data/constants';
 import * as invoiceService from '../../services/invoiceService';
 import { marketTecService } from '../../services/marketTecService';
@@ -23,6 +23,26 @@ import { downloadEstadoCuentaPDF } from '../../services/pdfService';
 export const DashboardView = ({ adminStats, user, unitName, setActiveTab, onClientClick }) => {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [trendData, setTrendData] = useState([]);
+  const [loadingTrends, setLoadingTrends] = useState(false);
+
+  // Fetch trend data whenever year or unit changes
+  useEffect(() => {
+    const fetchTrends = async () => {
+      if (user?.unitId) {
+        setLoadingTrends(true);
+        try {
+          const { data } = await invoiceService.getCollectionTrends(selectedYear, user.unitId);
+          setTrendData(data || []);
+        } catch (err) {
+          console.error('Error fetching trends:', err);
+        } finally {
+          setLoadingTrends(false);
+        }
+      }
+    };
+    fetchTrends();
+  }, [selectedYear, user?.unitId]);
 
   // Extraer años disponibles de los datos mensuales
   const availableYears = React.useMemo(() => {
@@ -78,6 +98,20 @@ export const DashboardView = ({ adminStats, user, unitName, setActiveTab, onClie
           onYearChange={setSelectedYear}
           onClientClick={onClientClick}
         />
+      </div>
+
+      {/* Accumulated Trend Chart */}
+      <div className="overflow-x-auto">
+        {loadingTrends ? (
+          <div className="w-full h-[400px] bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-2">
+              <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+              <p className="text-sm text-gray-500 font-medium">Cargando tendencias...</p>
+            </div>
+          </div>
+        ) : (
+          <AccumulatedChart data={trendData} year={selectedYear} onClientClick={onClientClick} user={user} />
+        )}
       </div>
     </div>
   );

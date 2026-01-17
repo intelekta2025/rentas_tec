@@ -2,6 +2,16 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
+} from 'recharts';
+import {
   AlertTriangle,
   Clock,
   School,
@@ -409,6 +419,294 @@ export const RevenueChart = ({ data, year = new Date().getFullYear(), title = "C
                             <p className="font-bold text-green-600">${item.paymentAmount?.toLocaleString('es-MX', { minimumFractionDigits: 2 }) || item.paid?.toLocaleString('es-MX', { minimumFractionDigits: 2 }) || '0.00'}</p>
                           ) : (
                             <p className="font-bold text-orange-600">${item.balance?.toLocaleString('es-MX', { minimumFractionDigits: 2 }) || '0.00'}</p>
+                          )}
+                        </div>
+                      </div>
+                      {onClientClick && item.clientId && (
+                        <div className="mt-2 text-xs text-indigo-600 flex items-center">
+                          <span>Ver estado de cuenta</span>
+                          <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+};
+
+export const AccumulatedChart = ({ data, year = new Date().getFullYear(), onClientClick, user }) => {
+  // Use user provided data or empty array
+  const chartData = data || [];
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerData, setDrawerData] = useState({ type: '', month: '', items: [], total: 0 });
+  const [loadingDetails, setLoadingDetails] = useState(false);
+
+  const formatMoney = (value) =>
+    new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(value);
+
+  const formatYAxis = (value) => {
+    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+    if (value >= 1000) return `$${(value / 1000).toFixed(0)}k`;
+    return value;
+  };
+
+  const handleDotClick = async (dataPoint, type) => {
+    setDrawerOpen(true);
+    setLoadingDetails(true);
+
+    const total = type === 'collected' ? dataPoint.cumulative_collected : dataPoint.cumulative_pending;
+
+    setDrawerData({
+      type: type === 'collected' ? 'Cobrado Acumulado' : 'Deuda Acumulada',
+      month: `${dataPoint.month_name} ${year}`,
+      items: [],
+      total
+    });
+
+    try {
+      // Import the service function dynamically
+      const { getCollectionTrendDetails } = await import('../../services/invoiceService');
+
+      const { data: details } = await getCollectionTrendDetails(
+        year,
+        dataPoint.month_num,
+        user?.unitId,
+        type
+      );
+
+      setDrawerData(prev => ({
+        ...prev,
+        items: details || []
+      }));
+    } catch (error) {
+      console.error('Error loading trend details:', error);
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="w-full bg-white p-6 rounded-xl shadow-sm border border-gray-100 mt-6">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h3 className="text-lg font-bold text-gray-800">
+              Tendencia Financiera Acumulada {year}
+            </h3>
+            <p className="text-sm text-gray-500">
+              Crecimiento de ingresos vs deuda acumulada año corriente (click en punto para detalles)
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <span className="px-3 py-1 bg-green-50 text-green-700 text-xs font-medium rounded-full border border-green-100">
+              Cobrado
+            </span>
+            <span className="px-3 py-1 bg-amber-50 text-amber-700 text-xs font-medium rounded-full border border-amber-100">
+              Pendiente
+            </span>
+          </div>
+        </div>
+
+        <div className="h-[400px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart
+              data={chartData}
+              margin={{ top: 10, right: 30, left: 10, bottom: 10 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+
+              <XAxis
+                dataKey="month_name"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: '#9ca3af', fontSize: 12 }}
+                dy={10}
+              />
+
+              <YAxis
+                tickFormatter={formatYAxis}
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: '#9ca3af', fontSize: 12 }}
+                width={60}
+              />
+
+              <Tooltip
+                formatter={(value) => [formatMoney(value), ""]}
+                contentStyle={{
+                  borderRadius: '12px',
+                  border: 'none',
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                  padding: '12px'
+                }}
+                cursor={{ stroke: '#e5e7eb', strokeWidth: 2 }}
+              />
+
+              <Legend
+                wrapperStyle={{ paddingTop: '20px' }}
+                iconType="circle"
+              />
+
+              <Line
+                type="monotone"
+                dataKey="cumulative_collected"
+                name="Cobrado Total"
+                stroke="#10b981"
+                strokeWidth={3}
+                dot={{ r: 5, fill: '#10b981', strokeWidth: 2, stroke: '#fff', cursor: 'pointer' }}
+                activeDot={{
+                  r: 8,
+                  strokeWidth: 0,
+                  cursor: 'pointer',
+                  onClick: (e, payload) => handleDotClick(payload.payload, 'collected')
+                }}
+                animationDuration={1500}
+              />
+
+              <Line
+                type="monotone"
+                dataKey="cumulative_pending"
+                name="Deuda Acumulada"
+                stroke="#f59e0b"
+                strokeWidth={3}
+                strokeDasharray="5 5"
+                dot={{ r: 5, fill: '#f59e0b', strokeWidth: 2, stroke: '#fff', cursor: 'pointer' }}
+                activeDot={{
+                  r: 8,
+                  strokeWidth: 0,
+                  cursor: 'pointer',
+                  onClick: (e, payload) => handleDotClick(payload.payload, 'pending')
+                }}
+                animationDuration={1500}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Slide-in Drawer */}
+      {drawerOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/30 z-40 transition-opacity"
+            onClick={() => setDrawerOpen(false)}
+          ></div>
+
+          {/* Drawer Panel */}
+          <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform transition-transform animate-in slide-in-from-right duration-300">
+            <div className={`p-4 border-b ${drawerData.type.includes('Cobrado') ? 'bg-green-50 border-green-200' : 'bg-orange-50 border-orange-200'}`}>
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className={`text-lg font-bold ${drawerData.type.includes('Cobrado') ? 'text-green-800' : 'text-orange-800'}`}>
+                    {drawerData.type} - {drawerData.month}
+                  </h3>
+                  <p className={`text-sm ${drawerData.type.includes('Cobrado') ? 'text-green-600' : 'text-orange-600'}`}>
+                    Total: {formatMoney(drawerData.total)}
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => {
+                      const runExport = () => {
+                        const exportData = drawerData.items.map(item => ({
+                          Cliente: item.clientName,
+                          Concepto: item.concept,
+                          'Fecha de Pago': item.paymentDate || '',
+                          'Fecha Vencimiento': item.dueDate || '',
+                          Monto: item.paymentAmount || item.paid || item.balance,
+                          Status: item.status,
+                          Referencia: item.paymentReference || '',
+                          'Market Tec Receiver': item.marketTecReceiver || ''
+                        }));
+
+                        const ws = XLSX.utils.json_to_sheet(exportData);
+                        const wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, ws, "Detalle");
+                        XLSX.writeFile(wb, `Tendencia_${drawerData.month.replace(/\s/g, '_')}.xlsx`);
+                      };
+                      runExport();
+                    }}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500 hover:text-blue-600"
+                    title="Exportar a Excel"
+                  >
+                    <Download size={20} />
+                  </button>
+                  <button
+                    onClick={() => setDrawerOpen(false)}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 overflow-y-auto h-[calc(100%-80px)]">
+              {loadingDetails ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <svg className="w-8 h-8 text-blue-600 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <p className="text-sm text-gray-500 mt-3 font-medium">Cargando detalles...</p>
+                </div>
+              ) : drawerData.items.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No hay registros detallados disponibles</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {drawerData.items.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-gray-50 rounded-lg p-3 border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer"
+                      onClick={() => {
+                        if (onClientClick && item.clientId) {
+                          setDrawerOpen(false);
+                          onClientClick(item.clientId);
+                        }
+                      }}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-900 truncate">{item.clientName}</p>
+                          <p className="text-xs text-gray-500 truncate">{item.concept}</p>
+                          {item.paymentDate ? (
+                            <p className="text-xs text-green-600 mt-1 font-medium">
+                              Fecha de Pago: {item.paymentDate}
+                            </p>
+                          ) : (
+                            drawerData.type !== 'Cobrado Acumulado' && item.dueDate && (
+                              <p className="text-xs text-gray-400 mt-1">Vence: {item.dueDate}</p>
+                            )
+                          )}
+                          {item.paymentReference && (
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              Ref: {item.paymentReference}
+                            </p>
+                          )}
+                          {item.marketTecReceiver && (
+                            <p className="text-xs text-blue-600 mt-0.5">
+                              Market Tec: {item.marketTecReceiver}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right ml-3 flex-shrink-0">
+                          {drawerData.type.includes('Cobrado') ? (
+                            <p className="font-bold text-green-600">{formatMoney(item.paymentAmount || item.paid || 0)}</p>
+                          ) : (
+                            <p className="font-bold text-orange-600">{formatMoney(item.balance || 0)}</p>
                           )}
                         </div>
                       </div>

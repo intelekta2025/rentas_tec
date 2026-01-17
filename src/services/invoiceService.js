@@ -457,6 +457,81 @@ export const generateBulkInvoices = async (invoices) => {
 }
 
 /**
+ * Obtiene las tendencias de cobranza acumuladas filtradas por año y unidad
+ * Llama a la función RPC 'get_collection_trends'
+ * @param {number} year - Año a consultar
+ * @param {number} unitId - ID de la unidad
+ * @returns {Promise<{data: array, error: object}>}
+ */
+export const getCollectionTrends = async (year, unitId) => {
+  try {
+    const { data, error } = await supabase.rpc('get_collection_trends', {
+      p_year: year,
+      p_unit_id: unitId
+    });
+
+    if (error) throw error;
+
+    return { data: data || [], error: null };
+  } catch (error) {
+    console.error('Error al obtener tendencias de cobranza:', error);
+    return { data: [], error };
+  }
+}
+
+/**
+ * Obtiene los detalles de facturas para un mes específico (para el drawer de tendencias)
+ * @param {number} year - Año a consultar
+ * @param {number} month - Mes a consultar (1-12)
+ * @param {number} unitId - ID de la unidad
+ * @param {string} type - Tipo de datos: 'collected' o 'pending'
+ * @returns {Promise<{data: array, error: object}>}
+ */
+export const getCollectionTrendDetails = async (year, month, unitId, type) => {
+  try {
+    let query = supabase
+      .from('receivables')
+      .select('*, clients(business_name, User_market_tec, contact_email)')
+      .eq('unit_id', unitId)
+      .gte('due_date', `${year}-01-01`) // Desde enero del año
+      .lte('due_date', `${year}-${String(month).padStart(2, '0')}-31`); // Hasta el mes seleccionado
+
+    if (type === 'collected') {
+      query = query.eq('status', 'Paid');
+    } else {
+      query = query.in('status', ['Pending', 'Overdue', 'Partial', 'Scheduled']);
+    }
+
+    const { data, error } = await query.order('due_date', { ascending: true });
+
+    if (error) throw error;
+
+    // Map to the format expected by the drawer
+    const mappedData = (data || []).map(inv => {
+      const mapped = mapReceivableFromDB(inv);
+      return {
+        clientId: mapped.clientId,
+        clientName: mapped.client,
+        concept: mapped.concept,
+        dueDate: mapped.dueDate,
+        paymentDate: mapped.paymentDates || null,
+        paymentAmount: type === 'collected' ? mapped.paidAmountRaw : null,
+        balance: type === 'pending' ? mapped.balanceDueRaw : null,
+        paid: mapped.paidAmountRaw,
+        status: mapped.status,
+        paymentReference: mapped.paymentReferences || '',
+        marketTecReceiver: mapped.marketTecReceiver || ''
+      };
+    });
+
+    return { data: mappedData, error: null };
+  } catch (error) {
+    console.error('Error al obtener detalles de tendencias:', error);
+    return { data: [], error };
+  }
+}
+
+/**
  * Registra un pago y actualiza el estado del movimiento
  */
 export const registerPayment = async (paymentData) => {
