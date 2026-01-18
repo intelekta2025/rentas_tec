@@ -62,6 +62,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           source: "supabase/functions"
           target: "/root/supabase/docker/volumes"
+          strip_components: 2
 
       - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@master
