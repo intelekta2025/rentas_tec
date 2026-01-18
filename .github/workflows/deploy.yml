@@ -63,7 +63,6 @@ jobs:
           source: "supabase/functions"
           target: "/root/supabase/docker/volumes/functions"
           strip_components: 2
-          strip_components: 2
 
       - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@master
