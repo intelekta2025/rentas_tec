@@ -251,57 +251,26 @@ export const marketTecService = {
     },
 
     // 6. Disparar conciliación en n8n
-    triggerReconciliation: async (uploadId, rowIds = []) => {
+    // 6. Disparar conciliación vía Supabase Edge Function
+    triggerReconciliation: async (uploadId) => {
         try {
-            // Si no se proporcionan rowIds específicos, consultar solo registros PENDIENTES
-            let recordIds = rowIds;
+            console.log("Iniciando conciliación inteligente (v2 - Edge Functions)...");
 
-            if (!rowIds || rowIds.length === 0) {
-                // Consultar registros con status PENDIENTE
-                const { data: pendingRecords, error: queryError } = await supabase
-                    .from('payment_staging')
-                    .select('id')
-                    .eq('upload_id', uploadId)
-                    .eq('processing_status', 'PENDIENTE');
-
-                if (queryError) {
-                    console.error('Error querying pending records:', queryError);
-                    throw queryError;
-                }
-
-                // Si no hay registros pendientes, retornar
-                if (!pendingRecords || pendingRecords.length === 0) {
-                    return {
-                        success: false,
-                        error: 'No hay registros pendientes para procesar. Todos los registros ya han sido procesados.'
-                    };
-                }
-
-                // Extraer IDs de registros pendientes
-                recordIds = pendingRecords.map(r => r.id);
-            }
-
-            let webhookUrl = `https://n8n-t.intelekta.ai/webhook/c0a61e42-37a7-40a9-ac8f-24899ee74dc4?upload_id=${uploadId}`;
-
-            if (recordIds && recordIds.length > 0) {
-                webhookUrl += `&record_ids=${recordIds.join(',')}`;
-            }
-
-            // Enviar ID de carga vía GET para que n8n procese
-            const response = await fetch(webhookUrl, {
-                method: 'GET'
+            // Llamada directa a Supabase Edge Function
+            const { data, error } = await supabase.functions.invoke('conciliar-pagos', {
+                body: { uploadId }
             });
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Error n8n: ${response.status} ${errorText}`);
-            }
+            if (error) throw error;
 
-            const result = await response.json();
-            return { success: true, data: result, recordCount: recordIds.length };
+            return {
+                success: true,
+                processed: data.processed,
+                matches: data.matches
+            };
+
         } catch (error) {
-            console.error('Error triggering reconciliation:', error);
-            // Retornamos success false para manejarlo en la UI
+            console.error("Error en conciliación:", error);
             return { success: false, error: error.message };
         }
     },

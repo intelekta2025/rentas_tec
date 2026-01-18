@@ -2297,6 +2297,7 @@ export const MarketTecView = ({ user, unitName }) => {
     const [isReconciling, setIsReconciling] = useState(false);
     const [isTriggering, setIsTriggering] = useState(false); // Nuevo para el botón
     const [showErrorModal, setShowErrorModal] = useState(false);
+    const [triggerError, setTriggerError] = useState(null); // Nuevo estado para error real
     const [processingProgress, setProcessingProgress] = useState(null);
     const [lastResult, setLastResult] = useState(null);
     const VERSION = "1.0.4"; // Para verificar recarga de cache
@@ -2306,6 +2307,7 @@ export const MarketTecView = ({ user, unitName }) => {
       setIsTriggering(true); // Bloquear botón inmediatamente
       setIsReconciling(true);
       setLastResult(null); // Limpiar resultado previo
+      setTriggerError(null);
       try {
         // No enviamos IDs específicos para que el servicio filtre automáticamente los PENDIENTES
         const { success, error, data, recordCount } = await marketTecService.triggerReconciliation(selectedUploadId);
@@ -2318,6 +2320,7 @@ export const MarketTecView = ({ user, unitName }) => {
               message: error
             });
           } else {
+            setTriggerError(error);
             setShowErrorModal(true);
           }
           setIsTriggering(false);
@@ -2423,6 +2426,7 @@ export const MarketTecView = ({ user, unitName }) => {
 
       } catch (err) {
         console.error('Error in reconciliation trigger:', err);
+        setTriggerError(err?.message || String(err));
         setShowErrorModal(true);
         setIsReconciling(false);
       }
@@ -2654,7 +2658,7 @@ export const MarketTecView = ({ user, unitName }) => {
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
               <AlertTriangle className="text-red-500 shrink-0 mt-0.5" size={20} />
               <p className="text-red-700 text-sm">
-                No pudimos conectar con el agente. Por favor, inténtalo de nuevo o contacta a soporte si el problema persiste.
+                {triggerError || "No pudimos conectar con el agente. Por favor, inténtalo de nuevo o contacta a soporte si el problema persiste."}
               </p>
             </div>
 
