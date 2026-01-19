@@ -254,19 +254,38 @@ export const marketTecService = {
     // 6. Disparar conciliación vía Supabase Edge Function
     triggerReconciliation: async (uploadId) => {
         try {
-            console.log("Iniciando conciliación inteligente (v2 - Edge Functions)...");
+            console.log("Iniciando conciliación inteligente via n8n...");
 
-            // Llamada directa a Supabase Edge Function
-            const { data, error } = await supabase.functions.invoke('conciliar-pagos', {
-                body: { uploadId }
+            const webhookUrl = 'https://n8n-t.intelekta.ai/webhook/c0a61e42-37a7-40a9-ac8f-24899ee74dc4';
+
+            const response = await fetch(webhookUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ uploadId })
             });
 
-            if (error) throw error;
+            if (!response.ok) {
+                // Si falla la red o el servidor responde con error
+                const errorText = await response.text().catch(() => response.statusText);
+                throw new Error(`Error en conciliación (n8n): ${response.status} ${errorText}`);
+            }
+
+            // Intentar parsear JSON, si n8n no devuelve JSON, manejarlo gracefuly
+            let data = {};
+            try {
+                data = await response.json();
+            } catch (e) {
+                console.warn('La respuesta de n8n no fue un JSON válido, asumiendo éxito sin detalles.', e);
+                // Si fue OK pero no JSON, asumimos éxito básico
+                data = { processed: 0, matches: 0 };
+            }
 
             return {
                 success: true,
-                processed: data.processed,
-                matches: data.matches
+                processed: data.processed || 0,
+                matches: data.matches || 0
             };
 
         } catch (error) {
