@@ -256,8 +256,11 @@ export const marketTecService = {
         try {
             console.log("Iniciando conciliación inteligente via n8n...");
 
+            // URL proporcionada explícitamente por el usuario
             const webhookUrl = 'https://n8n-t.intelekta.ai/webhook/c0a61e42-37a7-40a9-ac8f-24899ee74dc4';
 
+            // Volvemos a llamada estándar: el servidor n8n rechazó 'no-cors' (405).
+            // Si esto falla con CORS en localhost, ES NECESARIO agregar localhost en n8n.
             const response = await fetch(webhookUrl, {
                 method: 'POST',
                 headers: {
@@ -267,18 +270,16 @@ export const marketTecService = {
             });
 
             if (!response.ok) {
-                // Si falla la red o el servidor responde con error
                 const errorText = await response.text().catch(() => response.statusText);
                 throw new Error(`Error en conciliación (n8n): ${response.status} ${errorText}`);
             }
 
-            // Intentar parsear JSON, si n8n no devuelve JSON, manejarlo gracefuly
+            // Intentar parsear JSON
             let data = {};
             try {
                 data = await response.json();
             } catch (e) {
                 console.warn('La respuesta de n8n no fue un JSON válido, asumiendo éxito sin detalles.', e);
-                // Si fue OK pero no JSON, asumimos éxito básico
                 data = { processed: 0, matches: 0 };
             }
 
