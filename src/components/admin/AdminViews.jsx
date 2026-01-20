@@ -2201,7 +2201,9 @@ export const MarketTecView = ({ user, unitName }) => {
     const styles = {
       'COMPLETED': 'bg-green-100 text-green-700 border-green-200',
       'Procesando': 'bg-purple-100 text-purple-700 border-purple-200 animate-pulse',
+      'PROCESSING': 'bg-purple-100 text-purple-700 border-purple-200 animate-pulse', // Support English
       'PENDING': 'bg-gray-100 text-gray-700 border-gray-200',
+      'PARTIAL': 'bg-yellow-100 text-yellow-800 border-yellow-200', // Added PARTIAL
       'PARTIAL_ERROR': 'bg-orange-100 text-orange-700 border-orange-200',
       'ERROR': 'bg-red-100 text-red-700 border-red-200',
     };
@@ -2346,6 +2348,14 @@ export const MarketTecView = ({ user, unitName }) => {
           const errors = initialStatus.errorCount || 0;
           const handled = processed + noCxc + noClient + errors;
 
+          // DETERMINAR ESTADO FINAL Y ACTUALIZAR BD
+          let finalStatus = 'COMPLETED';
+          // Si quedaron pendientes o hubo errores, marcar como PARTIAL
+          if (initialStatus.pendingCount > 0 || errors > 0) {
+            finalStatus = 'PARTIAL';
+          }
+          await marketTecService.updateUploadStatus(selectedUploadId, finalStatus);
+
           setLastResult({
             success: true,
             message: `Conciliación completa. Se procesaron ${handled} registros.`,
@@ -2393,6 +2403,16 @@ export const MarketTecView = ({ user, unitName }) => {
               const handled = processed + noCxc + noClient + errors;
 
               console.log('[MarketTec] Processing complete:', { processed, noCxc, noClient, errors, handled });
+
+              // DETERMINAR ESTADO FINAL Y ACTUALIZAR BD
+              let finalStatus = 'COMPLETED';
+              // Si quedaron pendientes o hubo errores, marcar como PARTIAL
+              if (status.pendingCount > 0 || errors > 0) {
+                finalStatus = 'PARTIAL';
+              }
+
+              console.log(`[MarketTec] Updating status to ${finalStatus}`);
+              await marketTecService.updateUploadStatus(selectedUploadId, finalStatus);
 
               setLastResult({
                 success: true,
