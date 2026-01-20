@@ -2335,114 +2335,38 @@ export const MarketTecView = ({ user, unitName }) => {
         console.log('n8n response:', data);
         console.log(`Procesamiento iniciado para ${recordCount} registros. Verificando estado...`);
 
-        // Comprobar estado inmediatamente por si ya terminó
-        const initialStatus = await marketTecService.checkProcessingStatus(selectedUploadId);
-        if (initialStatus.isComplete) {
-          setIsReconciling(false);
-          setProcessingProgress(null);
-          await loadStagingForReview(selectedUploadId, true);
+        // Comprobar estado final una vez que el webhook regresa (n8n terminó, sea éxito o fallo parcial)
+        const finalStatusCheck = await marketTecService.checkProcessingStatus(selectedUploadId);
 
-          const processed = initialStatus.processedCount || 0;
-          const noCxc = initialStatus.noCxcCount || 0;
-          const noClient = initialStatus.noClientCount || 0;
-          const errors = initialStatus.errorCount || 0;
-          const handled = processed + noCxc + noClient + errors;
+        setIsReconciling(false);
+        setProcessingProgress(null);
+        await loadStagingForReview(selectedUploadId, true);
 
-          // DETERMINAR ESTADO FINAL Y ACTUALIZAR BD
-          let finalStatus = 'COMPLETED';
-          // Si quedaron pendientes o hubo errores, marcar como PARTIAL
-          if (initialStatus.pendingCount > 0 || errors > 0) {
-            finalStatus = 'PARTIAL';
-          }
-          await marketTecService.updateUploadStatus(selectedUploadId, finalStatus);
+        const processed = finalStatusCheck.processedCount || 0;
+        const noCxc = finalStatusCheck.noCxcCount || 0;
+        const noClient = finalStatusCheck.noClientCount || 0;
+        const errors = finalStatusCheck.errorCount || 0;
+        const handled = processed + noCxc + noClient + errors;
 
-          setLastResult({
-            success: true,
-            message: `Conciliación completa. Se procesaron ${handled} registros.`,
-            details: errors > 0 ? `${errors} con error.` : "Todos los registros fueron atendidos."
-          });
-
-          await loadUploads();
-          return;
+        // DETERMINAR ESTADO FINAL Y ACTUALIZAR BD
+        let finalStatus = 'COMPLETED';
+        // Si quedaron pendientes o hubo errores, marcar como PARTIAL
+        // NOTA: Si n8n terminó y aún hay pendientes, es un resultado PARCIAL válido (ej. n8n falló en procesarlos o loop limit)
+        if (finalStatusCheck.pendingCount > 0 || errors > 0) {
+          finalStatus = 'PARTIAL';
         }
+        await marketTecService.updateUploadStatus(selectedUploadId, finalStatus);
 
-        // Implementar polling para verificar el estado de procesamiento si no ha terminado
-        const pollInterval = 3000; // 3 segundos
-        const MAX_ATTEMPTS = 100; // Ej. 5 minutos (100 * 3s)
-        let attempts = 0;
+        setLastResult({
+          success: true,
+          message: `Conciliación completa. Se procesaron ${handled} registros.`,
+          details: finalStatus === 'PARTIAL'
+            ? `Finalizó con ${finalStatusCheck.pendingCount} pendientes y ${errors} errores.` // Detalle claro
+            : "Todos los registros fueron atendidos."
+        });
 
-        const checkStatus = async () => {
-          attempts++;
-
-          // 1. Timeout Safety Check
-          if (attempts > MAX_ATTEMPTS) {
-            setIsReconciling(false);
-            setProcessingProgress(null);
-            alert("El proceso está tardando demasiado. Por favor revisa manualmente el estado más tarde.");
-            return;
-          }
-
-          try {
-            const status = await marketTecService.checkProcessingStatus(selectedUploadId);
-
-            console.log('Estado de procesamiento:', status);
-
-            // Refrescar los datos de la tabla durante el polling (Silenciosamente para evitar parpadeo)
-            await loadStagingForReview(selectedUploadId, true);
-
-            if (status.isComplete) {
-              // Procesamiento completado
-              setIsReconciling(false);
-              setProcessingProgress(null);
-
-              // Mostrar mensaje de éxito en UI (Banner persistente)
-              const processed = status.processedCount || 0;
-              const noCxc = status.noCxcCount || 0;
-              const noClient = status.noClientCount || 0;
-              const errors = status.errorCount || 0;
-              const handled = processed + noCxc + noClient + errors;
-
-              console.log('[MarketTec] Processing complete:', { processed, noCxc, noClient, errors, handled });
-
-              // DETERMINAR ESTADO FINAL Y ACTUALIZAR BD
-              let finalStatus = 'COMPLETED';
-              // Si quedaron pendientes o hubo errores, marcar como PARTIAL
-              if (status.pendingCount > 0 || errors > 0) {
-                finalStatus = 'PARTIAL';
-              }
-
-              console.log(`[MarketTec] Updating status to ${finalStatus}`);
-              await marketTecService.updateUploadStatus(selectedUploadId, finalStatus);
-
-              setLastResult({
-                success: true,
-                message: `Conciliación completa. Se procesaron ${handled} registros.`,
-                details: errors > 0 ? `${errors} con error.` : "Todos los registros fueron atendidos."
-              });
-
-              // Refresh list and staging data (Silenciosamente)
-              await loadUploads();
-              await loadStagingForReview(selectedUploadId, true);
-
-              return; // Detener polling
-            }
-
-            // Actualizar progreso
-            setProcessingProgress({
-              done: status.totalCount - status.pendingCount - status.processingCount,
-              total: status.totalCount
-            });
-
-            // Continuar polling
-            setTimeout(checkStatus, pollInterval);
-          } catch (err) {
-            console.error('Error checking status:', err);
-            setIsReconciling(false);
-          }
-        };
-
-        // Iniciar polling
-        setTimeout(checkStatus, pollInterval);
+        await loadUploads();
+        return;
 
       } catch (err) {
         console.error('Error in reconciliation trigger:', err);

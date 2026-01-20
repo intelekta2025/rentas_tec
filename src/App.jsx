@@ -211,6 +211,24 @@ export default function App() {
   const shouldLoadAdminData = user && user.role !== 'Client' && user.unitId != null
   const shouldLoadClientData = user && user.role === 'Client' && user.clientId != null
 
+  // --- NUEVO: GUARDIÁN DE INTEGRIDAD DE SESIÓN ---
+  useEffect(() => {
+    // Si la autenticación ya cargó y tenemos un usuario...
+    if (!authLoading && user) {
+
+      // Regla: Si es Staff (no cliente) y NO tiene unitId, el estado está corrupto.
+      const isAdminMissingUnit = user.role !== 'Client' && !user.unitId;
+
+      // Regla: Si es Cliente y NO tiene clientId (opcional, por seguridad)
+      const isClientMissingId = user.role === 'Client' && !user.clientId;
+
+      if (isAdminMissingUnit || isClientMissingId) {
+        console.warn('⚠️ Detectada inconsistencia en la sesión (Faltan datos críticos). Cerrando sesión por seguridad.');
+        logout(); // <--- Esto te enviará al Login inmediatamente
+      }
+    }
+  }, [user, authLoading, logout]);
+
   // Obtener información de la unidad de negocio
   const { unitName: businessUnitName } = useBusinessUnit(
     user?.role !== 'Client' ? user?.unitId : null
