@@ -164,22 +164,33 @@ export default function EmailTemplateConfig({ onBack, unitName, onTemplateChange
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {templates.map(template => (
-                    <div key={template.id} className="bg-white border border-slate-200 rounded-xl p-6 hover:shadow-md transition cursor-pointer group" onClick={() => handleEdit(template)}>
-                        <div className="flex justify-between items-start mb-4">
-                            <div className="p-3 bg-indigo-50 rounded-lg text-indigo-600 group-hover:bg-indigo-100 transition">
-                                <Mail size={24} />
-                            </div>
-                            <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-1 rounded-full">{template.type}</span>
-                        </div>
-                        <h3 className="text-lg font-semibold text-slate-800 mb-1">{template.name}</h3>
-                        <p className="text-sm text-slate-500 line-clamp-2 mb-4">{template.subject}</p>
-                        <div className="flex justify-between items-center pt-4 border-t border-slate-100">
-                            <span className="text-xs text-slate-400">Actualizado: {template.lastUpdated}</span>
-                            <span className="text-sm text-indigo-600 font-medium hover:underline">Editar Configuración &rarr;</span>
-                        </div>
+                {templates.length === 0 ? (
+                    <div className="col-span-1 md:col-span-2 py-12 text-center bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                        <FileText className="mx-auto h-12 w-12 text-slate-300 mb-3" />
+                        <h3 className="text-lg font-medium text-slate-900">No hay plantillas configuradas</h3>
+                        <p className="text-sm text-slate-500 max-w-sm mx-auto mb-4">
+                            No se encontraron plantillas para la unidad {user?.unitId} ({unitName}).
+                            Comienza creando una nueva.
+                        </p>
                     </div>
-                ))}
+                ) : (
+                    templates.map(template => (
+                        <div key={template.id} className="bg-white border border-slate-200 rounded-xl p-6 hover:shadow-md transition cursor-pointer group" onClick={() => handleEdit(template)}>
+                            <div className="flex justify-between items-start mb-4">
+                                <div className="p-3 bg-indigo-50 rounded-lg text-indigo-600 group-hover:bg-indigo-100 transition">
+                                    <Mail size={24} />
+                                </div>
+                                <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-1 rounded-full">{template.type}</span>
+                            </div>
+                            <h3 className="text-lg font-semibold text-slate-800 mb-1">{template.name}</h3>
+                            <p className="text-sm text-slate-500 line-clamp-2 mb-4">{template.subject}</p>
+                            <div className="flex justify-between items-center pt-4 border-t border-slate-100">
+                                <span className="text-xs text-slate-400">Actualizado: {template.lastUpdated}</span>
+                                <span className="text-sm text-indigo-600 font-medium hover:underline">Editar Configuración &rarr;</span>
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
         </div>
     );
