@@ -2408,6 +2408,14 @@ export const MarketTecView = ({ user, unitName }) => {
     // Identificar problemas: Sin User_market_tec
     const unmatchedCount = stagingData.filter(r => !r.client_user_market_tec).length;
 
+    // Calcular pendientes (incluye errores para reintentar)
+    const pendingCount = stagingData.filter(r => {
+      const s = (r.processing_status || '').toUpperCase();
+      return ['PENDIENTE', 'PENDING', 'ERROR', 'PARTIAL_ERROR'].includes(s);
+    }).length;
+
+    const completedCount = totalRecords - pendingCount;
+
     return (
       <div className="animate-in slide-in-from-right-4 duration-300">
         {/* Header de Revisión */}
@@ -2427,14 +2435,6 @@ export const MarketTecView = ({ user, unitName }) => {
                       ? `Procesando: ${processingProgress.done} de ${processingProgress.total}...`
                       : 'Iniciando asistente IA...'}
                   </span>
-                  {processingProgress && (
-                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                      <div
-                        className="bg-purple-500 h-full transition-all duration-500"
-                        style={{ width: `${(processingProgress.done / processingProgress.total) * 100}%` }}
-                      ></div>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -2449,9 +2449,15 @@ export const MarketTecView = ({ user, unitName }) => {
               <ChevronLeft size={18} className="inline mr-1" /> Volver
             </button>
             <button
-              onClick={handleTriggerReconciliation}
-              disabled={isReconciling || isTriggering}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all shadow-sm ${isReconciling || isTriggering
+              onClick={() => {
+                if (pendingCount === 0) return;
+                const confirmMessage = `Se encontraron ${pendingCount} registros pendientes o con error.\n\nLos ${completedCount} registros ya procesados (correctos o ignorados) serán OMITIDOS para evitar duplicados.\n\n¿Deseas continuar con la conciliación?`;
+                if (window.confirm(confirmMessage)) {
+                  handleTriggerReconciliation();
+                }
+              }}
+              disabled={isReconciling || isTriggering || pendingCount === 0}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all shadow-sm ${isReconciling || isTriggering || pendingCount === 0
                 ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
                 : 'bg-slate-900 text-white hover:bg-black active:scale-[0.98]'
                 }`}
@@ -2459,9 +2465,9 @@ export const MarketTecView = ({ user, unitName }) => {
               {isTriggering || isReconciling ? (
                 <Loader2 size={18} className="animate-spin" />
               ) : (
-                <Bot size={18} className="text-purple-300" />
+                pendingCount === 0 ? <CheckCircle size={18} className="text-emerald-500" /> : <Bot size={18} className="text-purple-300" />
               )}
-              {isTriggering || isReconciling ? 'Ejecutando...' : 'Ejecutar Conciliación IA'}
+              {isTriggering || isReconciling ? 'Ejecutando...' : (pendingCount === 0 ? 'Conciliación Terminada' : 'Ejecutar Conciliación IA')}
             </button>
           </div>
         </div>
