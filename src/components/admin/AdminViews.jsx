@@ -2414,6 +2414,17 @@ export const MarketTecView = ({ user, unitName }) => {
       return ['PENDIENTE', 'PENDING', 'ERROR', 'PARTIAL_ERROR'].includes(s);
     }).length;
 
+    // DEBUG: Inspect structure to find error column
+    useEffect(() => {
+      if (stagingData.length > 0) {
+        console.log('📋 Staging Data Row Sample:', stagingData[0]);
+        const errors = stagingData.filter(r => r.processing_status === 'ERROR');
+        if (errors.length > 0) {
+          console.log('❌ Error Sample:', errors[0]);
+        }
+      }
+    }, [stagingData]);
+
     const completedCount = totalRecords - pendingCount;
 
     return (
@@ -2545,10 +2556,29 @@ export const MarketTecView = ({ user, unitName }) => {
                             href={`/?clientId=${row.client_matched_id}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800 hover:underline font-medium flex items-center gap-1 group/link"
+                            className="text-blue-600 hover:text-blue-800 hover:underline font-medium flex items-center gap-1 group/link relative"
                           >
                             {row.client_business_name}
                             <ExternalLink size={12} className="opacity-50 group-hover/link:opacity-100" />
+
+                            {/* Tooltip de Contrato */}
+                            <div className="absolute left-0 bottom-full mb-2 hidden group-hover/link:block bg-slate-800 text-white text-xs px-3 py-2 rounded shadow-lg z-50 min-w-[150px]">
+                              <div className="font-semibold border-b border-slate-600 pb-1 mb-1">Contrato Activo</div>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-slate-300">Renta:</span>
+                                <span className="font-mono">${(row.client_monthly_rent || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                              </div>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-slate-300">Servicios:</span>
+                                <span className="font-mono">${(row.client_monthly_services || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                              </div>
+                              <div className="border-t border-slate-600 mt-1 pt-1 flex justify-between gap-4 font-medium text-emerald-400">
+                                <span>Total:</span>
+                                <span>${((row.client_monthly_rent || 0) + (row.client_monthly_services || 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                              </div>
+                              {/* Flecha del tooltip */}
+                              <div className="absolute -bottom-1 left-4 w-2 h-2 bg-slate-800 rotate-45"></div>
+                            </div>
                           </a>
                         ) : (
                           row.client_business_name || <span className="text-slate-400 italic">{row.raw_receiver_name}</span>
@@ -2598,8 +2628,23 @@ export const MarketTecView = ({ user, unitName }) => {
                           if (s === 'PROCESANDO') {
                             return <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded border border-purple-200 font-medium animate-pulse">{s}</span>;
                           }
-                          if (s === 'ERROR') {
-                            return <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded border border-red-200 font-medium">{s}</span>;
+                          if (s === 'ERROR' || s === 'PARTIAL_ERROR') {
+                            return (
+                              <div className="group relative inline-block cursor-help">
+                                <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded border border-red-200 font-medium flex items-center gap-1">
+                                  {s}
+                                  <AlertCircle size={10} />
+                                </span>
+                                {/* Tooltip de Error */}
+                                <div className="absolute right-0 bottom-full mb-2 hidden group-hover:block bg-red-50 text-red-900 text-xs px-3 py-2 rounded shadow-lg border border-red-200 z-50 min-w-[200px] max-w-[300px] text-left">
+                                  <div className="font-semibold border-b border-red-200 pb-1 mb-1">Detalle del Error</div>
+                                  <p className="whitespace-pre-wrap">
+                                    {row.processing_log || row.error_message || row.details || "Sin detalles registrados."}
+                                  </p>
+                                  <div className="absolute -bottom-1 right-4 w-2 h-2 bg-red-50 border-r border-b border-red-200 rotate-45"></div>
+                                </div>
+                              </div>
+                            );
                           }
                           return <span className="text-xs bg-gray-50 text-gray-400 px-2 py-1 rounded border border-gray-100">{s}</span>;
                         })()}

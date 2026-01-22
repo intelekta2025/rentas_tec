@@ -220,11 +220,75 @@ export const marketTecService = {
                 .select('id, business_name, "User_market_tec"');
 
             if (!clientError && clients) {
+                // Obtener contratos para estos clientes (quitamos filtro estricto de status para depurar/flexibilidad)
+                // Y traemos todos para encontrar el activo 'real'
+                const clientIds = clients.map(c => c.id);
+                const { data: contracts, error: contractError } = await supabase
+                    .from('contracts')
+                    .select('client_id, monthly_rent_amount, monthly_services_amount, status, created_at')
+                    .in('client_id', clientIds);
+
+                const contractMap = {};
+
+                // Helper para limpiar montos (ej "$3,500.00" -> 3500.00)
+                const parseMoney = (val) => {
+                    if (!val) return 0;
+                    if (typeof val === 'number') return val;
+                    const clean = val.toString().replace(/[^0-9.-]+/g, '');
+                    return parseFloat(clean) || 0;
+                };
+
+                if (contracts) {
+                    // Agrupar contratos por cliente
+                    const contractsByClient = contracts.reduce((acc, cnt) => {
+                        if (!acc[cnt.client_id]) acc[cnt.client_id] = [];
+                        acc[cnt.client_id].push(cnt);
+                        return acc;
+                    }, {});
+
+                    // Para cada cliente, buscar el contrato activo
+                    Object.keys(contractsByClient).forEach(clientId => {
+                        const clientContracts = contractsByClient[clientId];
+                        // Priorizar 'Activo' / 'Active' case insensitive
+                        // OJO: Checar si vienen activos multiples. Tomamos el primero q coincida.
+                        let activeContract = clientContracts.find(c =>
+                            ['ACTIVO', 'ACTIVE', 'VIGENTE'].includes((c.status || '').toUpperCase())
+                        );
+
+                        if (activeContract) {
+                            contractMap[clientId] = {
+                                rent: parseMoney(activeContract.monthly_rent_amount),
+                                services: parseMoney(activeContract.monthly_services_amount)
+                            };
+                        } else {
+                            // Si no encontré activo, SOLO PARA DEBUG: ver si hay alguno 'Pendiente' o similar
+                            // console.log(`[DEBUG] No active contract for client ${clientId}. Statuses found:`, clientContracts.map(c=>c.status));
+
+                            // FALLBACK: Si hay un solo contrato, úsalo aunque no diga Activo explicitamente (o tomamos el más reciente)
+                            // Esto ayuda si la BD tiene status nulos o 'Creado'.
+                            // Por seguridad, solo si hay 1? O ordenamos por fecha.
+                            if (clientContracts.length > 0) {
+                                // Ordenar por created_at desc
+                                clientContracts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                                const mostRecent = clientContracts[0];
+                                // console.log(`[DEBUG] Using most recent contract for ${clientId} (Status: ${mostRecent.status})`);
+                                contractMap[clientId] = {
+                                    rent: parseMoney(mostRecent.monthly_rent_amount),
+                                    services: parseMoney(mostRecent.monthly_services_amount)
+                                };
+                            }
+                        }
+                    });
+                }
+
                 // Crear mapa normalizado (lowercase, trimmed) para comparación flexible
                 clients.forEach(c => {
                     if (c.User_market_tec) {
                         const normalizedKey = c.User_market_tec.toString().trim().toLowerCase();
-                        clientMap[normalizedKey] = c;
+                        clientMap[normalizedKey] = {
+                            ...c,
+                            contractInfo: contractMap[c.id] || { rent: 0, services: 0 }
+                        };
                     }
                 });
             } else if (clientError) {
@@ -240,7 +304,10 @@ export const marketTecService = {
                 ...row,
                 client_matched_id: client ? client.id : null,
                 client_business_name: client ? client.business_name : null,
-                client_user_market_tec: client ? client.User_market_tec : null
+                client_user_market_tec: client ? client.User_market_tec : null,
+                // Agregamos info de contrato para UX
+                client_monthly_rent: client?.contractInfo?.rent || 0,
+                client_monthly_services: client?.contractInfo?.services || 0
             };
         });
 
