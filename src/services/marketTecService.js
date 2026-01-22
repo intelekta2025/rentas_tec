@@ -225,7 +225,7 @@ export const marketTecService = {
                 const clientIds = clients.map(c => c.id);
                 const { data: contracts, error: contractError } = await supabase
                     .from('contracts')
-                    .select('client_id, monthly_rent_amount, monthly_services_amount, status, created_at')
+                    .select('client_id, monthly_rent_amount, monthly_services_amount, status, created_at, start_date')
                     .in('client_id', clientIds);
 
                 const contractMap = {};
@@ -258,7 +258,8 @@ export const marketTecService = {
                         if (activeContract) {
                             contractMap[clientId] = {
                                 rent: parseMoney(activeContract.monthly_rent_amount),
-                                services: parseMoney(activeContract.monthly_services_amount)
+                                services: parseMoney(activeContract.monthly_services_amount),
+                                year: activeContract.start_date ? activeContract.start_date.substring(0, 4) : (activeContract.created_at ? new Date(activeContract.created_at).getFullYear() : '-')
                             };
                         } else {
                             // Si no encontré activo, SOLO PARA DEBUG: ver si hay alguno 'Pendiente' o similar
@@ -274,7 +275,8 @@ export const marketTecService = {
                                 // console.log(`[DEBUG] Using most recent contract for ${clientId} (Status: ${mostRecent.status})`);
                                 contractMap[clientId] = {
                                     rent: parseMoney(mostRecent.monthly_rent_amount),
-                                    services: parseMoney(mostRecent.monthly_services_amount)
+                                    services: parseMoney(mostRecent.monthly_services_amount),
+                                    year: mostRecent.start_date ? mostRecent.start_date.substring(0, 4) : (mostRecent.created_at ? new Date(mostRecent.created_at).getFullYear() : '-')
                                 };
                             }
                         }
@@ -287,7 +289,7 @@ export const marketTecService = {
                         const normalizedKey = c.User_market_tec.toString().trim().toLowerCase();
                         clientMap[normalizedKey] = {
                             ...c,
-                            contractInfo: contractMap[c.id] || { rent: 0, services: 0 }
+                            contractInfo: contractMap[c.id] || { rent: 0, services: 0, year: null }
                         };
                     }
                 });
@@ -307,7 +309,8 @@ export const marketTecService = {
                 client_user_market_tec: client ? client.User_market_tec : null,
                 // Agregamos info de contrato para UX
                 client_monthly_rent: client?.contractInfo?.rent || 0,
-                client_monthly_services: client?.contractInfo?.services || 0
+                client_monthly_services: client?.contractInfo?.services || 0,
+                client_contract_year: client?.contractInfo?.year || '-'
             };
         });
 

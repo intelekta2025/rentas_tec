@@ -2427,6 +2427,32 @@ export const MarketTecView = ({ user, unitName }) => {
 
     const completedCount = totalRecords - pendingCount;
 
+    const handleExportExcel = () => {
+      if (!stagingData || stagingData.length === 0) {
+        alert('No hay datos para exportar');
+        return;
+      }
+
+      const exportData = stagingData.map(row => ({
+        'Cliente': row.client_business_name || row.raw_receiver_name || '-',
+        'Usuario Market Tec': row.client_user_market_tec || '-',
+        'Orden / Ref': row.raw_order || '-',
+        'Fecha Autorización': row.raw_authorized_date ? new Date(row.raw_authorized_date).toLocaleDateString('es-MX') : '-',
+        'Monto Servicio': row.client_monthly_services || 0,
+        'Monto Renta': row.client_monthly_rent || 0,
+        'Año Contrato': row.client_contract_year || '-',
+        'Monto Total': row.raw_total_value || 0,
+        'CxC Pendientes': row.pending_receivables_count || 0,
+        'Estatus': row.processing_status || '-'
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Staging Data");
+      const fileName = `Staging_Upload_${selectedUploadId}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+    };
+
     return (
       <div className="animate-in slide-in-from-right-4 duration-300">
         {/* Header de Revisión */}
@@ -2458,6 +2484,14 @@ export const MarketTecView = ({ user, unitName }) => {
               className={`px-4 py-2 text-slate-600 rounded-lg font-medium border border-slate-200 ${isReconciling || isTriggering ? 'opacity-50 cursor-not-allowed bg-slate-50' : 'hover:bg-slate-100'}`}
             >
               <ChevronLeft size={18} className="inline mr-1" /> Volver
+            </button>
+            <button
+              onClick={handleExportExcel}
+              className="px-4 py-2 text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg font-medium transition-colors flex items-center gap-2"
+              title="Descargar Excel"
+            >
+              <Download size={18} />
+              <span className="hidden sm:inline">Excel</span>
             </button>
             <button
               onClick={() => {
@@ -2542,6 +2576,9 @@ export const MarketTecView = ({ user, unitName }) => {
                     <th className="px-4 py-3 font-semibold">Orden / Ref</th>
                     <th className="px-4 py-3 font-semibold text-center">Market Tec Receiver</th>
                     <th className="px-4 py-3 font-semibold">Fecha Autorización</th>
+                    <th className="px-4 py-3 font-semibold text-center">Monto Servicio</th>
+                    <th className="px-4 py-3 font-semibold text-center">Monto Renta</th>
+                    <th className="px-4 py-3 font-semibold text-center">Año Contrato</th>
                     <th className="px-4 py-3 font-semibold text-right">Monto</th>
                     <th className="px-4 py-3 font-semibold text-center">CxC Pendientes</th>
                     <th className="px-4 py-3 font-semibold text-center">Status Procesamiento</th>
@@ -2606,6 +2643,15 @@ export const MarketTecView = ({ user, unitName }) => {
                       </td>
                       <td className="px-4 py-3 text-slate-600 text-xs capitalize">
                         {row.raw_authorized_date ? new Date(row.raw_authorized_date).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: '2-digit' }).replace('.', '') : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-center text-slate-600">
+                        ${(row.client_monthly_services || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-4 py-3 text-center text-slate-600">
+                        ${(row.client_monthly_rent || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-4 py-3 text-center text-slate-600">
+                        {row.client_contract_year || '-'}
                       </td>
                       <td className={`px-4 py-3 text-right ${row.raw_total_value === 0 ? 'text-red-600 font-bold' : 'text-slate-700'}`}>
                         ${(row.raw_total_value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
