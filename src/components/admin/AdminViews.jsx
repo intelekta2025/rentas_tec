@@ -10,7 +10,7 @@ import {
   Plus, Send, ChevronRight, FileCheck, Ban, Edit, Zap, Trash2,
   Key, UploadCloud, Loader, Play, Filter, Shield, Eye, User, Phone, Lightbulb,
   ChevronUp, ChevronDown, Upload, AlertCircle, X, Loader2, Bot, ArrowRight,
-  LayoutGrid, List, RefreshCw, ChevronLeft, Edit2, Save, UserCheck, UserX, RotateCcw, MessageCircle
+  LayoutGrid, List, RefreshCw, ChevronLeft, Edit2, Save, UserCheck, UserX, RotateCcw, MessageCircle, ExternalLink
 } from 'lucide-react';
 import { useSystemUsers } from '../../hooks/useSystemUsers';
 import { StatusBadge, OverdueBadge, KPICard, RevenueChart, Modal, AccumulatedChart } from '../ui/Shared';
@@ -2540,7 +2540,19 @@ export const MarketTecView = ({ user, unitName }) => {
                   {stagingData.map((row) => (
                     <tr key={row.id} className="hover:bg-slate-50">
                       <td className="px-4 py-3 text-slate-600">
-                        {row.client_business_name || <span className="text-slate-400 italic">{row.raw_receiver_name}</span>}
+                        {row.client_matched_id ? (
+                          <a
+                            href={`/?clientId=${row.client_matched_id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 hover:underline font-medium flex items-center gap-1 group/link"
+                          >
+                            {row.client_business_name}
+                            <ExternalLink size={12} className="opacity-50 group-hover/link:opacity-100" />
+                          </a>
+                        ) : (
+                          row.client_business_name || <span className="text-slate-400 italic">{row.raw_receiver_name}</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-slate-700">
                         {row.raw_order || <span className="text-red-300 italic">Vacío</span>}

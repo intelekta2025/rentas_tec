@@ -223,8 +223,11 @@ export default function App() {
       const isClientMissingId = user.role === 'Client' && !user.clientId;
 
       if (isAdminMissingUnit || isClientMissingId) {
-        console.warn('⚠️ Detectada inconsistencia en la sesión (Faltan datos críticos). Cerrando sesión por seguridad.');
-        logout(); // <--- Esto te enviará al Login inmediatamente
+        console.warn('⚠️ Detectada posible inconsistencia en la sesión (Faltan datos críticos).');
+        console.warn('Detalle:', { role: user.role, unitId: user.unitId, clientId: user.clientId });
+        // EVITAR LOGOUT AUTOMÁTICO por race-conditions entre pestañas.
+        // Mejor dejar que el usuario recargue si ve algo raro, o manejarlo en las vistas.
+        // logout(); 
       }
     }
   }, [user, authLoading, logout]);
@@ -291,30 +294,54 @@ export default function App() {
   // Pagos del cliente (solo si es cliente)
   // TODO: Restaurar cuando se implemente usePayments
 
-  // Deep linking logic - only process once on mount
+  // Deep linking logic state
+  const [isProcessingDeepLink, setIsProcessingDeepLink] = useState(() => {
+    // Inicializar en true SI hay un clientId en la URL para bloquear render
+    return window.location.search.includes('clientId');
+  });
   const deepLinkProcessed = useRef(false);
 
   useEffect(() => {
-    // Only process deep link once
-    if (deepLinkProcessed.current) return;
+    // Fail-safe: Si tarda más de 5s, soltar el bloqueo
+    const timeoutId = setTimeout(() => {
+      if (isProcessingDeepLink) setIsProcessingDeepLink(false);
+    }, 5000);
 
-    const params = new URLSearchParams(window.location.search);
-    const clientId = params.get('clientId');
+    const processDeepLink = () => {
+      // Si no hay clientes cargados, esperar (el effect se re-ejecutará)
+      if (filteredClients.length === 0) return;
 
-    if (clientId && filteredClients.length > 0 && user) {
-      const client = filteredClients.find(c => c.id === parseInt(clientId));
-      if (client) {
-        setSelectedClient(client);
-        setActiveTab('clientDetail');
+      const params = new URLSearchParams(window.location.search);
+      const clientId = params.get('clientId');
 
-        // Clear the URL parameter to prevent unwanted redirects
-        window.history.replaceState({}, '', window.location.pathname);
+      if (clientId && user) {
+        if (!deepLinkProcessed.current) {
+          console.log('🔗 Procesando Deep Link para cliente:', clientId);
+          const client = filteredClients.find(c => c.id === parseInt(clientId));
 
-        // Mark as processed
-        deepLinkProcessed.current = true;
+          if (client) {
+            setSelectedClient(client);
+            setActiveTab('clientDetail');
+            deepLinkProcessed.current = true;
+
+            // Limpiar URL
+            window.history.replaceState({}, '', window.location.pathname);
+          } else {
+            console.warn('🔗 Cliente del deep link no encontrado en la lista filtrada.');
+          }
+        }
       }
+
+      // Ya intentamos procesar (éxito o no encontrado), liberar pantalla
+      setIsProcessingDeepLink(false);
+    };
+
+    if (isProcessingDeepLink || !deepLinkProcessed.current) {
+      processDeepLink();
     }
-  }, [filteredClients, user]);
+
+    return () => clearTimeout(timeoutId);
+  }, [filteredClients, user, isProcessingDeepLink]);
   const clientPayments = [];
   const paymentsLoading = false;
 
@@ -685,13 +712,15 @@ export default function App() {
     }
   };
 
-  // Mostrar loading solo durante la carga inicial (cuando authLoading es true y no hay usuario aún)
-  if (authLoading && !user) {
+  // Mostrar loading durante carga inicial o procesamiento de deep link
+  if ((authLoading && !user) || isProcessingDeepLink) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando...</p>
+          <p className="mt-4 text-gray-600">
+            {isProcessingDeepLink ? 'Cargando cliente...' : 'Cargando sistema...'}
+          </p>
         </div>
       </div>
     );
