@@ -177,9 +177,9 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
                 'Usuario Market Tec': client.user_market_tec || client.User_market_tec || '',
                 'Total del Contrato': client.totalContract || 0,
                 'Saldo Pendiente': client.pendingBalance || 0,
-                'Total Rentas': client.totalRentCount || 0,
-                'Total Servicios': client.totalServiceCount || 0,
+                'Pagos': client.totalPaid || 0,
                 'Saldo Vencido': client.overdueBalance || 0,
+                'Rentas/Servicios': `${client.totalRentCount || 0}/${client.totalServiceCount || 0}`,
                 'Estatus': client.status
               }));
 
@@ -260,9 +260,9 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Cliente</th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Total del contrato</th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Saldo pendiente</th>
-                  <th className="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-widest">Total Rentas</th>
-                  <th className="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-widest">Total Servicios</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Pagos</th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Saldo vencido</th>
+                  <th className="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-widest">Rentas / Servicios</th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Usuario Market Tec</th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-widest">Estado</th>
                 </tr>
@@ -283,20 +283,20 @@ export const ClientsView = ({ filteredClients, setAddClientModalOpen, handleClie
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900 font-medium">${(client.pendingBalance || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <div className={`text-sm font-bold ${client.totalRentCount > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
-                        {client.totalRentCount || 0}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <div className={`text-sm font-bold ${client.totalServiceCount > 0 ? 'text-indigo-600' : 'text-gray-400'}`}>
-                        {client.totalServiceCount || 0}
-                      </div>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-emerald-700 font-bold">${(client.totalPaid || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className={`text-sm font-bold flex items-center ${client.overdueBalance > 0 ? 'text-red-600' : 'text-gray-500'}`}>
                         ${(client.overdueBalance || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                         {client.overdueBalance > 0 && <AlertTriangle size={14} className="ml-1" />}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <div className="text-sm font-bold">
+                        <span className={client.totalRentCount > 0 ? 'text-amber-600' : 'text-gray-400'}>{client.totalRentCount || 0}</span>
+                        <span className="text-gray-400 mx-1">/</span>
+                        <span className={client.totalServiceCount > 0 ? 'text-indigo-600' : 'text-gray-400'}>{client.totalServiceCount || 0}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

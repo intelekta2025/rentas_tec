@@ -26,6 +26,7 @@ const mapClientFromDB = (dbClient) => {
 
     // Campos calculados de financieros
     totalContract: dbClient.totalContract || 0,
+    totalPaid: dbClient.totalPaid || 0,
     pendingBalance: dbClient.pendingBalance || 0,
     overdueBalance: dbClient.overdueBalance || 0,
     totalRentCount: dbClient.totalRentCount || 0,
@@ -160,6 +161,7 @@ export const getClients = async (unitId = null, year = null) => {
         return mapClientFromDB({
           ...client,
           totalContract,
+          totalPaid: totalContract - pendingBalance,
           pendingBalance,
           overdueBalance,
           totalRentCount,
