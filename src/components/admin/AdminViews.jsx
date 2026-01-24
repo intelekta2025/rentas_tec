@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import * as XLSX from 'xlsx';
 import ClientForm from './ClientForm';
@@ -13,6 +13,7 @@ import {
   LayoutGrid, List, RefreshCw, ChevronLeft, Edit2, Save, UserCheck, UserX, RotateCcw, MessageCircle, ExternalLink
 } from 'lucide-react';
 import { useSystemUsers } from '../../hooks/useSystemUsers';
+import { parseBasicMarkdown } from '../../lib/markdown';
 import { StatusBadge, OverdueBadge, KPICard, RevenueChart, Modal, AccumulatedChart } from '../ui/Shared';
 import { UNITS, mockStaff } from '../../data/constants';
 import * as invoiceService from '../../services/invoiceService';
@@ -3086,9 +3087,14 @@ export const OverdueView = ({ filteredCXC, selectedOverdue, toggleOverdueSelecti
   );
 };
 
+// Helper functions for RemindersView replacement
+// To avoid duplication, we'll implement the logic inline as much as possible, or assume external helpers are available if they were imported.
+// But we need to use the existing imports.
+
 export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleReminderSelection, setSelectedReminders, user, unitName, templates: propTemplates }) => {
   const [filterType, setFilterType] = useState('currentMonth'); // 'currentMonth' | 'nextMonth'
   const [showModal, setShowModal] = useState(false);
+  const [expandedClients, setExpandedClients] = useState(new Set());
 
   // Template State
   const [templates, setTemplates] = useState([]);
@@ -3162,10 +3168,65 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
   const displayedReminders = filterType === 'currentMonth' ? currentMonthReminders : nextMonthReminders;
   const displayedPending = displayedReminders.filter(i => !i.sent);
 
+  // Group by Client
+  const groupedReminders = useMemo(() => {
+    const grouped = {};
+    displayedReminders.forEach(item => {
+      const clientId = item.clientId || item.client; // Fallback to name if ID missing, but ID preferred
+      if (!grouped[clientId]) {
+        grouped[clientId] = {
+          clientId,
+          clientName: item.client,
+          items: [],
+          totalAmount: 0,
+          contactEmail: item.email,
+          contactPhone: item.contactName // Using contactName as phone placeholder based on other view, or just contact info
+        };
+      }
+      grouped[clientId].items.push(item);
+      grouped[clientId].totalAmount += (typeof item.amount === 'number' ? item.amount : parseFloat(String(item.amount).replace(/[^0-9.-]+/g, '')) || 0);
+    });
+    return Object.values(grouped);
+  }, [displayedReminders]);
+
   // KPI stats
   const currentMonthCount = currentMonthReminders.length;
   const nextMonthCount = nextMonthReminders.length;
-  const pendingCount = displayedPending.length;
+  // const pendingCount = displayedPending.length; // Unused var
+
+  const toggleClientExpansion = (clientId) => {
+    const newExpanded = new Set(expandedClients);
+    if (newExpanded.has(clientId)) {
+      newExpanded.delete(clientId);
+    } else {
+      newExpanded.add(clientId);
+    }
+    setExpandedClients(newExpanded);
+  };
+
+  const toggleClientSelection = (clientGroup) => {
+    const itemIds = clientGroup.items.map(i => i.id);
+    const allSelected = itemIds.every(id => selectedReminders.includes(id));
+
+    if (allSelected) {
+      // Deselect all items of this client
+      setSelectedReminders(prev => prev.filter(id => !itemIds.includes(id)));
+    } else {
+      // Select all items of this client (union)
+      setSelectedReminders(prev => [...new Set([...prev, ...itemIds])]);
+    }
+  };
+
+  const toggleAllSelection = () => {
+    const allItemIds = displayedPending.map(i => i.id);
+    const allSelected = allItemIds.length > 0 && allItemIds.every(id => selectedReminders.includes(id));
+
+    if (allSelected) {
+      setSelectedReminders([]);
+    } else {
+      setSelectedReminders(allItemIds);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -3255,7 +3316,7 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
         </div>
       </div>
 
-      {/* Main Table */}
+      {/* Main Table Groups */}
       <div className="bg-white shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
         <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
           <div className="flex items-center gap-4">
@@ -3287,77 +3348,135 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left">
+                <th scope="col" className="px-6 py-3 w-12 text-center">
                   <input
                     type="checkbox"
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedReminders(displayedPending.map(i => i.id));
-                      } else {
-                        setSelectedReminders([]);
-                      }
-                    }}
-                    checked={selectedReminders.length === displayedPending.length && displayedPending.length > 0}
+                    onChange={toggleAllSelection}
+                    checked={displayedPending.length > 0 && displayedPending.every(i => selectedReminders.includes(i.id))}
                   />
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Conceptos a Cobrar</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vence en</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                <th scope="col" className="relative px-6 py-3"><span className="sr-only">Ver</span></th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente / Razón Social</th>
+                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total a Pagar</th>
+                <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Pagos</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Antigüedad</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {displayedReminders.length > 0 ? (
-                displayedReminders.map((item) => {
-                  const daysDiff = Math.ceil((new Date(item.dueDate) - new Date()) / (1000 * 60 * 60 * 24));
-                  const isSelected = selectedReminders.includes(item.id);
-                  const isSent = item.sent;
+            <tbody className="bg-white divide-y divide-gray-100">
+              {groupedReminders.length > 0 ? (
+                groupedReminders.map(group => {
+                  const isExpanded = expandedClients.has(group.clientId);
+                  const allGroupItemsSelected = group.items.length > 0 && group.items.every(i => selectedReminders.includes(i.id));
+                  const someGroupItemsSelected = group.items.some(i => selectedReminders.includes(i.id));
+                  const isIndeterminate = someGroupItemsSelected && !allGroupItemsSelected;
+
+                  // Calculate badges for group
+                  const minDays = Math.min(...group.items.map(i => Math.ceil((new Date(i.dueDate) - new Date()) / (1000 * 60 * 60 * 24))));
 
                   return (
-                    <tr key={item.id} className={isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <input
-                          type="checkbox"
-                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          checked={isSelected}
-                          disabled={isSent}
-                          onChange={() => toggleReminderSelection(item.id)}
-                        />
-                      </td>
-                      <td className="px-6 py-4 font-medium text-gray-900">{item.client}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{item.concept}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                        {typeof item.amount === 'number'
-                          ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(item.amount)
-                          : item.amount}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-bold rounded-full ${daysDiff < 3 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-                          {daysDiff} días
-                        </span>
-                        <div className="text-xs text-gray-400 mt-1">{item.dueDate}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {isSent ? (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                            Enviado
+                    <React.Fragment key={group.clientId}>
+                      {/* Parent Row */}
+                      <tr className={`hover:bg-gray-50 transition-colors ${isExpanded ? 'bg-gray-50' : ''} ${someGroupItemsSelected ? 'bg-blue-50/30' : ''}`}>
+                        <td className="px-6 py-4 text-center">
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            ref={input => { if (input) input.indeterminate = isIndeterminate; }}
+                            checked={allGroupItemsSelected}
+                            onChange={() => toggleClientSelection(group)}
+                          />
+                        </td>
+                        <td className="px-6 py-4">
+                          <div
+                            className="flex items-center gap-3 cursor-pointer select-none"
+                            onClick={() => toggleClientExpansion(group.clientId)}
+                          >
+                            <div className={`p-1 rounded-md transition-transform duration-200 ${isExpanded ? 'rotate-90 bg-gray-200' : 'text-gray-400'}`}>
+                              <ChevronRight size={16} />
+                            </div>
+                            <div>
+                              <div className="font-semibold text-gray-900">{group.clientName}</div>
+                              <div className="text-xs text-gray-500">{group.contactEmail}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right whitespace-nowrap text-sm font-bold text-gray-900">
+                          {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(group.totalAmount)}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="bg-gray-100 text-gray-600 py-1 px-2.5 rounded-full text-xs font-bold">
+                            {group.items.length}
                           </span>
-                        ) : (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                            Pendiente
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-bold rounded-full ${minDays < 3 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                            Vence en {minDays} días
                           </span>
-                        )}
-                      </td>
+                        </td>
+                      </tr>
 
-                    </tr>
+                      {/* Child Rows */}
+                      {isExpanded && (
+                        <tr className="bg-gray-50/50 shadow-inner">
+                          <td colSpan="5" className="p-0">
+                            <div className="py-2 pl-16 pr-8 border-l-4 border-indigo-500 ml-0 animate-in slide-in-from-top-2 fade-in duration-200">
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="text-gray-400 border-b border-gray-200/60">
+                                    <th className="pb-2 pl-2 w-8"></th>
+                                    <th className="pb-2 font-medium text-left">Concepto</th>
+                                    <th className="pb-2 font-medium text-left">Fecha Vencimiento</th>
+                                    <th className="pb-2 font-medium text-right">Monto</th>
+                                    <th className="pb-2 font-medium text-center">Estado</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200/60">
+                                  {group.items.map(item => {
+                                    const daysDiff = Math.ceil((new Date(item.dueDate) - new Date()) / (1000 * 60 * 60 * 24));
+                                    const isSelected = selectedReminders.includes(item.id);
+                                    return (
+                                      <tr key={item.id} className="text-gray-600 hover:bg-gray-100/50 transition-colors">
+                                        <td className="py-3 pl-2 text-center">
+                                          <input
+                                            type="checkbox"
+                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            checked={isSelected}
+                                            disabled={item.sent}
+                                            onChange={() => toggleReminderSelection(item.id)}
+                                          />
+                                        </td>
+                                        <td className="py-3">{item.concept}</td>
+                                        <td className="py-3 flex items-center gap-2">
+                                          <Calendar size={12} className="text-gray-400" />
+                                          {item.dueDate}
+                                        </td>
+                                        <td className="py-3 text-right font-medium">
+                                          {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(
+                                            typeof item.amount === 'number' ? item.amount : parseFloat(String(item.amount).replace(/[^0-9.-]+/g, '')) || 0
+                                          )}
+                                        </td>
+                                        <td className="py-3 text-center">
+                                          {item.sent ? (
+                                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Enviado</span>
+                                          ) : (
+                                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Pendiente</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan="7" className="px-6 py-10 text-center text-gray-500 italic">
+                  <td colSpan="5" className="px-6 py-10 text-center text-gray-500 italic">
                     No hay recordatorios encontrados para este periodo
                   </td>
                 </tr>
@@ -3450,6 +3569,15 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
 
                         // Receivables summary (aggregate)
                         const totalBalance = clientData.invoices.reduce((sum, inv) => sum + (parseFloat(String(inv.amount).replace(/[^0-9.-]+/g, '')) || 0), 0);
+
+                        const rentBalance = clientData.invoices.reduce((sum, inv) => {
+                          const type = (inv.type || '').toLowerCase();
+                          const amount = parseFloat(String(inv.amount).replace(/[^0-9.-]+/g, '')) || 0;
+                          return (type === 'rent' || type === 'renta') ? sum + amount : sum;
+                        }, 0);
+
+                        const servicesBalance = totalBalance - rentBalance;
+
                         const concepts = clientData.invoices.map(inv => inv.concept).join(', ');
                         const dueDates = clientData.invoices.map(inv => {
                           if (!inv.dueDate) return '';
@@ -3462,6 +3590,8 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
                         processed = processed.replace(/\{\{receivables\.concept\}\}/g, concepts);
                         processed = processed.replace(/\{\{receivables\.due_date\}\}/g, dueDates);
                         processed = processed.replace(/\{\{receivables\.balance\}\}/g, `$${totalBalance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`);
+                        processed = processed.replace(/\{\{receivables\.rent_balance\}\}/g, `$${rentBalance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`);
+                        processed = processed.replace(/\{\{receivables\.services_balance\}\}/g, `$${servicesBalance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`);
                         processed = processed.replace(/\{\{receivables\.type\}\}/g, types);
 
                         // Business unit
@@ -3469,7 +3599,7 @@ export const RemindersView = ({ filteredUpcoming, selectedReminders, toggleRemin
 
                         // Convert to HTML if it's the body
                         if (isBody) {
-                          processed = processed.replace(/\n/g, '<br>');
+                          processed = parseBasicMarkdown(processed);
                           processed = `<div style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333;">${processed}</div>`;
                         }
 

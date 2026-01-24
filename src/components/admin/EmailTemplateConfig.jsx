@@ -14,7 +14,7 @@ export default function EmailTemplateConfig({ onBack, unitName, onTemplateChange
     // Variables disponibles para usar en plantillas
     const dbVariables = [
         { category: 'Cliente', vars: ['{{client.contact_name}}', '{{client.business_name}}', '{{client.contact_email}}'] },
-        { category: 'Cuenta por Cobrar', vars: ['{{receivables.concept}}', '{{receivables.due_date}}', '{{receivables.balance}}', '{{receivables.type}}'] },
+        { category: 'Cuenta por Cobrar', vars: ['{{receivables.concept}}', '{{receivables.due_date}}', '{{receivables.balance}}', '{{receivables.rent_balance}}', '{{receivables.services_balance}}', '{{receivables.type}}'] },
         { category: 'Unidad de Negocio', vars: ['{{business_units.name}}'] }
     ];
 
@@ -154,7 +154,7 @@ export default function EmailTemplateConfig({ onBack, unitName, onTemplateChange
                 <div className="flex items-center gap-4">
 
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-800">Plantillas de Notificación - {unitName || `Unidad ${user.unitId}`}</h2>
+                        <h2 className="text-2xl font-bold text-slate-800">Plantillas de Notificación - {unitName || (user?.unitId ? `Unidad ${user.unitId}` : '')}</h2>
                         <p className="text-slate-500">Administra los correos automáticos que envía el sistema.</p>
                     </div>
                 </div>
@@ -315,6 +315,39 @@ export default function EmailTemplateConfig({ onBack, unitName, onTemplateChange
                             <p className="text-xs text-blue-700">
                                 Estas variables se llenarán automáticamente con la información de la tabla <strong>payment_applications</strong> y sus relaciones.
                             </p>
+                        </div>
+                    </div>
+
+                    <div className="mt-6 pt-4 border-t border-slate-200">
+                        <div className="flex items-center gap-2 mb-2 text-slate-800">
+                            <Code size={16} className="text-indigo-600" />
+                            <h3 className="font-semibold text-sm">Formato (Markdown)</h3>
+                        </div>
+                        <div className="text-xs text-slate-500 space-y-2 font-mono bg-white p-3 rounded border border-slate-200">
+                            <div className="flex justify-between">
+                                <span>Negrita:</span>
+                                <span className="text-slate-700">**texto**</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Cursiva:</span>
+                                <span className="text-slate-700">*texto*</span>
+                            </div>
+                            <div className="flex flex-col">
+                                <span>Enlace:</span>
+                                <span className="text-slate-700">[Texto](https://ejemplo.com)</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Lista:</span>
+                                <span className="text-slate-700">- Elemento de lista</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Separador:</span>
+                                <span className="text-slate-700">---</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Salto forzado:</span>
+                                <span className="text-slate-700">[br]</span>
+                            </div>
                         </div>
                     </div>
                 </div>

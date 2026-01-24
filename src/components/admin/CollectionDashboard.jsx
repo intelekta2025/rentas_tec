@@ -20,6 +20,7 @@ import {
 import { getCollectionStats } from '../../services/clientService';
 import { getTemplates } from '../../services/templateService';
 import { useAuth } from '../../hooks/useAuth';
+import { parseBasicMarkdown } from '../../lib/markdown';
 
 
 export default function CollectionDashboard({ unitName, onClientClick, onBack, templates: propTemplates }) {
@@ -345,13 +346,7 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack, t
                                         <Mail className="w-3 h-3" />
                                         Enviar Email
                                     </button>
-                                    <button
-                                        onClick={() => setShowModal(true)}
-                                        className="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md shadow-sm flex items-center gap-2 transition-all"
-                                    >
-                                        <MessageCircle className="w-3 h-3" />
-                                        Enviar WhatsApp
-                                    </button>
+
                                 </div>
                             </div>
                         )}
@@ -683,6 +678,14 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack, t
 
                                                     // Receivables summary (aggregate)
                                                     const totalBalance = clientData.invoices.reduce((sum, inv) => sum + inv.amount, 0);
+
+                                                    const rentBalance = clientData.invoices.reduce((sum, inv) => {
+                                                        const type = (inv.type || '').toLowerCase();
+                                                        return (type === 'rent' || type === 'renta') ? sum + inv.amount : sum;
+                                                    }, 0);
+
+                                                    const servicesBalance = totalBalance - rentBalance;
+
                                                     const concepts = clientData.invoices.map(inv => inv.concept).join(', ');
                                                     const dueDates = clientData.invoices.map(inv => {
                                                         if (!inv.dueDate) return '';
@@ -695,6 +698,8 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack, t
                                                     processed = processed.replace(/\{\{receivables\.concept\}\}/g, concepts);
                                                     processed = processed.replace(/\{\{receivables\.due_date\}\}/g, dueDates);
                                                     processed = processed.replace(/\{\{receivables\.balance\}\}/g, `$${totalBalance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`);
+                                                    processed = processed.replace(/\{\{receivables\.rent_balance\}\}/g, `$${rentBalance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`);
+                                                    processed = processed.replace(/\{\{receivables\.services_balance\}\}/g, `$${servicesBalance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`);
                                                     processed = processed.replace(/\{\{receivables\.type\}\}/g, types);
 
                                                     // Business unit
@@ -702,8 +707,8 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack, t
 
                                                     // Convert to HTML if it's the body
                                                     if (isBody) {
-                                                        // Convert newlines to <br> tags
-                                                        processed = processed.replace(/\n/g, '<br>');
+                                                        // Use markdown parser
+                                                        processed = parseBasicMarkdown(processed);
                                                         // Wrap in basic HTML structure
                                                         processed = `<div style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333;">${processed}</div>`;
                                                     }

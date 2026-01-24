@@ -1,6 +1,6 @@
 // src/components/auth/LoginView.jsx
 import React, { useState } from 'react';
-import { Mail, Lock, XCircle } from 'lucide-react';
+import { Mail, Lock, XCircle, FileText } from 'lucide-react';
 const logoTec = '/logotec.png';
 
 export const LoginView = ({ onLogin, loginError }) => {
@@ -127,6 +127,19 @@ export const LoginView = ({ onLogin, loginError }) => {
               </button>
             </div>
           </form>
+
+          <div className="mt-6 flex justify-center">
+            <a
+              href="https://drive.google.com/file/d/1RVk9wkNbTRzt0DdOai2J9QpVNMWO8BJu/view?usp=sharing"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-sm text-gray-500 hover:text-blue-900 transition-colors"
+              title="Ver manual de usuario"
+            >
+              <FileText className="h-4 w-4" />
+              <span>Ver Manual de Usuario</span>
+            </a>
+          </div>
         </div>
       </div>
     </div>
