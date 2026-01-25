@@ -869,6 +869,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
+                                      setSelectedContractId(contract.id);
                                       setGenerationType('Rent');
                                       setContractToGenerate(contract);
                                       setGenerateModalOpen(true);
@@ -881,6 +882,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
+                                      setSelectedContractId(contract.id);
                                       setGenerationType('Service');
                                       setContractToGenerate(contract);
                                       setGenerateModalOpen(true);
@@ -896,6 +898,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    setSelectedContractId(contract.id);
                                     onEditContract && onEditContract(contract);
                                   }}
                                   className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
@@ -908,6 +911,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    setSelectedContractId(contract.id);
                                     handleFinalizeClick(contract);
                                   }}
                                   className="p-1 text-gray-400 hover:text-red-500 transition-colors"
@@ -920,6 +924,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    setSelectedContractId(contract.id);
                                     onReactivateContract && onReactivateContract(contract);
                                   }}
                                   className="p-1 text-gray-400 hover:text-green-600 transition-colors"

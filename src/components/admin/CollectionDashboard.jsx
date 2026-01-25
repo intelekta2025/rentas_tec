@@ -20,7 +20,7 @@ import {
 import { getCollectionStats } from '../../services/clientService';
 import { getTemplates } from '../../services/templateService';
 import { useAuth } from '../../hooks/useAuth';
-import { parseBasicMarkdown } from '../../lib/markdown';
+
 
 
 export default function CollectionDashboard({ unitName, onClientClick, onBack, templates: propTemplates }) {
@@ -705,13 +705,11 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack, t
                                                     // Business unit
                                                     processed = processed.replace(/\{\{business_units\.name\}\}/g, user?.unitName || '');
 
-                                                    // Convert to HTML if it's the body
-                                                    if (isBody) {
-                                                        // Use markdown parser
-                                                        processed = parseBasicMarkdown(processed);
-                                                        // Wrap in basic HTML structure
-                                                        processed = `<div style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333;">${processed}</div>`;
-                                                    }
+                                                    // Convert to HTML if it's the body - REMOVED to receive Plain Text
+                                                    // if (isBody) {
+                                                    //    processed = parseBasicMarkdown(processed);
+                                                    //    processed = `<div style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333;">${processed}</div>`;
+                                                    // }
 
                                                     return processed;
                                                 };
@@ -743,6 +741,7 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack, t
                                                 const webhookPayload = {
                                                     templateId: selectedTemplate,
                                                     templateName: templateData.name,
+                                                    userId: user?.id,
                                                     unitId: user?.unitId,
                                                     unitName: user?.unitName,
                                                     clients: selectedClientData,
