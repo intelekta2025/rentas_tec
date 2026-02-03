@@ -388,7 +388,8 @@ export const generateEstadoCuentaPDF = (client, receivables, contractInfo = {}, 
 
     // Separar receivables por tipo
     const rentas = receivables.filter(r => r.type === 'Renta' || r.type === 'Rent');
-    const servicios = receivables.filter(r => r.type !== 'Renta' && r.type !== 'Rent');
+    const servicios = receivables.filter(r => r.type === 'Service' || r.type === 'Services' || r.type === 'Luz');
+    const otros = receivables.filter(r => r.type === 'Other' || r.type === 'Otro');
 
     // Crear tabla de Rentas
     if (rentas.length > 0) {
@@ -410,6 +411,18 @@ export const generateEstadoCuentaPDF = (client, receivables, contractInfo = {}, 
             yPos += 8;
         }
         createTable('Servicios', servicios, [234, 179, 8]); // amber-500
+    }
+
+    // Crear tabla de Otros
+    if (otros.length > 0) {
+        if (rentas.length === 0 && servicios.length === 0) {
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(0, 0, 0);
+            doc.text('Detalle de Movimientos', pageWidth / 2, yPos, { align: 'center' });
+            yPos += 8;
+        }
+        createTable('Otros', otros, [147, 51, 234]); // purple-600
     }
 
     // ============ FOOTER ============

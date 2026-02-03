@@ -385,7 +385,8 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
       const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
       const monthName = monthNames[manualReceivableForm.periodMonth - 1];
       const typeLabel = manualReceivableForm.type === 'Rent' ? 'Renta' :
-        manualReceivableForm.type === 'Service' ? 'Luz/Servicios' : 'Cargo';
+        manualReceivableForm.type === 'Service' ? 'Luz/Servicios' :
+          manualReceivableForm.type === 'Other' ? 'Otro' : manualReceivableForm.type;
 
       const newConcept = `${typeLabel} ${monthName} ${manualReceivableForm.periodYear}`;
 
@@ -422,10 +423,8 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
       // Filter by Service Type
       if (serviceTypeFilter === 'Todos') return true;
       if (serviceTypeFilter === 'Rent') return item.type === 'Rent' || item.type === 'Renta';
-      if (serviceTypeFilter === 'Service') {
-        // Cualquier tipo que NO sea Rent/Renta se considera Service
-        return item.type !== 'Rent' && item.type !== 'Renta';
-      }
+      if (serviceTypeFilter === 'Service') return item.type === 'Service' || item.type === 'Services' || item.type === 'Luz';
+      if (serviceTypeFilter === 'Other') return item.type === 'Other' || item.type === 'Otro';
 
       return true;
     });
@@ -497,7 +496,8 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
       const periodStr = item.periodMonth ? `${monthNames[item.periodMonth - 1]} ${String(item.periodYear).substring(2)}` : '-';
 
       return {
-        'Tipo': (item.type === 'Rent' || item.type === 'Renta') ? 'Renta' : 'Luz/Servicios',
+        'Tipo': (item.type === 'Rent' || item.type === 'Renta') ? 'Renta' :
+          (item.type === 'Other' || item.type === 'Otro') ? 'Otro' : 'Luz/Servicios',
         'Mes': periodStr,
         'Vencimiento': item.dueDate || '-',
         'Concepto': item.concept || '-',
@@ -547,7 +547,13 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
         status: 'Pending'
       };
 
+      // Debug logging
+      console.log('📝 Datos del formulario manual CXC:', data);
+      // NOTA: Ya no convertimos 'Other' a 'Service' - se guarda directamente como 'Other'
+
       const result = await onAddManualReceivable(data);
+      console.log('📬 Resultado del servidor:', result);
+
       if (result.success) {
         setAddManualReceivableModalOpen(false);
         setManualReceivableForm({
@@ -559,7 +565,8 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
           concept: ''
         });
       } else {
-        alert("Error al crear el registro: " + (result.error?.message || "Error desconocido"));
+        console.error('❌ Error del servidor:', result.error);
+        alert("Error al crear el registro: " + (result.error?.message || result.error || "Error desconocido"));
       }
     } catch (err) {
       console.error(err);
@@ -986,7 +993,8 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
               {[
                 { id: 'Todos', label: 'Todos', icon: null },
                 { id: 'Rent', label: 'Renta', icon: <Home size={14} className="mr-1.5" /> },
-                { id: 'Service', label: 'Servicios', icon: <Lightbulb size={14} className="mr-1.5" /> }
+                { id: 'Service', label: 'Servicios', icon: <Lightbulb size={14} className="mr-1.5" /> },
+                { id: 'Other', label: 'Otro', icon: <Plus size={14} className="mr-1.5" /> }
               ].map((f) => (
                 <button
                   key={f.id}
@@ -1079,6 +1087,10 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                       {item.type === 'Rent' || item.type === 'Renta' ? (
                         <div className="flex items-center text-blue-600" title="Renta">
                           <Home size={18} />
+                        </div>
+                      ) : item.type === 'Other' || item.type === 'Otro' ? (
+                        <div className="flex items-center text-purple-600" title="Otro">
+                          <Plus size={18} />
                         </div>
                       ) : (
                         <div className="flex items-center text-yellow-600" title="Luz/Servicios">
@@ -1569,6 +1581,7 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                 >
                   <option value="Rent">Renta</option>
                   <option value="Service">Servicio / Luz</option>
+                  <option value="Other">Otro</option>
                 </select>
               </div>
               <div>
