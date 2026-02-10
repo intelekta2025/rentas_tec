@@ -1233,9 +1233,10 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                   ['pending', 'pendiente', 'partial', 'parcial', 'overdue'].includes(i.status.toLowerCase())
                 ));
 
-                const pdfOverdueTotal = calculatePdfBalance((sortedReceivables || []).filter(i =>
-                  i.status.toLowerCase() === 'overdue'
-                ));
+                const pdfOverdueTotal = calculatePdfBalance((sortedReceivables || []).filter(i => {
+                  const status = (i.status || '').toLowerCase();
+                  return status === 'overdue' || status === 'vencido';
+                }));
 
                 const contractWithCounts = {
                   ...selectedContract,
