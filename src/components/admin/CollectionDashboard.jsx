@@ -14,8 +14,10 @@ import {
     MessageCircle,
     ArrowLeft,
     X,
-    Calendar
+    Calendar,
+    Download
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 import { getCollectionStats } from '../../services/clientService';
 import { getTemplates } from '../../services/templateService';
@@ -240,6 +242,39 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack, t
         }
     };
 
+    // Export to Excel
+    const handleExportExcel = () => {
+        // Prepare data for export
+        const exportData = filteredClients.map(client => {
+            const maxDays = Math.max(...client.invoices.map(i => i.daysOverdue));
+            const totalDebt = clientDebt(client);
+            const status = getClientStatus(client);
+
+            return {
+                'Cliente / Razón Social': client.clientName || '',
+                'Email': client.contactEmail || '',
+                'Teléfono': client.contactPhone || '',
+                'Market Tec': client.marketTecReceiver || '',
+                'Deuda Total': totalDebt,
+                'CXC': client.invoices.length,
+                'Días Vencidos': maxDays,
+                'Estado': status
+            };
+        });
+
+        // Create worksheet and workbook
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Cobranza');
+
+        // Generate filename with current date
+        const date = new Date().toISOString().split('T')[0];
+        const fileName = `Cobranza_${unitName || 'Clientes'}_${date}.xlsx`;
+
+        // Download file
+        XLSX.writeFile(wb, fileName);
+    };
+
 
 
 
@@ -328,6 +363,14 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack, t
                                         {activeFilterCount}
                                     </span>
                                 )}
+                            </button>
+                            <button
+                                onClick={handleExportExcel}
+                                disabled={filteredClients.length === 0}
+                                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-all shadow-sm"
+                            >
+                                <Download className="w-4 h-4" />
+                                Exportar Excel
                             </button>
                             <span className="text-sm text-slate-500">
                                 Mostrando {filteredClients.length} de {clients.length} clientes
