@@ -64,11 +64,10 @@ const mapReceivableFromDB = (dbReceivable) => {
   // Determinar el estado efectivo considerando la lógica de negocio de la BD
   const dbStatus = (dbReceivable.status || '').toLowerCase();
 
-  // Es vencido si:
-  // 1. La BD ya lo marcó como 'Y' en la columna computada
-  // 2. O si el status es pendiente/parcial y la fecha de vencimiento ya pasó (antes de hoy)
-  const isOverdueFlag = (dbReceivable.overdue === 'Y') ||
-    (['pending', 'pendiente', 'partial', 'parcial'].includes(dbStatus) && dueDate && dueDate < today);
+  // Es vencido si el status es pendiente/parcial y la fecha de vencimiento YA PASÓ (estrictamente antes de hoy)
+  // No usamos dbReceivable.overdue porque la BD puede usar <= en lugar de <
+  // Esto asegura que items con vencimiento "hoy" NO se marquen como vencidos hasta mañana
+  const isOverdueFlag = (['pending', 'pendiente', 'partial', 'parcial'].includes(dbStatus) && dueDate && dueDate < today);
 
   const effectiveStatus = isOverdueFlag ? 'Overdue' : (dbReceivable.status || 'Pending');
 

@@ -824,7 +824,11 @@ export const ClientDetailView = ({ client, setActiveTab, onBackToClients, setCon
                             <div className="text-sm font-bold flex items-center text-red-600">
                               {/* Calculate Overdue for this specific contract */}
                               {(() => {
-                                const overdueVal = receivables.filter(r => r.contractId === contract.id && (r.status || '').toLowerCase() === 'overdue').reduce((acc, curr) => acc + (curr.balanceDueRaw || 0), 0);
+                                const overdueVal = receivables.filter(r => {
+                                  const status = (r.status || '').toLowerCase();
+                                  return r.contractId === contract.id && (status === 'overdue' || status === 'vencido');
+                                }).reduce((acc, curr) => acc + (curr.balanceDueRaw || 0), 0);
+
                                 return (
                                   <>
                                     ${overdueVal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
