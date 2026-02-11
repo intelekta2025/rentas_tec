@@ -244,8 +244,8 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack, t
 
     // Export to Excel
     const handleExportExcel = () => {
-        // Prepare data for export
-        const exportData = filteredClients.map(client => {
+        // Prepare client summary data
+        const summaryData = filteredClients.map(client => {
             const maxDays = Math.max(...client.invoices.map(i => i.daysOverdue));
             const totalDebt = clientDebt(client);
             const status = getClientStatus(client);
@@ -262,10 +262,33 @@ export default function CollectionDashboard({ unitName, onClientClick, onBack, t
             };
         });
 
-        // Create worksheet and workbook
-        const ws = XLSX.utils.json_to_sheet(exportData);
+        // Prepare detailed invoice data
+        const detailData = [];
+        filteredClients.forEach(client => {
+            client.invoices.forEach(invoice => {
+                detailData.push({
+                    'Cliente / Razón Social': client.clientName || '',
+                    'Email': client.contactEmail || '',
+                    'Teléfono': client.contactPhone || '',
+                    'Concepto': invoice.concept || '',
+                    'Fecha Vencimiento': invoice.date || '',
+                    'Días Vencido': invoice.daysOverdue || 0,
+                    'Estado': invoice.daysOverdue > 30 ? 'Crítico' : 'Vencido',
+                    'Monto': invoice.amount || 0
+                });
+            });
+        });
+
+        // Create workbook with two sheets
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Cobranza');
+
+        // Sheet 1: Client Summary
+        const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+        XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen Clientes');
+
+        // Sheet 2: Invoice Details
+        const wsDetail = XLSX.utils.json_to_sheet(detailData);
+        XLSX.utils.book_append_sheet(wb, wsDetail, 'Detalle CXC');
 
         // Generate filename with current date
         const date = new Date().toISOString().split('T')[0];
